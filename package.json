@@ -1,0 +1,170 @@
+{
+  "name": "repo-ask",
+  "displayName": "RepoAsk",
+  "description": "VS Code extension with Sidebar and Chat Participant",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.96.0",
+    "node": ">=22.9.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "repo-ask-sidebar",
+          "title": "RepoAsk",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "repo-ask-sidebar": [
+        {
+          "type": "webview",
+          "id": "repo-ask.sidebarView",
+          "name": "RepoAsk Chat"
+        }
+      ]
+    },
+    "chatParticipants": [
+      {
+        "id": "repo-ask.repo-ask",
+        "name": "repo-ask",
+        "description": "Assistant to ask questions about the repository content.",
+        "isSticky": true,
+        "commands": [
+          {
+            "name": "help",
+            "description": "Get help with the plugin"
+          }
+        ]
+      }
+    ],
+    "commands": [
+      {
+        "command": "repo-ask.openChat",
+        "title": "Open Chat Window"
+      },
+      {
+        "command": "repo-ask.feedbackAccept",
+        "title": "Accept Answer"
+      },
+      {
+        "command": "repo-ask.feedbackReject",
+        "title": "Reject Answer"
+      },
+      {
+        "command": "repo-ask.feedbackConfluence",
+        "title": "Add to Confluence"
+      }
+    ],
+    "configuration": {
+      "title": "RepoAsk",
+      "properties": {
+        "repo-ask.backendUrl": {
+          "type": "string",
+          "default": "http://localhost:14321",
+          "description": "URL of the local RAG backend server"
+        },
+        "repo-ask.jira.urls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "List of Jira URLs"
+        },
+        "repo-ask.jira.personalToken": {
+          "type": "string",
+          "default": "",
+          "description": "Personal Access Token for Jira"
+        },
+        "repo-ask.jira.instance": {
+          "type": "string",
+          "default": "alm",
+          "description": "Jira instance"
+        },
+        "repo-ask.confluence.urls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "List of Confluence URLs"
+        },
+        "repo-ask.confluence.personalToken": {
+          "type": "string",
+          "default": "",
+          "description": "Personal Access Token for Confluence"
+        },
+        "repo-ask.confluence.instance": {
+          "type": "string",
+          "default": "alm",
+          "description": "Confluence instance"
+        },
+        "repo-ask.github.urls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "List of GitHub URLs"
+        },
+        "repo-ask.github.personalToken": {
+          "type": "string",
+          "default": "",
+          "description": "Personal Access Token for GitHub"
+        },
+        "repo-ask.github.instance": {
+          "type": "string",
+          "default": "alm",
+          "description": "GitHub instance"
+        },
+        "repo-ask.bitbucket.urls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "List of Bitbucket URLs"
+        },
+        "repo-ask.bitbucket.personalToken": {
+          "type": "string",
+          "default": "",
+          "description": "Personal Access Token for Bitbucket"
+        },
+        "repo-ask.bitbucket.instance": {
+          "type": "string",
+          "default": "alm",
+          "description": "Bitbucket instance"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.96.0",
+    "@types/glob": "^8.1.0",
+    "@types/mocha": "^10.0.1",
+    "@types/node": "22.9.0",
+    "@typescript-eslint/eslint-plugin": "^5.59.1",
+    "@typescript-eslint/parser": "^5.59.1",
+    "eslint": "^8.39.0",
+    "glob": "^8.1.0",
+    "mocha": "^10.2.0",
+    "typescript": "^5.0.4",
+    "@vscode/test-electron": "^2.3.0"
+  }
+}

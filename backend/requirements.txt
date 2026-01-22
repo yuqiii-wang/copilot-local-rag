@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+paddlepaddle
+paddleocr
+sqlalchemy
+psycopg2-binary
+python-multipart
+

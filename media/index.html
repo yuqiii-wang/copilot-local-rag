@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RepoAsk Sidebar</title>
+    <style>
+        body { font-family: var(--vscode-font-family); padding: 10px; padding-bottom: 60px; /* Make room for sticky footer */ }
+        button { width: 25%; margin-bottom: 10px; padding: 5px; display: block; }
+        .image-upload { border: 1px dashed var(--vscode-descriptionForeground); padding: 20px; text-align: center; transition: all 0.2s; cursor: pointer; }
+        .image-upload.drag-over { border-color: var(--vscode-focusBorder); background-color: var(--vscode-editor-selectionBackground); }
+        #ocr-result { margin-top: 20px; white-space: pre-wrap; background-color: var(--vscode-editor-background); padding: 10px; border: 1px solid var(--vscode-input-border); display: none; }
+        #ocr-result h4 { margin-top: 0; }
+        .spinner {
+            border: 4px solid var(--vscode-editor-background);
+            border-top: 4px solid var(--vscode-progressBar-background);
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: none;
+            margin: 10px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .link-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; padding: 2px 0; border-bottom: 1px solid var(--vscode-widget-border); }
+        .link-item a { flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 10px; }
+        .remove-link-btn { cursor: pointer; color: var(--vscode-errorForeground); font-weight: bold; padding: 0 5px; }
+        .remove-link-btn:hover { background-color: var(--vscode-toolbar-hoverBackground); border-radius: 3px; }
+        
+        .feedback-container {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background-color: var(--vscode-editor-background);
+            border-top: 1px solid var(--vscode-widget-border);
+            padding: 10px;
+            box-sizing: border-box;
+            display: none; /* Hidden by default until AI responds */
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .feedback-buttons {
+            display: flex;
+            justify-content: space-between;
+            gap: 5px;
+        }
+
+        .feedback-buttons button {
+            width: 100%; 
+            margin-bottom: 0;
+            font-size: 0.9em;
+        }
+        
+        #feedback-comment-area {
+            display: none;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h3>RepoAsk</h3>
+    
+    <div class="image-upload" id="drop-zone">
+        <p style="margin-top: 0; margin-bottom: 10px;">Drag & Drop Images</p>
+        <button type="button">Choose Files</button>
+        <input type="file" id="image-input" accept="image/*" multiple style="display: none;" />
+        <div id="image-preview" style="display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; justify-content: center;"></div>
+    </div>
+
+    <div style="margin-top: 15px;">
+        <textarea id="manual-text-input" placeholder="Type or paste text here..." style="width: 100%; min-height: 80px; box-sizing: border-box; background-color: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); padding: 5px; font-family: inherit; resize: vertical;"></textarea>
+        <!-- Removed inline style width: 100% to follow the 1/4 requirement -->
+        <button id="query-btn" style="margin-top: 5px;">Find Documents</button>
+    </div>
+
+    <div id="loading-spinner" class="spinner"></div>
+
+    <div id="rag-result" style="display: none; margin-top: 15px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+            <h4 style="margin: 0;">RAG Results:</h4>
+            <button id="add-link-btn" style="width: auto; padding: 2px 8px; margin: 0;">+</button>
+        </div>
+        <ul id="rag-content" style="padding-left: 0; list-style-type: none; margin: 0;"></ul>
+        
+        <div id="add-link-form" style="display: none; margin-top: 10px; border: 1px solid var(--vscode-input-border); padding: 10px;">
+            <input type="text" id="new-link-title" placeholder="Title" style="width: 100%; margin-bottom: 5px; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); padding: 4px;">
+            <input type="text" id="new-link-url" placeholder="URL" style="width: 100%; margin-bottom: 5px; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); padding: 4px;">
+            <div style="display: flex; gap: 5px;">
+                <button id="save-link-btn" style="width: 50%;">Save</button>
+                <button id="cancel-link-btn" style="width: 50%;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="ocr-result">
+        <h4>Found text from images</h4>
+        <div id="ocr-content"></div>
+        <div style="display: flex; gap: 5px; margin-top: 10px;">
+            <button id="edit-btn">Edit</button>
+            <button id="confirm-btn" style="display: none;">Confirm</button>
+        </div>
+    </div>
+    <button id="send-btn" style="margin-top: 10px; display: none;">Ask in AI Chat</button>
+
+    <div id="feedback-container" class="feedback-container">
+        <div class="feedback-buttons">
+            <button id="accept-btn" title="Accept Answer">Accept</button>
+            <button id="reject-btn" title="Reject Answer">Reject</button>
+            <button id="add-confluence-btn" title="Add to new Confluence">Add to Confluence</button>
+        </div>
+        <div id="feedback-comment-area">
+             <input type="text" id="feedback-comment" placeholder="Add comments..." style="width: 100%; box-sizing: border-box; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); padding: 4px; margin-bottom: 5px;">
+             <button id="submit-feedback-btn" style="width: 100%">Submit Feedback</button>
+             <button id="cancel-feedback-btn" style="width: 100%; margin-top: 5px;">Cancel</button>
+        </div>
+    </div>
+
+    <script>
+        const vscode = acquireVsCodeApi();
+        
+        const ocrContent = document.getElementById('ocr-content');
+        const editBtn = document.getElementById('edit-btn');
+        const sendBtn = document.getElementById('send-btn');
+        const confirmBtn = document.getElementById('confirm-btn');
+        const queryBtn = document.getElementById('query-btn');
+        const spinner = document.getElementById('loading-spinner');
+        const feedbackContainer = document.getElementById('feedback-container');
+        const acceptBtn = document.getElementById('accept-btn');
+        const rejectBtn = document.getElementById('reject-btn');
+        const addConfluenceBtn = document.getElementById('add-confluence-btn');
+        const feedbackCommentArea = document.getElementById('feedback-comment-area');
+        const feedbackCommentInput = document.getElementById('feedback-comment');
+        const submitFeedbackBtn = document.getElementById('submit-feedback-btn');
+        const cancelFeedbackBtn = document.getElementById('cancel-feedback-btn');
+
+        let currentFeedbackAction = null;
+        let currentFeedbackData = null;
+
+        // ... existing code ...
+        // Link management elements
+
+        const ragList = document.getElementById('rag-content');
+        const addLinkBtn = document.getElementById('add-link-btn');
+        const addLinkForm = document.getElementById('add-link-form');
+        const saveLinkBtn = document.getElementById('save-link-btn');
+        const cancelLinkBtn = document.getElementById('cancel-link-btn');
+        const newLinkTitle = document.getElementById('new-link-title');
+        const newLinkUrl = document.getElementById('new-link-url');
+
+        function createLinkItem(title, url) {
+            const li = document.createElement('li');
+            li.className = 'link-item';
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.innerText = title;
+            a.title = url;
+            
+            const removeSpan = document.createElement('span');
+            removeSpan.className = 'remove-link-btn';
+            removeSpan.innerHTML = '&times;';
+            removeSpan.title = 'Remove';
+            removeSpan.onclick = () => {
+                li.remove();
+                // Hide container if list empty? Optional.
+            };
+            
+            li.appendChild(a);
+            li.appendChild(removeSpan);
+            return li;
+        }
+
+        addLinkBtn.addEventListener('click', () => {
+            addLinkForm.style.display = 'block';
+            addLinkBtn.style.display = 'none';
+        });
+
+        cancelLinkBtn.addEventListener('click', () => {
+            addLinkForm.style.display = 'none';
+            addLinkBtn.style.display = 'block';
+            newLinkTitle.value = '';
+            newLinkUrl.value = '';
+        });
+
+        saveLinkBtn.addEventListener('click', () => {
+            let title = newLinkTitle.value.trim();
+            const url = newLinkUrl.value.trim();
+            
+            if (url) {
+                if (!title) {
+                    title = url;
+                }
+                ragList.appendChild(createLinkItem(title, url));
+                addLinkForm.style.display = 'none';
+                addLinkBtn.style.display = 'block';
+                newLinkTitle.value = '';
+                newLinkUrl.value = '';
+            } else {
+                 // Highlight error on url field if needed
+                 newLinkUrl.style.borderColor = 'var(--vscode-errorForeground)';
+                 setTimeout(() => {
+                     newLinkUrl.style.borderColor = 'var(--vscode-input-border)';
+                 }, 2000);
+            }
+        });
+
+        queryBtn.addEventListener('click', () => {
+            spinner.style.display = 'block';
+            const ocrText = ocrContent.innerText;
+            const manualText = document.getElementById('manual-text-input').value;
+            const textToSend = [manualText, ocrText].filter(t => t && t.trim()).join('\n\n');
+            vscode.postMessage({ type: 'queryRag', text: textToSend });
+        });
+
+        editBtn.addEventListener('click', () => {
+            ocrContent.contentEditable = 'true';
+            ocrContent.style.border = '1px solid var(--vscode-focusBorder)';
+            ocrContent.focus();
+            editBtn.style.display = 'none';
+            confirmBtn.style.display = 'block';
+        });
+
+        confirmBtn.addEventListener('click', () => {
+            ocrContent.contentEditable = 'false';
+            ocrContent.style.border = 'none';
+            editBtn.style.display = 'block';
+            confirmBtn.style.display = 'none';
+        });
+
+        sendBtn.addEventListener('click', () => {
+            spinner.style.display = 'block';
+            const ocrText = ocrContent.innerText;
+            const manualText = document.getElementById('manual-text-input').value;
+            
+            // Gather all links
+            const links = [];
+            const linkItems = ragList.getElementsByTagName('li');
+            for (let item of linkItems) {
+                const anchor = item.getElementsByTagName('a')[0];
+                if (anchor && anchor.href) {
+                     links.push(anchor.href);
+                }
+            }
+
+            vscode.postMessage({ 
+                type: 'processAndChat', 
+                manualText: manualText,
+                ocrText: ocrText,
+                urls: links
+            });
+        });
+
+        function handleFiles(files) {
+            const previewContainer = document.getElementById('image-preview');
+            const spinner = document.getElementById('loading-spinner');
+            
+            if (files && files.length > 0) {
+                 spinner.style.display = 'block';
+                 Array.from(files).forEach(file => {
+                     const reader = new FileReader();
+                     reader.onload = function(evt) {
+                         const arrayBuffer = evt.target.result;
+                         
+                         // Create preview image
+                         const blob = new Blob([arrayBuffer], { type: file.type });
+                         const imageUrl = URL.createObjectURL(blob);
+                         const imgElement = document.createElement('img');
+                         imgElement.src = imageUrl;
+                         imgElement.style.width = '50px';
+                         imgElement.style.height = '50px';
+                         imgElement.style.objectFit = 'cover';
+                         imgElement.style.border = '1px solid var(--vscode-widget-border)';
+                         previewContainer.appendChild(imgElement);
+
+                         // Convert ArrayBuffer to Array for serializing
+                         const data = Array.from(new Uint8Array(arrayBuffer));
+                         vscode.postMessage({ 
+                             type: 'uploadImage', 
+                             fileName: file.name,
+                             data: data 
+                         });
+                     };
+                     reader.readAsArrayBuffer(file);
+                 });
+            }
+        }
+
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('image-input');
+
+        dropZone.addEventListener('click', (e) => {
+            if (e.target !== fileInput) {
+                fileInput.click();
+            }
+        });
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drag-over');
+        });
+
+        dropZone.addEventListener('dragleave', (e) => {
+            dropZone.classList.remove('drag-over');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            handleFiles(e.dataTransfer.files);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+             // Clear input to allow re-uploading same files
+             e.target.value = '';
+        });
+
+        // Feedback handling
+        function showFeedbackInput(action) {
+            currentFeedbackAction = action;
+            feedbackCommentArea.style.display = 'block';
+            document.querySelector('.feedback-buttons').style.display = 'none'; // Hide buttons while commenting
+        }
+
+        acceptBtn.addEventListener('click', () => {
+             showFeedbackInput('accept');
+        });
+        
+        rejectBtn.addEventListener('click', () => {
+             showFeedbackInput('reject');
+        });
+
+        addConfluenceBtn.addEventListener('click', () => {
+            // For now treat as accept or generic feedback
+             showFeedbackInput('addConfluence');
+        });
+
+        cancelFeedbackBtn.addEventListener('click', () => {
+             feedbackCommentArea.style.display = 'none';
+             document.querySelector('.feedback-buttons').style.display = 'flex';
+             currentFeedbackAction = null;
+        });
+
+        submitFeedbackBtn.addEventListener('click', () => {
+             const comments = feedbackCommentInput.value;
+             const ocrText = ocrContent.innerText;
+             const manualText = document.getElementById('manual-text-input').value; // Get latest text
+
+             let payload = {
+                 type: 'submitFeedback',
+                 action: currentFeedbackAction,
+                 comments: comments,
+                 manualText: manualText,
+                 ocrText: ocrText
+             };
+
+             if (currentFeedbackData) {
+                 payload = { ...payload, ...currentFeedbackData };
+             }
+
+             vscode.postMessage(payload);
+
+             // Reset UI
+             feedbackCommentArea.style.display = 'none';
+             document.querySelector('.feedback-buttons').style.display = 'flex';
+             feedbackContainer.style.display = 'none'; // Hide feedback after submission? Or keep it? Assuming hide for now.
+             feedbackCommentInput.value = '';
+             currentFeedbackAction = null;
+             currentFeedbackData = null;
+        });
+
+        window.addEventListener('message', event => {
+            const message = event.data;
+            const spinner = document.getElementById('loading-spinner');
+
+            if (message.type === 'ocrResult' || message.type === 'error' || message.type === 'ragResult' || message.type === 'processingComplete') {
+                 if (spinner) spinner.style.display = 'none';
+            }
+
+            if (message.type === 'processingComplete') {
+                if (feedbackContainer) feedbackContainer.style.display = 'flex';
+            }
+
+            switch (message.type) {
+                case 'triggerFeedback':
+                    if (message.data) {
+                        currentFeedbackData = message.data;
+                    }
+                    showFeedbackInput(message.action);
+                    break;
+                case 'ragResult':
+                    const ragDiv = document.getElementById('rag-result');
+                    // ragList is already defined globally now
+                    const sendBtnRag = document.getElementById('send-btn');
+                    
+                    ragList.innerHTML = '';
+                    if (message.results && message.results.length > 0) {
+                        message.results.forEach(item => {
+                            ragList.appendChild(createLinkItem(item.title, item.link));
+                        });
+                        ragDiv.style.display = 'block';
+                         if (sendBtnRag) sendBtnRag.style.display = 'block';
+                    }
+                    break;
+                case 'ocrResult':
+                    const resultDiv = document.getElementById('ocr-result');
+                    const contentDiv = document.getElementById('ocr-content');
+                    const sendBtn = document.getElementById('send-btn');
+                    resultDiv.style.display = 'block';
+                    if (sendBtn) sendBtn.style.display = 'block';
+                    const newText = (contentDiv.innerText ? '\n\n---\n\n' : '') + message.text;
+                    contentDiv.innerText = newText;
+                    break;
+                case 'error':
+                     const resultDivErr = document.getElementById('ocr-result');
+                     const contentDivErr = document.getElementById('ocr-content');
+                     resultDivErr.style.display = 'block';
+                     const errorText = (contentDivErr.innerText ? '\n\n---\n\n' : '') + 'Error: ' + message.message;
+                     contentDivErr.innerText = errorText;
+                     break;
+            }
+        });
+    </script>
+</body>
+</html>
