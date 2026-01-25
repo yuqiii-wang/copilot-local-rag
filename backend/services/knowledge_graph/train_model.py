@@ -63,11 +63,18 @@ def train():
     with open(QA_FILE, 'r') as f:
         qa_data = json.load(f)
     
-    prior_weight = 100.0 # "Very high weight" as requested
+    prior_weight = 1.0 # Reduced from 100.0 to 1.0 to match TF-IDF scale
     
     vocab_map = fg.vectorizer.vocabulary_ # Word -> Index
     
     priors_injected_count = 0
+    
+    # Pre-calculate frequency of each query keyword in the QA dataset
+    query_keyword_counts = {}
+    for query in qa_data.keys():
+        for token in clean_and_tokenize(query):
+             query_keyword_counts[token] = query_keyword_counts.get(token, 0) + 1
+
     for query, target_files in qa_data.items():
         # Tokenize query to match vocab tokens using the SAME logic as ingestion
         query_tokens = clean_and_tokenize(query)
@@ -75,6 +82,18 @@ def train():
         for token in query_tokens:
             if token in vocab_map:
                 kw_idx = vocab_map[token]
+                
+                # Dynamic weighting based on Inverse Frequency in QA Dataset
+                # If a token appears in only 1 query, it's highly specific -> Boost its weight significantly
+                freq = query_keyword_counts.get(token, 1)
+                # Formula: Base Weight * (1 + 1/freq) - simple boost for rare terms
+                # Or stronger: Base Weight * (Total Queries / freq) - standard IDF-like
+                # Let's use a strong multiplier for unique items
+                if freq == 1:
+                    current_weight = prior_weight * 5.0 # Boost to 5.0 for unique
+                else:
+                    current_weight = prior_weight
+                
                 for fname in target_files:
                     # Fix: Dataset paths vs FeatureGenerator keys match
                     # FeatureGenerator stores just the filename (basename)
@@ -83,27 +102,29 @@ def train():
                     if fname_key in fg.file_map:
                         doc_idx = fg.file_map[fname_key]
                         # Boost Feature: Keyword Presence in Doc
-                        X[doc_idx, kw_idx] += prior_weight
+                        X[doc_idx, kw_idx] += current_weight
                         priors_injected_count += 1
                         
     print(f"Injected {priors_injected_count} QA priors into feature matrix.")
 
     # 3b. Inject Code Priors (Strings and Dependencies)
     print("Injecting Code Priors from Java analysis...")
-    # Assume source code is in 'services/knowledge_graph/dummy_dataset/dummy_trading_sys_java/src'
-    # In a real app, this path would be dynamic
-    code_root = os.path.join("services", "knowledge_graph", "dummy_dataset", "dummy_trading_sys_java", "src")
+    # Assume source code is in 'services/knowledge_graph/dummy_dataset/dummy_trading_sys_java' (includes src and test)
+    code_root = os.path.join("services", "knowledge_graph", "dummy_dataset", "dummy_trading_sys_java")
     indexer = JavaCodeIndexer(code_root)
     indexer.index_project()
-    code_priors = indexer.get_code_priors(hard_weight=50.0, decay=0.5)
+    code_priors = indexer.get_code_priors(hard_weight=2.0, decay=0.5) # Reduced hard_weight to 2.0
     
     code_prior_count = 0
     for token, file_weights in code_priors.items():
         if token in vocab_map:
             kw_idx = vocab_map[token]
             for fname, weight in file_weights.items():
-                 if fname in fg.file_map: # Check if file exists in our feature set
-                     doc_idx = fg.file_map[fname]
+                 # Fix: Ensure fname matches the keys in fg.file_map (which are simple filenames)
+                 fname_key = os.path.basename(fname)
+                 
+                 if fname_key in fg.file_map: # Check if file exists in our feature set
+                     doc_idx = fg.file_map[fname_key]
                      X[doc_idx, kw_idx] += weight
                      code_prior_count += 1
                      
@@ -162,7 +183,11 @@ def train():
     print("Generating knowledge graph mapping...")
     model.eval()
     with torch.no_grad():
-        final_scores = model(X, hyperedge_index).numpy() # [Docs, Keywords]
+        gnn_scores = model(X, hyperedge_index)
+        # Add Input Features to Output Scores (Residual/Skip Connection for Inference)
+        # This boosts the score of documents that actually contain the term (from TF-IDF or Priors)
+        # helping distinguish them from neighbors that only get "leaked" signal.
+        final_scores = (gnn_scores + X).numpy() # [Docs, Keywords]
         
     # We want "Keyword -> Related Documents".
     
@@ -184,7 +209,7 @@ def train():
             doc_types[name] = d_type
 
         count = 0
-        threshold = 0.1 # Loosened threshold to allow more entities (TF-IDF often < 1.0)
+        threshold = 0.5 # Loosened threshold to allow more entities (TF-IDF often < 1.0)
         
         for k_idx, keyword in enumerate(vocab_list):
             # Get docs for this keyword

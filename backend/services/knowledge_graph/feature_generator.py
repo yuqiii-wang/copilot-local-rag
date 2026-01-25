@@ -99,6 +99,28 @@ class FeatureGenerator:
                     except Exception as e:
                         print(f"Error reading {file}: {e}")
         
+        # Add QA Dataset keys as a "synthetic" document to ensure they exist in vocabulary
+        # if min_df=2 is set. 
+        # This increases the document frequency of these terms by 1.
+        qa_file_path = os.path.join(root_dir, "qa_dataset.json")
+        if os.path.exists(qa_file_path):
+            try:
+                import json
+                with open(qa_file_path, 'r') as f:
+                    qa_data = json.load(f)
+                
+                # Extract all tokens from keys
+                all_qa_tokens = []
+                for query in qa_data.keys():
+                    all_qa_tokens.extend(clean_and_tokenize(query))
+                
+                # Combine into one document
+                qa_doc_content = " ".join(all_qa_tokens)
+                file_list.append(("__QA_KEYS_METADATA__", qa_doc_content))
+                print(f"Loaded QA Dataset Metada as synthetic document with {len(all_qa_tokens)} tokens")
+            except Exception as e:
+                print(f"Error loading QA dataset metadata: {e}")
+
         # Sort to ensure consistent mapping
         file_list.sort(key=lambda x: x[0])
         

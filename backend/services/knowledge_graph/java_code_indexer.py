@@ -34,11 +34,19 @@ class JavaCodeIndexer:
             
             tree = javalang.parse.parse(content)
             
-            # 1. Identify Class Definition (Map Class -> File)
+            # 1. Identify Class Definition (Map Class -> File) AND Inheritance
             for path, node in tree:
                 if isinstance(node, javalang.tree.ClassDeclaration):
                     self.class_to_file[node.name] = filename
                     
+                    # Handle Inheritance Dependencies here (merged)
+                    if node.extends:
+                         if isinstance(node.extends, list):
+                             for ext in node.extends:
+                                 if hasattr(ext, 'name'): self.pending_deps[filename].add(ext.name)
+                         elif hasattr(node.extends, 'name'):
+                             self.pending_deps[filename].add(node.extends.name)
+
                 # 2. Identify String Literals (Logs, Errors)
                 elif isinstance(node, javalang.tree.Literal):
                     val = str(node.value)
@@ -51,17 +59,12 @@ class JavaCodeIndexer:
                     if node.type and hasattr(node.type, 'name'):
                         self.pending_deps[filename].add(node.type.name)
                 
-                # 4. Identify Dependencies (Inheritance)
-                elif isinstance(node, javalang.tree.ClassDeclaration):
-                    if node.extends:
-                         if isinstance(node.extends, list):
-                             for ext in node.extends:
-                                 if hasattr(ext, 'name'): self.pending_deps[filename].add(ext.name)
-                         elif hasattr(node.extends, 'name'):
-                             self.pending_deps[filename].add(node.extends.name)
+                # 4. Identify Dependencies (Inheritance) - REMOVED (Merged into Step 1)
+
 
         except Exception as e:
-            # print(f"Failed to parse {file_path}: {e}")
+            if 'Test' in filename:
+                print(f"Failed to parse {filename}: {e}")
             pass
 
     def _resolve_dependencies(self):
@@ -77,25 +80,52 @@ class JavaCodeIndexer:
         """
         Generates priors:
         - String Literals -> File (Hard Weight)
-        - String Literals -> Dependent Files (Decaying Weight)
+        - String Literals -> Dependent Files (Decaying Weight - Transitive/Deep)
         """
         priors = defaultdict(lambda: defaultdict(float)) # token -> {filename: weight}
         
+        # We want to propagate from Source (contains string) -> Downstream Dependencies
+        # If OptionTest contains "USOPTIONS4", and OptionTest -> DummyTestBase -> ExecutionEngine
+        # We want "USOPTIONS4" to have weight in DummyTestBase and ExecutionEngine.
+        
+        # Precompute all-pairs shortest paths or just do BFS for each source
+        # using networkx.
+        
         for filename, strings in self.file_literals.items():
+            if not strings: continue
+            
+            # Find all reachable nodes from 'filename' in the dependency graph
+            # We want to go "down" the dependency chain.
+            # If A depends on B (A->B), and A has string "S".
+            # "S" is contextually relevant to B (because A uses B in the context of S).
+            
+            # BFS to find all descendants
+            descendants = {} # filename -> distance
+            
+            if filename in self.file_dependency_graph:
+                # Use BFS to get distances
+                for v in self.file_dependency_graph.nodes():
+                    if v == filename: continue
+                    try:
+                        path_len = nx.shortest_path_length(self.file_dependency_graph, source=filename, target=v)
+                        descendants[v] = path_len
+                    except nx.NetworkXNoPath:
+                        pass
+            
             for s in strings:
-                # Tokenize string
                 tokens = clean_and_tokenize(s)
                 for t in tokens:
-                    # Hard Bind to current file
+                    # 1. Hard Bind to current file (Source)
                     priors[t][filename] += hard_weight
                     
-                    # Propagate to dependencies (Diminishing weight)
-                    # If File A depends on File B, and File A has a log string, 
-                    # File B (the context) is somewhat relevant.
-                    if filename in self.file_dependency_graph:
-                        neighbors = list(self.file_dependency_graph.successors(filename))
-                        for neighbor in neighbors:
-                             priors[t][neighbor] += (hard_weight * decay)
+                    # 2. Propagate to dependencies with decay based on distance
+                    for neighbor, distance in descendants.items():
+                         # Weight = Hard * (Decay ^ Distance)
+                         # e.g., dist=1 (DummyTestBase), weight = 10 * 0.5 = 5
+                         # dist=2 (ExecutionEngine), weight = 10 * 0.25 = 2.5
+                         weight = hard_weight * (decay ** distance)
+                         if weight > 0.01: # Cutoff
+                             priors[t][neighbor] += weight
                              
         return priors
 

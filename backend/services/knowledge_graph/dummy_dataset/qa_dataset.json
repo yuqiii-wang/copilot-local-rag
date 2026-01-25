@@ -54,34 +54,35 @@
     "dummy_trading_sys_java/src/com/trading/dummy/model/MarginRequirement.java"
   ],
   "TRD-1": [
+    "dummy_trading_sys_confluence/Risk_Management_Policy.txt",
     "dummy_trading_sys_jira/TRD-1.txt",
-    "dummy_trading_sys_confluence/System_Overview.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/TradingSystem.java"
+    "dummy_trading_sys_jira/TRD-2.txt",
+    "dummy_trading_sys_jira/TRD-3.txt",
+    "dummy_trading_sys_jira/TRD-4.txt",
+    "dummy_trading_sys_jira/TRD-5.txt"
   ],
   "Core Architecture Ticket": [
     "dummy_trading_sys_jira/TRD-1.txt",
     "dummy_trading_sys_confluence/Architecture_Design.txt"
   ],
   "TRD-2": [
-    "dummy_trading_sys_jira/TRD-2.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/core/ExecutionEngine.java"
+    "dummy_trading_sys_jira/TRD-1.txt",
+    "dummy_trading_sys_jira/TRD-2.txt"
   ],
   "TRD-3": [
-    "dummy_trading_sys_jira/TRD-3.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/core/MarketGateway.java"
+    "dummy_trading_sys_jira/TRD-1.txt",
+    "dummy_trading_sys_jira/TRD-3.txt"
   ],
   "TRD-4": [
-    "dummy_trading_sys_jira/TRD-4.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Order.java"
+    "dummy_trading_sys_jira/TRD-1.txt",
+    "dummy_trading_sys_jira/TRD-4.txt"
   ],
   "TRD-5": [
-    "dummy_trading_sys_jira/TRD-5.txt",
-    "dummy_trading_sys_confluence/User_Guide_Placing_Orders.txt"
+    "dummy_trading_sys_jira/TRD-1.txt",
+    "dummy_trading_sys_jira/TRD-5.txt"
   ],
   "BUG-209": [
-    "dummy_trading_sys_jira/BUG-209.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Position.java",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Portfolio.java"
+    "dummy_trading_sys_jira/BUG-209.txt"
   ],
   "PnL calculation bug": [
     "dummy_trading_sys_jira/BUG-209.txt",
@@ -93,18 +94,16 @@
     "dummy_trading_sys_java/src/com/trading/dummy/model/Position.java"
   ],
   "MKT-101": [
-    "dummy_trading_sys_jira/MKT-101.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/core/MarketGateway.java",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/MarketData.java"
+    "dummy_trading_sys_jira/MKT-101.txt"
   ],
   "OPS-12": [
-    "dummy_trading_sys_jira/OPS-12.txt",
-    "dummy_trading_sys_confluence/Developer_Setup.txt"
+    "dummy_trading_sys_confluence/Incident_Report_2023_11_05.txt",
+    "dummy_trading_sys_jira/OPS-12.txt"
   ],
   "RSK-1": [
     "dummy_trading_sys_jira/RSK-1.txt",
-    "dummy_trading_sys_confluence/Risk_Management_Policy.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/RiskLimit.java"
+    "dummy_trading_sys_jira/RSK-2.txt",
+    "dummy_trading_sys_jira/RSK-3.txt"
   ],
   "Risk Management Epic": [
     "dummy_trading_sys_jira/RSK-1.txt",
@@ -112,11 +111,10 @@
   ],
   "RSK-2": [
     "dummy_trading_sys_jira/RSK-2.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Collateral.java"
+    "dummy_trading_sys_jira/TRD-5.txt"
   ],
   "RSK-3": [
-    "dummy_trading_sys_jira/RSK-3.txt",
-    "dummy_trading_sys_confluence/API_Reference_Margin_Service.txt"
+    "dummy_trading_sys_jira/RSK-3.txt"
   ],
   "Order Class": [
     "dummy_trading_sys_java/src/com/trading/dummy/model/Order.java",
@@ -476,7 +474,7 @@
     "dummy_trading_sys_java/test/com/trading/dummy/EquityTest.java"
   ],
   "Future Multiplier": [
-     "dummy_trading_sys_java/test/com/trading/dummy/FutureTest.java"
+    "dummy_trading_sys_java/test/com/trading/dummy/FutureTest.java"
   ],
   "US02079K3059": [
     "dummy_trading_sys_java/test/com/trading/dummy/EquityTest.java"
@@ -485,7 +483,12 @@
     "dummy_trading_sys_java/test/com/trading/dummy/FutureTest.java"
   ],
   "US0378331005": [
-    "dummy_trading_sys_java/test/com/trading/dummy/OrderTest.java"
+    "dummy_trading_sys_java/test/com/trading/dummy/EquityTest.java",
+    "dummy_trading_sys_java/test/com/trading/dummy/FutureTest.java",
+    "dummy_trading_sys_java/test/com/trading/dummy/OptionTest.java",
+    "dummy_trading_sys_java/test/com/trading/dummy/OrderTest.java",
+    "dummy_trading_sys_java/test/com/trading/dummy/core/ExecutionEngineTest.java",
+    "dummy_trading_sys_java/test/com/trading/dummy/core/MarketGatewayTest.java"
   ],
   "US0231351067": [
     "dummy_trading_sys_java/test/com/trading/dummy/EquityTest.java"
@@ -500,7 +503,8 @@
     "dummy_trading_sys_java/test/com/trading/dummy/EquityTest.java"
   ],
   "US64110L1061": [
-    "dummy_trading_sys_java/test/com/trading/dummy/EquityTest.java"
+    "dummy_trading_sys_java/test/com/trading/dummy/EquityTest.java",
+    "dummy_trading_sys_java/test/com/trading/dummy/OptionTest.java"
   ],
   "US1234567891": [
     "dummy_trading_sys_java/test/com/trading/dummy/BondTest.java"
@@ -518,28 +522,27 @@
     "dummy_trading_sys_java/test/com/trading/dummy/OptionTest.java"
   ],
   "USOPTIONS1": [
-     "dummy_trading_sys_java/test/com/trading/dummy/OptionTest.java"
+    "dummy_trading_sys_java/test/com/trading/dummy/OptionTest.java"
   ],
   "USOPTIONS2": [
-     "dummy_trading_sys_java/test/com/trading/dummy/OptionTest.java"
+    "dummy_trading_sys_java/test/com/trading/dummy/OptionTest.java"
   ],
   "USOPTIONS3": [
-     "dummy_trading_sys_java/test/com/trading/dummy/OptionTest.java"
+    "dummy_trading_sys_java/test/com/trading/dummy/OptionTest.java"
   ],
   "USOPTIONS4": [
-     "dummy_trading_sys_java/test/com/trading/dummy/OptionTest.java"
+    "dummy_trading_sys_java/test/com/trading/dummy/OptionTest.java"
   ],
   "OPT-301": [
-    "dummy_trading_sys_jira/OPT-301.txt",
-    "dummy_trading_sys_confluence/Options_Trading_Spec.txt"
+    "dummy_trading_sys_jira/OPT-301.txt"
   ],
   "FUT-402": [
-    "dummy_trading_sys_jira/FUT-402.txt",
-    "dummy_trading_sys_confluence/Futures_Roll_Procedure.txt"
+    "dummy_trading_sys_confluence/Futures_Roll_Procedure.txt",
+    "dummy_trading_sys_jira/FUT-402.txt"
   ],
   "OPS-15": [
-    "dummy_trading_sys_jira/OPS-15.txt",
-    "dummy_trading_sys_confluence/Database_Schema_Migration.txt"
+    "dummy_trading_sys_confluence/Database_Schema_Migration.txt",
+    "dummy_trading_sys_jira/OPS-15.txt"
   ],
   "BUG-215": [
     "dummy_trading_sys_jira/BUG-215.txt"
