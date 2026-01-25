@@ -1,0 +1,21 @@
+Title: Futures Roll Procedure
+Space: Operations / Middle Office
+Author: Ops Manager
+Last Updated: 2023-12-05
+
+# Context
+Futures contracts expire. For example, `ES-DEC24` expires in December 2024. Traders usually want to maintain exposure, so they "roll" the position to `ES-MAR25`.
+
+# The Procedure (Manual)
+1.  **Notification**: 3 days before expiry, the system sends an email listing all open positions in the expiring contract.
+2.  **Close Leg**: Trader places a Market SELL order for the existing contract (e.g., Close 50 ES-DEC24).
+3.  **Open Leg**: Trader places a Market BUY order for the next contract (e.g., Open 50 ES-MAR25).
+
+# Automated Roll (Target State)
+We want to build a "Roll" button in the UI.
+*   **Action**: Atomic transaction creating two orders.
+*   **Price**: Executed as a "Calendar Spread" if the exchange supports it, otherwise two legs.
+*   **Risk**: The risk check should see this as a net-neutral risk event (delta remains similar), so we shouldn't block it on Gross Exposure if the temporary limits are tight.
+
+# Reference
+See JIRA Ticket: FUT-402 for settlement logic.

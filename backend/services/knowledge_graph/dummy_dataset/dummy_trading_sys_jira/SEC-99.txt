@@ -1,0 +1,13 @@
+Key: SEC-99
+Type: Task
+Summary: Security Audit for API Endpoints
+Status: Review
+Priority: High
+Description:
+The internal audit team flagged that `TradingSystem.placeOrder` does not validate the `userId` in the context.
+Basically, anyone can place an order for any account if they know the text ID.
+
+Remediation:
+- Implement a `UserContext` object.
+- Validates that `UserContext.acl` contains generic "WRITE" permission for `Portfolio.id`.
+- Log all unauthorized attempts as SECURITY_AUDIT events.

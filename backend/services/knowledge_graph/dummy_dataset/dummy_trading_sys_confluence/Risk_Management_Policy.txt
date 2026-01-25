@@ -1,0 +1,29 @@
+Title: Risk Management Policy
+Space: Compliance / Risk
+Author: Chief Risk Officer
+Last Updated: 2023-10-01
+
+# Purpose
+This document outlines the limitations and controls configured in the Trading System to protect firm capital.
+
+# 1. Pre-Trade Controls
+All orders must pass the following checks before being sent to the market:
+1.  **Limit Check**: Check if the User has exceeded their assigned Gross Exposure Limit.
+2.  **Price Band**: Limit orders must be within 10% of the last traded price (Not yet implemented, see Ticket TRD-102).
+3.  **Order Size**: Max quantity per order is capped at 10,000 units.
+
+# 2. Margin Requirements
+Accounts must maintain sufficient Equity to cover Margin Requirements.
+
+| Asset Class | Initial Margin (IM) | Maintenance Margin (MM) |
+| :--- | :--- | :--- |
+| **Equity (Major)** | 50% | 25% |
+| **Equity (Penny)** | 100% | 100% |
+| **Govt Bonds** | 5% | 3% |
+| **Cash** | 0% | 0% |
+
+# 3. Margin Call Process
+If `Total Collateral Value < Maintenance Margin`:
+1.  The account enters "Margin Call" state.
+2.  No new opening positions are allowed.
+3.  The user has 24h to post additional Collateral (Cash, T-Bills) or liquidate positions.

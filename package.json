@@ -76,7 +76,7 @@
           "items": {
             "type": "string"
           },
-          "default": [],
+          "default": ["http://localhost:14329"],
           "description": "List of Jira URLs"
         },
         "repo-ask.jira.personalToken": {
@@ -94,7 +94,7 @@
           "items": {
             "type": "string"
           },
-          "default": [],
+          "default": ["http://localhost:14329"],
           "description": "List of Confluence URLs"
         },
         "repo-ask.confluence.personalToken": {
@@ -130,7 +130,7 @@
           "items": {
             "type": "string"
           },
-          "default": [],
+          "default": ["http://localhost:14329"],
           "description": "List of Bitbucket URLs"
         },
         "repo-ask.bitbucket.personalToken": {

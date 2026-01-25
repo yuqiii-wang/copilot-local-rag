@@ -1,24 +1,20 @@
 class RAGService:
     def get_dummy_search_results(self, query: str = ""):
-        all_results = [
-            {"title": "Confluence: Project Apollo Specs", "link": "https://confluence.example.com/pages/viewpage.action?pageId=12345"},
-            {"title": "Jira: PROJ-123 - Backend API", "link": "https://jira.example.com/browse/PROJ-123"},
-            {"title": "GitHub: Commit 8a2b3c - Fix login bug", "link": "https://github.com/example/repo/commit/8a2b3c4d"},
-            {"title": "SharePoint: Q3 Roadmap.docx", "link": "https://company.sharepoint.com/sites/engineering/Shared%20Documents/Q3%20Roadmap.docx"},
-        ]
-        
-        if not query:
-            return all_results
-            
-        # Simple case-insensitive filter
-        query_lower = query.lower()
-        filtered = [r for r in all_results if query_lower in r['title'].lower()]
-        
-        # If no matches, return all (fallback) or return empty? 
-        # Usually RAG returns most relevant. If nothing matches, returning nothing is correct.
-        # But for valid demo, let's returns all if nothing matches, or maybe just the filtered list.
-        # Let's return filtered list to prove search works.
-        return filtered if filtered else all_results # Fallback to all if no match found for demo purposes
+        # --- Integration with Knowledge Graph Service ---
+        filtered = [] # Default empty
+        try:
+            from services.knowledge_graph_service import kg_service
+            print(f"Querying Knowledge Graph with: {query}")
+            kg_results = kg_service.query_graph(query)
+            if kg_results:
+                filtered = kg_results
+        except ImportError:
+            print("Knowledge Graph Service not available, falling back to dummy data.")
+            # Simple case-insensitive filter
+        except Exception as e:
+            print(f"Error during KG query: {e}")
+
+        return filtered if filtered else [] # Fallback to empty if no match found for demo purposes
 
     def process_feedback(self, action: str, query: str, ai_thinking: str = "", ai_answer: str = "", comments: str = ""):
         # Log feedback to file or database

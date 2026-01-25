@@ -1,0 +1,15 @@
+Key: MKT-105
+Type: Story
+Summary: Connect to new Bloomberg Feed Adapter
+Status: Grooming
+Priority: Low
+Description:
+The current random number generator in `SimplePricer` is not realistic enough for the QA team.
+We have purchased a license for the B-PIPE adapter.
+
+We need to implement `MarketDataSource` interface to consume the B-PIPE socket stream.
+
+Technical Notes:
+- The adapter provides prices for Equities and Futures.
+- Options support is separate.
+- Need to handle "Heartbeat" messages to detect disconnects.

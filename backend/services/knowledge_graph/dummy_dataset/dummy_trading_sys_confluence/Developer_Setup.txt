@@ -1,0 +1,29 @@
+Title: Developer Setup Guide
+Space: Engineering / Trading Platform
+Author: DevOps Team
+Last Updated: 2023-10-25
+
+# Prerequisites
+*   **Java JDK**: Version 17 or higher.
+*   **IDE**: IntelliJ IDEA or Eclipse.
+*   **Build Tool**: Maven or Gradle (currently manual classpath in dummy project).
+
+# Installation
+1.  Clone the repository:
+    `git clone https://github.com/dummy-corp/trading-sys-java.git`
+2.  Navigate to `src/`.
+3.  Compile the project:
+    `javac com/trading/dummy/TradingSystem.java`
+
+# Running the Simulation
+Execute the main class to run the standard simulation scenario:
+`java com.trading.dummy.TradingSystem`
+
+# Project Structure
+*   `src/com/trading/dummy/model`: POJOs.
+*   `src/com/trading/dummy/service`: Logic services.
+*   `src/com/trading/dummy/core`: Application logic.
+
+# Debugging
+*   Logs are currently printed to `System.out`.
+*   Common issue: `NullPointerException` if Price is missing for a Security. Ensure you add `MarketData` to the `Pricer` before trading.

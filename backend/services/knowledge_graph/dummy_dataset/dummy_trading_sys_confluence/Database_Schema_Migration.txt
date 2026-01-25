@@ -1,0 +1,34 @@
+Title: Database Schema Migration Plan
+Space: Architecture / Data
+Author: Database Admin
+Last Updated: 2024-01-15
+
+# Goal
+Migrate from in-memory objects to PostgreSQL (Ticket OPS-15).
+
+# Proposed Schema
+
+## Table: SECURITIES
+| Column | Type | Notes |
+| :--- | :--- | :--- |
+| symbol | VARCHAR(20) | PK |
+| isin | VARCHAR(12) | Unique |
+| type | VARCHAR(10) | EQUITY, BOND, etc. |
+| exchange | VARCHAR(20) | |
+| currency | CHAR(3) | |
+| attributes | JSONB | Stores strike, expiry, coupon, etc. |
+
+## Table: ORDERS
+| Column | Type | Notes |
+| :--- | :--- | :--- |
+| order_id | UUID | PK |
+| symbol | VARCHAR(20) | FK |
+| side | CHAR(4) | BUY/SELL |
+| quantity | DECIMAL | |
+| status | VARCHAR(15) | NEW, FILLED, REJECTED |
+| created_at | TIMESTAMP | |
+
+# Migration Strategy
+1.  We will use **Liquibase** to manage version control of the schema.
+2.  The existing `DummySecuritiesLoading` class will be converted to a `@PostConstruct` bean that checks if the DB is empty, and if so, populates it (Seed Data).
+3.  Test Plan: Run `DummyDataTest` pointing to a Testcontainer Postgres.

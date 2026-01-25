@@ -5,4 +5,7 @@ paddleocr
 sqlalchemy
 psycopg2-binary
 python-multipart
+torch
+torch-geometric
+
 

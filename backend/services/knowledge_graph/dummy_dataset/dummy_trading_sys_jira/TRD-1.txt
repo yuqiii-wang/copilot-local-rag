@@ -1,0 +1,20 @@
+Key: TRD-1
+Type: Epic
+Summary: Core Trading System Architecture
+Status: In Progress
+Priority: High
+Description:
+Design and implement the foundational data models and core engine for the new trading system.
+This includes the definition of Securities, Orders, Trades, and the main Execution Engine loop.
+
+Acceptance Criteria:
+- Define base Security classes (Equity, Bond, etc.)
+- Define Order and Trade lifecycle
+- Implement basic Portfolio management
+- Create the Execution Engine for matching/routing
+
+Child Issues:
+- TRD-2
+- TRD-3
+- TRD-4
+- TRD-5

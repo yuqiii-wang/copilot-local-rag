@@ -2,7 +2,7 @@ from fastapi import APIRouter, UploadFile, File, HTTPException
 import shutil
 import os
 import uuid
-import models
+import models as models
 from pgdb.pgdb_manager import pg_manager
 from services import ocr_service
 

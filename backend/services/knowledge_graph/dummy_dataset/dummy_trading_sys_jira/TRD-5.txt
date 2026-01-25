@@ -1,0 +1,26 @@
+Key: TRD-5
+Type: Story
+Parent: TRD-1
+Summary: Core Execution Engine Logic
+Status: In Progress
+Assignee: Tech Lead
+Description:
+The heart of the system.
+Need a class `ExecutionEngine` that connects everything.
+
+Flow:
+1. Receive Order.
+2. Validate Order parameters.
+3. Check Market Price (via Pricer).
+4. Check Pre-trade Risk (via RiskManager).
+5. Execute (Simulate fill).
+6. Update Portfolio.
+
+Constraint:
+- For now, simulate fills against a static/simple MarketData provider.
+- Market Orders fill at current Ask/Bid.
+- Limit Orders fill only if price crosses.
+
+Current Implementation:
+- Basic flow is working.
+- Need to integrate RiskManager call (Dependence on RSK-2).

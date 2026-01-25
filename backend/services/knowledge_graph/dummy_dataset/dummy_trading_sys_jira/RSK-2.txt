@@ -1,0 +1,19 @@
+Key: RSK-2
+Type: Story
+Parent: RSK-1
+Summary: Implement Pre-Trade Risk Limits
+Status: Done
+Assignee: Alice
+Description:
+Prevent fat-finger errors or excessive risk taking.
+
+Requirements:
+- Define `RiskLimit` configuration object.
+- Implement `RiskManager` service.
+- Check: Gross Exposure (Sum of Abs Value) < Limit.
+- Check: Net Exposure < Limit.
+- If check fails, Order should be REJECTED.
+
+Dev Notes:
+- Added RiskManager.java
+- Integated into ExecutionEngine.placeOrder().

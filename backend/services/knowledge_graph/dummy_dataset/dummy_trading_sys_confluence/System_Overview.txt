@@ -1,0 +1,23 @@
+Title: Trading System Overview
+Space: Engineering / Trading Platform
+Author: Tech Lead
+Last Updated: 2023-10-15
+
+# Introduction
+Welcome to the documentation for the new dummy Trading System (Project TRD). This system is designed to handle multi-asset securities trading with real-time risk checks and margin calculations.
+
+# Key Capabilities
+*   **Multi-Asset Support**: Currently supports Equities, with architecture in place for Bonds, Options, and Futures.
+*   **Order Management**: Supports Market and Limit orders with basic lifecycle (New -> Filled/Rejected).
+*   **Real-time Risk**: Pre-trade validation for Gross and Net exposure limits.
+*   **Portfolio Management**: Real-time position tracking and PnL calculation.
+*   **Margin Engine**: Initial and Maintenance margin calculations based on asset risk profiles.
+
+# High-Level Modules
+1.  **Core Engine**: `com.trading.dummy.core` - Handles order matching and routing.
+2.  **Models**: `com.trading.dummy.model` - Data structures (Security, Trade, Position).
+3.  **Services**: `com.trading.dummy.service` - Business logic (Risk, Margin, Pricing).
+
+# Getting Started
+*   See [Developer Setup] for building the project.
+*   See [Architecture Design] for system diagrams.

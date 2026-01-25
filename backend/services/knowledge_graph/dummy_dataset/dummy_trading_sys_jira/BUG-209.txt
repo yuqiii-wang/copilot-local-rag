@@ -1,0 +1,21 @@
+Key: BUG-209
+Type: Bug
+Summary: Realized PnL calculation incorrect on partial sells
+Status: Open
+Priority: Medium
+Description:
+The current logic in `Position.java` simplifies PnL calculation.
+It assumes a simple `(TradePrice - AvgCost) * Qty`.
+However, if the position flips from Long to Short in a single trade, the Logic might break or be inaccurate.
+
+Steps to Reproduce:
+1. Buy 100 @ 10.
+2. Sell 200 @ 12.
+3. Result should be: Realized PnL on 100, and new Short Position of 100.
+4. Current code might just reduce quantity to -100 and calc PnL on 200, which is weird if cost basis changes.
+
+Code Reference:
+backend/services/knowledge_graph/dummy_dataset/dummy_trading_sys_java/src/com/trading/dummy/model/Position.java
+
+Impact:
+Accounting is wrong for flip-flop trades.

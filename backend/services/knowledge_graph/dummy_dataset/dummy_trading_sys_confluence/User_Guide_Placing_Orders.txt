@@ -1,0 +1,28 @@
+Title: User Guide: Placing Orders
+Space: User Support / Trading
+Author: Product Owner
+Last Updated: 2023-11-05
+
+# How to Place an Order
+
+## 1. Select Security
+Identify the security you wish to trade by its Symbol (e.g., AAPL) or ISIN.
+
+## 2. Choose Side
+*   **BUY**: You want to purchase shares.
+*   **SELL**: You want to sell shares you own.
+*   **SELL SHORT**: You want to sell shares you do not own (betting on price drop).
+
+## 3. Order Type
+*   **Market Order**: Execute immediately at the best available price. Set `price = 0`.
+*   **Limit Order**: Execute only at the specified price or better. Set `price = 150.00`.
+
+## 4. Execution
+Once submitted, the system will:
+1.  Status = `NEW`
+2.  Validation & Risk Check.
+3.  If passed: Status = `FILLED` (for Market) or `PENDING` (for Limit).
+4.  If failed: Status = `REJECTED` (e.g., "Risk Check Failed: Gross Exposure > 1M").
+
+# Monitoring Positions
+Navigate to the **Portfolio** tab to see your current holdings, Average Cost, and PnL.

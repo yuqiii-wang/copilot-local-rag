@@ -1,0 +1,21 @@
+Key: BUG-215
+Type: Bug
+Summary: NPE when Market Data is missing for Bonds
+Status: Open
+Priority: Critical
+Description:
+The `SimplePricer.getPrice(Security sec)` creates a NullPointerException if called for a Bond that hasn't had an `updateMarketData` call yet.
+
+Stack Trace:
+java.lang.NullPointerException
+    at com.trading.dummy.service.SimplePricer.getPrice(SimplePricer.java:45)
+    at com.trading.dummy.model.Portfolio.calculateNav(Portfolio.java:102)
+
+Steps to Reproduce:
+1. Initialize system.
+2. Create a new Bond "UST30Y".
+3. Do not send market data.
+4. Attempt to check Margin/NAV.
+
+Expected:
+Should return 0.0 or throw a handled `MarketException`.

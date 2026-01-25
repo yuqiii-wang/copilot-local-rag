@@ -11,7 +11,7 @@ async def lifespan(app: FastAPI):
         pg_manager.connect()
     except Exception as e:
         print(f"Failed to connect to DB: {e}")
-        # We might want to let the app start anyway, or fail. Falsing here allows debugging.
+        raise e
     yield
     # Close the database connection pool
     pg_manager.disconnect()

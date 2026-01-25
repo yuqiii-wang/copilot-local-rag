@@ -1,0 +1,17 @@
+Key: OPS-15
+Type: Task
+Summary: Migrate Database to PostgreSQL 16
+Status: In Progress
+Priority: Medium
+Description:
+Our current in-memory H2 database (or flat file structure) is insufficient for the new load tests.
+We need to provision a proper Postgres 16 instance.
+
+Steps:
+1. Provision RDS or Container.
+2. Update `application.properties` with JDBC URL.
+3. Create new Liquibase change logs for initial schema (see Confluence page 'Database Schema Migration').
+4. Verify `DummyTradesLoading` can run against the real DB.
+
+Blockers:
+- Need firewall rules opened (Ticket NET-55).

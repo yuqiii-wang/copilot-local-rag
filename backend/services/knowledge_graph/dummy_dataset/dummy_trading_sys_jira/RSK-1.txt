@@ -1,0 +1,12 @@
+Key: RSK-1
+Type: Epic
+Summary: Risk Management Module
+Status: To Do
+Priority: Critical
+Description:
+Implement pre-trade risk checks and post-trade margin calculations to ensure system safety.
+
+Scope:
+- Exposure Limits (Gross/Net)
+- Margin Requirements (Initial/Maintenance)
+- Integration with Execution Engine

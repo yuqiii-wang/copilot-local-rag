@@ -152,7 +152,7 @@
         const newLinkTitle = document.getElementById('new-link-title');
         const newLinkUrl = document.getElementById('new-link-url');
 
-        function createLinkItem(title, url) {
+        function createLinkItem(title, url, score) {
             const li = document.createElement('li');
             li.className = 'link-item';
             
@@ -160,6 +160,21 @@
             a.href = url;
             a.innerText = title;
             a.title = url;
+            
+            li.appendChild(a);
+
+            if (score !== undefined && score !== null) {
+                const scoreSpan = document.createElement('span');
+                let displayScore = score;
+                if (typeof score === 'number') {
+                     displayScore = score.toFixed(2);
+                }
+                scoreSpan.innerText = displayScore;
+                scoreSpan.style.marginRight = '10px';
+                scoreSpan.style.color = 'var(--vscode-descriptionForeground)';
+                scoreSpan.title = 'Relevance Score';
+                li.appendChild(scoreSpan);
+            }
             
             const removeSpan = document.createElement('span');
             removeSpan.className = 'remove-link-btn';
@@ -170,7 +185,6 @@
                 // Hide container if list empty? Optional.
             };
             
-            li.appendChild(a);
             li.appendChild(removeSpan);
             return li;
         }
@@ -401,7 +415,7 @@
                     ragList.innerHTML = '';
                     if (message.results && message.results.length > 0) {
                         message.results.forEach(item => {
-                            ragList.appendChild(createLinkItem(item.title, item.link));
+                            ragList.appendChild(createLinkItem(item.title, item.link, item.score));
                         });
                         ragDiv.style.display = 'block';
                          if (sendBtnRag) sendBtnRag.style.display = 'block';

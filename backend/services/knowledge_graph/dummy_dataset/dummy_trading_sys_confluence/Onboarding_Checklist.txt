@@ -1,0 +1,29 @@
+Title: New Developer Onboarding Checklist
+Space: General
+Author: Team Lead
+Last Updated: 2024-01-10
+
+# Hello!
+Welcome to the team. To get the `dummy-trading-system` running on your local machine, follow these steps.
+
+# Prerequisites
+1.  **Java JDK 17+**: We use modern records and switch expressions.
+2.  **Maven 3.8+**: Build tool.
+3.  **IDE**: IntelliJ IDEA is recommended.
+
+# First Run
+1.  Clone the repo: `git clone ...`
+2.  Navigate to `backend/services/knowledge_graph/dummy_dataset/dummy_trading_sys_java`.
+3.  Run the tests to ensure environment is clean:
+    ```bash
+    mvn test
+    ```
+    *Note: You should see `EquityTest`, `BondTest`, etc. passing.*
+
+# Common Issues
+*   **"Security not found"**: Make sure you initialized the `DummyTestBase` or loaded the `DummySecuritiesLoading` helper if running main.
+*   **"Borrow rate invalid"**: If you try to short sell without setting a borrow rate in `LendingService`, it defaults to rejection.
+
+# Key Contacts
+*   **Domain Expert**: Jane Doe (handling Options/Futures logic).
+*   **Archiect**: John Smith (Core Engine).
