@@ -578,5 +578,11 @@
   ],
   "Security Audit": [
     "dummy_trading_sys_jira/SEC-99.txt"
+  ],
+  "Starting HFT Strategy Engine...": [
+    "dummy_trading_sys_cpp/HFTStrategy.cpp"
+  ],
+  "Should succeed at least once in 10 tries": [
+    "dummy_trading_sys_java/test/com/trading/dummy/core/MarketGatewayTest.java"
   ]
 }

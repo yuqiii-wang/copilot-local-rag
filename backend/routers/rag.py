@@ -10,10 +10,12 @@ router = APIRouter(
 
 class QueryRequest(BaseModel):
     query: str
+    skip: int = 0
+    limit: int = 5
 
 @router.post("/retrieve")
 async def retrieve(request: QueryRequest):
-    return rag_service.get_dummy_search_results(request.query)
+    return rag_service.get_dummy_search_results(request.query, skip=request.skip, limit=request.limit)
 
 class FeedbackRequest(BaseModel):
     query: str

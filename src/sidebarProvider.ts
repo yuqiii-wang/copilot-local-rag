@@ -35,6 +35,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
     webviewView.webview.onDidReceiveMessage(async (data) => {
+      const config = vscode.workspace.getConfiguration('repo-ask');
+      const backendUrl = config.get<string>('backendUrl') || 'http://localhost:14321';
+
       switch (data.type) {
         case "openChat": {
           vscode.commands.executeCommand("repo-ask.openChat");
@@ -66,7 +69,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                 
                 // If there are URLs, download content for them
                 if (data.urls && data.urls.length > 0) {
-                     const response = await fetch('http://127.0.0.1:14321/download/fetch', {
+                     const response = await fetch(`${backendUrl}/download/fetch`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -122,13 +125,17 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         }
         case "queryRag": {
             try {
+                const skip = data.skip || 0;
                 // Call backend RAG service with the query parameter
-                const response = await fetch(`http://127.0.0.1:14321/rag/retrieve`, {
+                const response = await fetch(`${backendUrl}/rag/retrieve`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ query: data.text || "" })
+                    body: JSON.stringify({ 
+                        query: data.text || "",
+                        skip: skip
+                    })
                 });
 
                 if (!response.ok) {
@@ -138,7 +145,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                 
                 webviewView.webview.postMessage({
                     type: 'ragResult',
-                    results: results
+                    results: results,
+                    isLoadMore: skip > 0
                 });
             } catch (error: any) {
                  vscode.window.showErrorMessage(`RAG Error: ${error.message}`);
@@ -171,7 +179,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                 else if (action === 'reject') endpoint = '/rag/feedback/reject';
                 
                 if (endpoint) {
-                     const response = await fetch(`http://127.0.0.1:14321${endpoint}`, {
+                     const response = await fetch(`${backendUrl}${endpoint}`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'

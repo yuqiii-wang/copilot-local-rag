@@ -95,6 +95,9 @@
                 <button id="cancel-link-btn" style="width: 50%;">Cancel</button>
             </div>
         </div>
+        <div style="text-align: right; margin-top: 10px;">
+            <a id="load-more-btn" style="cursor: pointer; display: none; color: var(--vscode-textLink-foreground);">Load More ...</a>
+        </div>
     </div>
 
     <div id="ocr-result">
@@ -151,6 +154,9 @@
         const cancelLinkBtn = document.getElementById('cancel-link-btn');
         const newLinkTitle = document.getElementById('new-link-title');
         const newLinkUrl = document.getElementById('new-link-url');
+        const loadMoreBtn = document.getElementById('load-more-btn');
+        let currentSkip = 0;
+        const RAG_LIMIT = 5;
 
         function createLinkItem(title, url, score) {
             const li = document.createElement('li');
@@ -224,12 +230,27 @@
         });
 
         queryBtn.addEventListener('click', () => {
+            currentSkip = 0;
+            if(loadMoreBtn) loadMoreBtn.style.display = 'none';
             spinner.style.display = 'block';
             const ocrText = ocrContent.innerText;
             const manualText = document.getElementById('manual-text-input').value;
             const textToSend = [manualText, ocrText].filter(t => t && t.trim()).join('\n\n');
-            vscode.postMessage({ type: 'queryRag', text: textToSend });
+            vscode.postMessage({ type: 'queryRag', text: textToSend, skip: 0 });
         });
+
+        if(loadMoreBtn) {
+            loadMoreBtn.addEventListener('click', () => {
+                 spinner.style.display = 'block';
+                 currentSkip += RAG_LIMIT;
+                 
+                 const ocrText = ocrContent.innerText;
+                 const manualText = document.getElementById('manual-text-input').value;
+                 const textToSend = [manualText, ocrText].filter(t => t && t.trim()).join('\n\n');
+                 
+                 vscode.postMessage({ type: 'queryRag', text: textToSend, skip: currentSkip });
+            });
+        }
 
         editBtn.addEventListener('click', () => {
             ocrContent.contentEditable = 'true';
@@ -412,13 +433,33 @@
                     // ragList is already defined globally now
                     const sendBtnRag = document.getElementById('send-btn');
                     
-                    ragList.innerHTML = '';
+                    if (!message.isLoadMore) {
+                        ragList.innerHTML = '';
+                    }
+
                     if (message.results && message.results.length > 0) {
                         message.results.forEach(item => {
                             ragList.appendChild(createLinkItem(item.title, item.link, item.score));
                         });
                         ragDiv.style.display = 'block';
                          if (sendBtnRag) sendBtnRag.style.display = 'block';
+                        
+                        // Show/Hide Load More
+                        if (loadMoreBtn) {
+                             if (message.results.length >= RAG_LIMIT) {
+                                  loadMoreBtn.style.display = 'inline';
+                             } else {
+                                  loadMoreBtn.style.display = 'none';
+                             }
+                        }
+
+                    } else {
+                        if (!message.isLoadMore) {
+                             // Only show "No documents" if it's a fresh search
+                             // For load more, if no more results, just hide the button
+                             ragList.innerHTML = '<li>No documents found.</li>';
+                        }
+                        if (loadMoreBtn) loadMoreBtn.style.display = 'none';
                     }
                     break;
                 case 'ocrResult':

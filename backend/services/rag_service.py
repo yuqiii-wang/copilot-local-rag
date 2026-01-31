@@ -1,11 +1,11 @@
 class RAGService:
-    def get_dummy_search_results(self, query: str = ""):
+    def get_dummy_search_results(self, query: str = "", skip: int = 0, limit: int = 5):
         # --- Integration with Knowledge Graph Service ---
         filtered = [] # Default empty
         try:
             from services.knowledge_graph_service import kg_service
-            print(f"Querying Knowledge Graph with: {query}")
-            kg_results = kg_service.query_graph(query)
+            print(f"Querying Knowledge Graph with: {query}, skip={skip}, limit={limit}")
+            kg_results = kg_service.query_graph(query, skip=skip, limit=limit)
             if kg_results:
                 filtered = kg_results
         except ImportError:

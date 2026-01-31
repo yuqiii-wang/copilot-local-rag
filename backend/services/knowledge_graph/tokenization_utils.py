@@ -16,6 +16,18 @@ PATTERN_DATE_COMMON = r'^\d{2}/\d{2}/\d{4}$'
 PATTERN_PRICE = r'^\d+\.\d{2}$'
 # Pure Number: Just digits
 PATTERN_NUM = r'^\d+$'
+# Quantity/Money: $1,000, 100k, 10M, 500.5. Can have commas, $, suffixes.
+PATTERN_QUANTITY = r'^[$]?[0-9]{1,3}(?:,?[0-9]{3})*(?:\.[0-9]+)?[kKmMbB]?$'
+
+# All Caps Word: At least 2 chars, allows underscores (e.g. MAX_VALUE, RISK_LIMIT)
+PATTERN_ALL_CAPS = r'^[A-Z][A-Z0-9_]+$'
+
+# Compact Date: YYYYMMDD
+PATTERN_DATE_COMPACT = r'^\d{8}$'
+
+# Digit-Punctuation-Capital: e.g. "100USD", "50%LIMIT", "2023-Q4"
+# Digits, optional punctuation, then Capital letters
+PATTERN_DIGIT_CAPS = r'^\d+[.,\-/%]*[A-Z]+$'
 
 PATTERNS = [
     ("UUID", re.compile(PATTERN_UUID)),
@@ -23,20 +35,68 @@ PATTERNS = [
     ("CUSIP", re.compile(PATTERN_CUSIP)),
     ("DATE_ISO", re.compile(PATTERN_DATE_ISO)),
     ("DATE_COMMON", re.compile(PATTERN_DATE_COMMON)),
+    ("DATE_COMPACT", re.compile(PATTERN_DATE_COMPACT)),
     ("PRICE", re.compile(PATTERN_PRICE)),
     ("NUM", re.compile(PATTERN_NUM)),
-    ("TICKER", re.compile(PATTERN_TICKER))
+    ("QUANTITY", re.compile(PATTERN_QUANTITY)),
+    ("TICKER", re.compile(PATTERN_TICKER)),
+    ("ALL_CAPS", re.compile(PATTERN_ALL_CAPS)),
+    ("DIGIT_CAPS", re.compile(PATTERN_DIGIT_CAPS))
 ]
+
+
+def generate_structural_regex(text: str) -> str:
+    """
+    Generates a regex representing the structural composition of the text.
+    E.g. "123" -> "\\d{3}", "ABC" -> "[A-Z]{3}", "Abc" -> "[A-Z][a-z]{2}"
+    """
+    from itertools import groupby
+    
+    def get_char_type(char):
+        if char.isdigit(): return 'digit'
+        if char.isupper(): return 'upper'
+        if char.islower(): return 'lower'
+        return 'symbol'
+
+    regex_parts = []
+    
+    for type_name, group in groupby(text, key=get_char_type):
+        chars = list(group)
+        count = len(chars)
+
+        if type_name == 'digit':
+            regex_parts.append(r'\d' + (f'{{{count}}}' if count > 1 else ''))
+        elif type_name == 'upper':
+            regex_parts.append(r'[A-Z]' + (f'{{{count}}}' if count > 1 else ''))
+        elif type_name == 'lower':
+            regex_parts.append(r'[a-z]' + (f'{{{count}}}' if count > 1 else ''))
+        else: # symbol
+            for sym, sym_group in groupby(chars):
+                sym_count = len(list(sym_group))
+                # re is imported globally
+                regex_parts.append(re.escape(sym) + (f'{{{sym_count}}}' if sym_count > 1 else ''))
+                
+    return "".join(regex_parts)
 
 def identify_pattern(token: str) -> str:
     """
     Checks if the token matches any registered pattern.
-    Returns the pattern name (e.g. 'PATTERN_ISIN') or None.
+    Returns the structural regex of the token if matched (e.g. '\\d{7}'), else None.
     """
     # Strip common punctuation that might wrap the token for matching
     clean_token = token.strip(".,;:()[]{}'\"")
     
     for name, regex in PATTERNS:
         if regex.fullmatch(clean_token):
-            return f"pattern_{name.lower()}"
+            return generate_structural_regex(clean_token)
     return None
+
+def extract_capital_sequences(text: str) -> list[str]:
+    """
+    Extracts sequences of 2 or more uppercase words (potential entities/names).
+    Example: "RISK MANAGEMENT POLICY" -> ["RISK MANAGEMENT POLICY"]
+    """
+    # Finds consecutive words starting with A-Z and containing upper/digits/underscores
+    # Must be at least 2 words long
+    pattern = r'\b[A-Z][A-Z0-9_]+(?:\s+[A-Z][A-Z0-9_]+)+\b'
+    return re.findall(pattern, text)

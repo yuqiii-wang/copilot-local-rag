@@ -15,24 +15,74 @@ import csv
 from services.knowledge_graph.feature_generator import FeatureGenerator
 from services.knowledge_graph.graph_model import KeywordReconstructionHGNN
 from services.knowledge_graph.tokenization import clean_and_tokenize
-from services.knowledge_graph.java_code_indexer import JavaCodeIndexer
+from services.knowledge_graph.code_indexer import (
+    JavaCodeIndexer,
+    CppCodeIndexer,
+    BashCodeIndexer,
+    SqlCodeIndexer
+)
 
 # Configuration
 MAX_FEATURES = None # Extract every word
 HIDDEN_DIM = 128
-LEARNING_RATE = 0.01
-EPOCHS = 300 
+LEARNING_RATE = 0.001 # Reduced to improve stability
+EPOCHS = 500 
 DATASET_DIR = "services/knowledge_graph/dummy_dataset"
 QA_FILE = os.path.join(DATASET_DIR, "qa_dataset.json")
 MODEL_SAVE_PATH = "services/knowledge_graph/query_model.pth"
 FEATURE_GEN_PATH = "services/knowledge_graph/feature_gen.pkl"
 RESULTS_CSV_PATH = "services/knowledge_graph/hypergraph_results.csv"
 
+def generate_ngrams(tokens, n_range=(1, 5)):
+    """Generate n-grams from a list of tokens."""
+    ngrams = []
+    for n in range(n_range[0], n_range[1] + 1):
+        for i in range(len(tokens) - n + 1):
+            ngram = " ".join(tokens[i:i+n])
+            ngrams.append(ngram)
+    return ngrams
+
 def train():
+    # 0. Run Indexers FIRST to extract literals
+    print("Running Code Indexers to capture literals for Vocabulary...")
+    
+    indexer_configs = [
+        (JavaCodeIndexer, os.path.join("services", "knowledge_graph", "dummy_dataset", "dummy_trading_sys_java")),
+        (CppCodeIndexer, os.path.join("services", "knowledge_graph", "dummy_dataset", "dummy_traing_sys_cpp")),
+        (BashCodeIndexer, os.path.join("services", "knowledge_graph", "dummy_dataset")),
+        (SqlCodeIndexer, os.path.join("services", "knowledge_graph", "dummy_dataset", "dummy_trading_system_sql"))
+    ]
+
+    executed_indexers = []
+    all_extracted_literals = []
+
+    for IndexerClass, root_path in indexer_configs:
+        if not os.path.exists(root_path):
+            print(f"Skipping {IndexerClass.__name__}: path {root_path} not found")
+            continue
+            
+        print(f"Running {IndexerClass.__name__} on {root_path}")
+        indexer = IndexerClass(root_path)
+        indexer.index_project()
+        executed_indexers.append(indexer)
+        
+        # Collect literals for Vocab Augmentation
+        for fname, literals in indexer.file_literals.items():
+             for lit in literals:
+                 # Tokenize strictly for vocab
+                 tokens = clean_and_tokenize(lit)
+                 if tokens:
+                     all_extracted_literals.extend(tokens)
+                     # Add separator to prevent false n-grams between independent literals
+                     all_extracted_literals.append("___SEP___")
+
+    print(f"Collected {len(all_extracted_literals)} tokens from hardcoded strings for Vocabulary.")
+
     # 1. Initialize and Fit Feature Generator (Extract every word)
     print("Initializing Feature Generator...")
     fg = FeatureGenerator(max_features=MAX_FEATURES)
     fg.load_data(DATASET_DIR)
+    
     fg.fit()
     fg.save(FEATURE_GEN_PATH)
 
@@ -58,11 +108,37 @@ def train():
     # Base Features: TF-IDF Matrix [Docs, Keywords]
     X_check = fg.features.toarray()
     X = torch.FloatTensor(X_check)
-    
-    print("Injecting Priors from QA Dataset...")
+
+    # N-Gram Boosting: Scale features by n-gram length to emphasize wider coverage
+    print("Boosting features based on N-Gram length...")
+    vocab_list = fg.vectorizer.get_feature_names_out()
+    # Boost: length^2.5 to strongly favor longest matches as requested
+    ngram_weights = [len(w.split()) ** 2.5 for w in vocab_list] 
+    ngram_weights_tensor = torch.FloatTensor(ngram_weights)
+    X = X * ngram_weights_tensor
+
+    # Load QA Dataset first
+    print("Loading QA Dataset...")
     with open(QA_FILE, 'r') as f:
         qa_data = json.load(f)
+
+    # 3b. Augment QA Dataset with Indexer results (already run)
+    print("Augmenting QA Dataset with extracted literals...")
     
+    for indexer in executed_indexers:
+        count_lits = 0
+        for fname, literals in indexer.file_literals.items():
+             for lit in literals:
+                 clean_lit = lit.strip()
+                 if len(clean_lit) > 2:
+                     if clean_lit not in qa_data:
+                         qa_data[clean_lit] = []
+                     if fname not in qa_data[clean_lit]:
+                        qa_data[clean_lit].append(fname)
+                        count_lits += 1
+
+
+    print("Injecting Priors from QA Dataset (and extracted literals)...")
     prior_weight = 1.0 # Reduced from 100.0 to 1.0 to match TF-IDF scale
     
     vocab_map = fg.vectorizer.vocabulary_ # Word -> Index
@@ -79,20 +155,25 @@ def train():
         # Tokenize query to match vocab tokens using the SAME logic as ingestion
         query_tokens = clean_and_tokenize(query)
         
-        for token in query_tokens:
+        # PRIOR INJECTION UPDATE: Use N-Grams to match sequence order
+        query_ngrams = generate_ngrams(query_tokens, n_range=(1, 7))
+        
+        for token in query_ngrams:
             if token in vocab_map:
                 kw_idx = vocab_map[token]
                 
                 # Dynamic weighting based on Inverse Frequency in QA Dataset
                 # If a token appears in only 1 query, it's highly specific -> Boost its weight significantly
-                freq = query_keyword_counts.get(token, 1)
-                # Formula: Base Weight * (1 + 1/freq) - simple boost for rare terms
-                # Or stronger: Base Weight * (Total Queries / freq) - standard IDF-like
-                # Let's use a strong multiplier for unique items
-                if freq == 1:
-                    current_weight = prior_weight * 5.0 # Boost to 5.0 for unique
-                else:
-                    current_weight = prior_weight
+                freq = query_keyword_counts.get(token, 1) 
+                
+                # Boost based on sequence length (the "sql"/"seq" of keywords)
+                # Longer sequences (n-grams) imply higher specificity and should significantly boost weight.
+                ngram_len = len(token.split())
+                
+                # Power boost for sequences
+                # E.g. "risk" (len 1) -> 5.0
+                # "risk limit" (len 2) -> 25.0
+                current_weight = prior_weight * (5.0 ** ngram_len)
                 
                 for fname in target_files:
                     # Fix: Dataset paths vs FeatureGenerator keys match
@@ -107,28 +188,42 @@ def train():
                         
     print(f"Injected {priors_injected_count} QA priors into feature matrix.")
 
-    # 3b. Inject Code Priors (Strings and Dependencies)
-    print("Injecting Code Priors from Java analysis...")
-    # Assume source code is in 'services/knowledge_graph/dummy_dataset/dummy_trading_sys_java' (includes src and test)
-    code_root = os.path.join("services", "knowledge_graph", "dummy_dataset", "dummy_trading_sys_java")
-    indexer = JavaCodeIndexer(code_root)
-    indexer.index_project()
-    code_priors = indexer.get_code_priors(hard_weight=2.0, decay=0.5) # Reduced hard_weight to 2.0
-    
+    # 3b. Inject Code Priors (Strings and Dependencies) - SECOND PASS for Graph Propagation
+    print("Injecting Code Graph Priors (Dependency Propagation)...")
     code_prior_count = 0
-    for token, file_weights in code_priors.items():
-        if token in vocab_map:
-            kw_idx = vocab_map[token]
-            for fname, weight in file_weights.items():
-                 # Fix: Ensure fname matches the keys in fg.file_map (which are simple filenames)
-                 fname_key = os.path.basename(fname)
-                 
-                 if fname_key in fg.file_map: # Check if file exists in our feature set
-                     doc_idx = fg.file_map[fname_key]
-                     X[doc_idx, kw_idx] += weight
-                     code_prior_count += 1
+    
+    for indexer in executed_indexers:
+        # We reuse the already executed indexers
+        priors = indexer.get_code_priors(hard_weight=2.0, decay=0.5)
+        
+        for token, file_weights in priors.items():
+            if token in vocab_map:
+                kw_idx = vocab_map[token]
+                for fname, weight in file_weights.items():
+                     fname_key = os.path.basename(fname)
                      
-    print(f"Injected {code_prior_count} Code priors into feature matrix.")
+                     if fname_key in fg.file_map: 
+                         doc_idx = fg.file_map[fname_key]
+                         X[doc_idx, kw_idx] += weight
+                         code_prior_count += 1
+                     
+    print(f"Injected {code_prior_count} Code graph priors into feature matrix.")
+
+    # 3c. Inject Pattern Metadata (Structural Priors)
+    if hasattr(fg, 'doc_patterns'):
+        print("Injecting Metadata Patterns into feature matrix (Structural Boosting)...")
+        pattern_inject_count = 0
+        vocab_map = fg.vectorizer.vocabulary_
+        
+        for i, patterns in enumerate(fg.doc_patterns):
+            for pat in patterns:
+                if pat in vocab_map:
+                    idx = vocab_map[pat]
+                    # Specific Boost for Structural Patterns
+                    # This ensures documents with similar structures (e.g. both have ISINs) are linked
+                    X[i, idx] += 5.0 # Significant boost
+                    pattern_inject_count += 1
+        print(f"Injected {pattern_inject_count} pattern signals.")
 
     # Log-transform features to handle skewness and large priors (100.0 -> ~4.6)
     print("Log-transforming features for better numerical stability...")
@@ -150,10 +245,10 @@ def train():
     
     optimizer = optim.AdamW(model.parameters(), lr=LEARNING_RATE, weight_decay=1e-4) # AdamW for better regularization
     
-    # Scheduler: Cosine Annealing for smoother convergence
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=EPOCHS, eta_min=1e-4)
+    # Scheduler: CosineAnnealingLR for smoother convergence over fixed epochs
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=EPOCHS, eta_min=1e-6)
     
-    criterion = nn.SmoothL1Loss(beta=1.0) # SmoothL1Loss is less sensitive to outliers (like our heavy priors) than MSE
+    # criterion = nn.SmoothL1Loss(beta=1.0) 
 
     # 5. Training Loop
     print(f"Starting training (Reconstruction Task) for {EPOCHS} epochs...")
@@ -165,15 +260,28 @@ def train():
         # Forward
         outputs = model(X, hyperedge_index)
         
-        # Loss
-        loss = criterion(outputs, X)
+        # Weighted Reconstruction Loss
+        # We want to penalize missing non-zero values (the signal) much more than getting 0s wrong.
+        # Since the matrix is highly sparse (~99% zeros), standard loss is dominated by 0->0 predictions.
+        
+        loss_fn = nn.MSELoss(reduction='none')
+        element_loss = loss_fn(outputs, X)
+        
+        # Create a weight matrix: Boost importance of non-zero targets
+        # Non-zero entries get 20x weight
+        weights = torch.ones_like(X)
+        weights[X > 0] = 20.0 
+        
+        loss = (element_loss * weights).mean()
         
         loss.backward()
         optimizer.step()
         scheduler.step()
         
         if (epoch + 1) % 20 == 0 or epoch == 0:
-            print(f"Epoch [{epoch+1}/{EPOCHS}], Loss: {loss.item():.6f}, LR: {scheduler.get_last_lr()[0]:.6f}")
+            # Get current LR
+            current_lr = optimizer.param_groups[0]['lr']
+            print(f"Epoch [{epoch+1}/{EPOCHS}], Loss: {loss.item():.6f}, LR: {current_lr:.6f}")
 
     # 6. Save Model
     torch.save(model.state_dict(), MODEL_SAVE_PATH)
@@ -200,7 +308,7 @@ def train():
         # Determine Doc Types for Visualization
         doc_types = {}
         for name in fg.doc_names:
-            if name.endswith('.java'): 
+            if name.endswith(('.java', '.cpp', '.cc', '.h', '.hpp', '.c', '.sh', '.bash', '.sql')): 
                 d_type = 'code'
             elif 'jira' in name.lower() or 'bug' in name.lower() or 'trd' in name.lower():
                 d_type = 'jira'

@@ -26,8 +26,11 @@ export function registerChatParticipant(context: vscode.ExtensionContext) {
                 let loadedContext = "";
                 if (requestData.urls && requestData.urls.length > 0) {
                      try {
+                        const config = vscode.workspace.getConfiguration('repo-ask');
+                        const backendUrl = config.get<string>('backendUrl') || 'http://localhost:14321';
+
                         // Assuming fetch is globally available in Node environment or use node-fetch if needed.
-                        const response = await fetch('http://127.0.0.1:14321/download/fetch', {
+                        const response = await fetch(`${backendUrl}/download/fetch`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ urls: requestData.urls })

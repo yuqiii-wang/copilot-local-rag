@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import csv
 from services.knowledge_graph.feature_generator import generate_features
 
-def visualize_knowledge_graph(dataset_path: str, output_file="knowledge_graph.png", max_keywords=50):
+def visualize_knowledge_graph(dataset_path: str, output_file="knowledge_graph.png", max_keywords=50, max_edges=100):
     G = nx.Graph()
     
     # Define colors for different node types
@@ -36,12 +36,39 @@ def visualize_knowledge_graph(dataset_path: str, output_file="knowledge_graph.pn
                     print("CSV is empty.")
                     return
 
-                print(f"Found {len(rows)} connections in CSV. Building graph...")
+                print(f"Found {len(rows)} connections in CSV. Filtering and sorting...")
+                
+                # Collect edges with scores
+                edges_list = []
                 for row in rows:
                     keyword = row['Keyword']
+                    if len(keyword.strip().split()) > 3:
+                        continue
+                        
                     doc_id = row['Document ID']
                     doc_type = row.get('Document Type', 'unknown')
-                    # score = float(row['Score'])
+                    try:
+                        score = float(row.get('Score', 0.0))
+                    except (ValueError, KeyError):
+                        score = 0.0
+                        
+                    edges_list.append({
+                        'keyword': keyword,
+                        'doc_id': doc_id,
+                        'doc_type': doc_type,
+                        'score': score
+                    })
+
+                # Sort by score descending and limit
+                edges_list.sort(key=lambda x: x['score'], reverse=True)
+                edges_list = edges_list[:max_edges]
+                
+                print(f"Building graph with top {len(edges_list)} edges...")
+
+                for item in edges_list:
+                    keyword = item['keyword']
+                    doc_id = item['doc_id']
+                    doc_type = item['doc_type']
 
                     # Document Node
                     # Use doc_id as unique key. 
@@ -80,10 +107,18 @@ def visualize_knowledge_graph(dataset_path: str, output_file="knowledge_graph.pn
         # Extract data
         docs = data['docs']
         vocab = data['vocab']
-        hyperedge_index = data['hyperedge_index'] # [2, num_edges] (row 0: doc_idx, row 1: kw_idx)
-        
-        # 1. Add Document Nodes
-        print(f"Adding {len(docs)} document nodes...")
+        added_edges = 0
+        if len(doc_indices.shape) > 0:
+            for d_idx, k_idx in zip(doc_indices, kw_indices):
+                if added_edges >= max_edges:
+                    break
+                    
+                word = vocab[k_idx]
+                if len(word.strip().split()) > 3:
+                    continue
+
+                G.add_edge(f"doc_{d_idx}", f"kw_{k_idx}")
+                added_edges += 1
         for i, doc in enumerate(docs):
             node_id = f"doc_{i}"
             doc_type = doc.get('type', 'unknown')
@@ -157,7 +192,7 @@ def visualize_knowledge_graph(dataset_path: str, output_file="knowledge_graph.pn
     ]
     plt.legend(handles=legend_elements, loc='upper right', fontsize=12)
     
-    plt.title("Knowledge Graph Visualization\n(Documents linked by Shared Selective Keywords)", fontsize=16)
+    plt.title(f"Knowledge Graph Visualization\n(Documents linked by Shared Selective Keywords - Top {max_edges} Edges)", fontsize=16)
     plt.axis('off')
     
     output_path = current_dir / output_file

@@ -2,16 +2,12 @@ import os
 import javalang
 from pathlib import Path
 from collections import defaultdict
-import networkx as nx
-from services.knowledge_graph.tokenization import clean_and_tokenize
+from services.knowledge_graph.code_indexer.code_indexer import BaseCodeIndexer
 
-class JavaCodeIndexer:
+class JavaCodeIndexer(BaseCodeIndexer):
     def __init__(self, root_dir):
-        self.root_dir = Path(root_dir)
-        # Graph stores relationships: File -> File (Dependencies)
-        self.file_dependency_graph = nx.DiGraph() 
+        super().__init__(root_dir)
         self.class_to_file = {} # ClassName -> Filename
-        self.file_literals = defaultdict(list) # Filename -> List[String content]
         self.pending_deps = defaultdict(set) # Filename -> Set[Dep ClassNames]
 
     def index_project(self):
@@ -76,58 +72,7 @@ class JavaCodeIndexer:
                     if target_file != filename:
                         self.file_dependency_graph.add_edge(filename, target_file)
 
-    def get_code_priors(self, hard_weight=10.0, decay=0.5):
-        """
-        Generates priors:
-        - String Literals -> File (Hard Weight)
-        - String Literals -> Dependent Files (Decaying Weight - Transitive/Deep)
-        """
-        priors = defaultdict(lambda: defaultdict(float)) # token -> {filename: weight}
-        
-        # We want to propagate from Source (contains string) -> Downstream Dependencies
-        # If OptionTest contains "USOPTIONS4", and OptionTest -> DummyTestBase -> ExecutionEngine
-        # We want "USOPTIONS4" to have weight in DummyTestBase and ExecutionEngine.
-        
-        # Precompute all-pairs shortest paths or just do BFS for each source
-        # using networkx.
-        
-        for filename, strings in self.file_literals.items():
-            if not strings: continue
-            
-            # Find all reachable nodes from 'filename' in the dependency graph
-            # We want to go "down" the dependency chain.
-            # If A depends on B (A->B), and A has string "S".
-            # "S" is contextually relevant to B (because A uses B in the context of S).
-            
-            # BFS to find all descendants
-            descendants = {} # filename -> distance
-            
-            if filename in self.file_dependency_graph:
-                # Use BFS to get distances
-                for v in self.file_dependency_graph.nodes():
-                    if v == filename: continue
-                    try:
-                        path_len = nx.shortest_path_length(self.file_dependency_graph, source=filename, target=v)
-                        descendants[v] = path_len
-                    except nx.NetworkXNoPath:
-                        pass
-            
-            for s in strings:
-                tokens = clean_and_tokenize(s)
-                for t in tokens:
-                    # 1. Hard Bind to current file (Source)
-                    priors[t][filename] += hard_weight
-                    
-                    # 2. Propagate to dependencies with decay based on distance
-                    for neighbor, distance in descendants.items():
-                         # Weight = Hard * (Decay ^ Distance)
-                         # e.g., dist=1 (DummyTestBase), weight = 10 * 0.5 = 5
-                         # dist=2 (ExecutionEngine), weight = 10 * 0.25 = 2.5
-                         weight = hard_weight * (decay ** distance)
-                         if weight > 0.01: # Cutoff
-                             priors[t][neighbor] += weight
-                             
-        return priors
+
 
 
 if __name__ == "__main__":

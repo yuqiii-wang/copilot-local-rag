@@ -3,7 +3,7 @@ import re
 import javalang
 from pathlib import Path
 from typing import List, Dict, Tuple
-from services.knowledge_graph.tokenization_utils import identify_pattern
+from services.knowledge_graph.tokenization_utils import identify_pattern, extract_capital_sequences
 
 # Java language keywords to exclude (Still useful for regex fallback or general cleaning)
 JAVA_KEYWORDS = {
@@ -13,6 +13,28 @@ JAVA_KEYWORDS = {
     "catch", "extends", "int", "short", "try", "char", "final", "interface", "static", "void",
     "class", "finally", "long", "strictfp", "volatile", "const", "float", "native", "super", "while",
     "true", "false", "null", "string", "system", "out", "println", "util", "java", "com"
+}
+
+# C++ Keywords
+CPP_KEYWORDS = {
+    "alignas", "alignof", "and", "and_eq", "asm", "atomic_cancel", "atomic_commit", "atomic_noexcept", "auto",
+    "bitand", "bitor", "bool", "break", "case", "catch", "char", "char8_t", "char16_t", "char32_t", "class",
+    "compl", "concept", "const", "consteval", "constexpr", "constinit", "const_cast", "continue", "co_await",
+    "co_return", "co_yield", "decltype", "default", "delete", "do", "double", "dynamic_cast", "else", "enum",
+    "explicit", "export", "extern", "false", "float", "for", "friend", "goto", "if", "inline", "int", "long",
+    "mutable", "namespace", "new", "noexcept", "not", "not_eq", "nullptr", "operator", "or", "or_eq", "private",
+    "protected", "public", "register", "reinterpret_cast", "requires", "return", "short", "signed", "sizeof",
+    "static", "static_assert", "static_cast", "struct", "switch", "template", "this", "thread_local", "throw",
+    "true", "try", "typedef", "typeid", "typename", "union", "unsigned", "using", "virtual", "void", "volatile",
+    "wchar_t", "while", "xor", "xor_eq", "std", "include", "define", "ifdef", "endif"
+}
+
+# Bash Keywords
+BASH_KEYWORDS = {
+    "if", "then", "else", "elif", "fi", "case", "esac", "for", "select", "while", "until", "do", "done", "in",
+    "function", "time", "coproc", "declare", "typeset", "local", "readonly", "export", "unset", "set", "shift",
+    "trap", "ulimit", "umask", "alias", "unalias", "break", "continue", "return", "exit", "echo", "printf",
+    "read", "cd", "pwd", "pushd", "popd", "dirs", "eval", "exec", "source", "true", "false", "null"
 }
 
 def split_camel_snake(text: str) -> str:
@@ -66,13 +88,20 @@ def clean_and_tokenize(text: str) -> List[str]:
                 final_tokens_list.extend(t.lower().split())
             
     # 4. Filter stop words (Java keywords + common English stops if needed)
-    # Also filtering very short tokens, but keeping metadata tokens
+    # Also filtering very short tokens, but keeping metadata tokens and numbers
     final_tokens = [
         t for t in final_tokens_list 
-        if t not in JAVA_KEYWORDS and (len(t) > 2 or t.startswith('('))
+        if t not in JAVA_KEYWORDS and (len(t) > 2 or t.startswith('(') or any(c.isdigit() for c in t))
     ]
     
     return final_tokens
+
+def tokenize_log_message(text: str) -> List[str]:
+    """
+    Standard tokenization for Log/Error Strings.
+    """
+    tokens = clean_and_tokenize(text)
+    return tokens
 
 def extract_java_tokens(source_code: str) -> List[str]:
     """
@@ -159,9 +188,112 @@ def extract_java_tokens(source_code: str) -> List[str]:
         # Split by space and add
         sub = cleaned_str.split()
         for s in sub:
-            if s.lower() not in JAVA_KEYWORDS and len(s) > 2:
+            if s.lower() not in JAVA_KEYWORDS and (len(s) > 2 or any(c.isdigit() for c in s)):
                 expanded_tokens.append(s.lower())
                 
+    return expanded_tokens
+
+def extract_cpp_tokens(source_code: str) -> List[str]:
+    """
+    Parses C++ code using regex to extract meaningful tokens:
+    - #include headers
+    - Class/Struct names
+    - Function names
+    - Variable types
+    - String literals
+    """
+    tokens = []
+    
+    # 1. Includes
+    includes = re.findall(r'#include\s*[<"]([^>"]+)[>"]', source_code)
+    tokens.extend(includes)
+    
+    # 2. Class/Struct Definitions (class MyClass, struct MyStruct)
+    class_defs = re.findall(r'\b(class|struct)\s+(\w+)', source_code)
+    for _, name in class_defs:
+        tokens.append(name)
+        
+    # 3. Function Definitions/Declarations (Type FuncName(...))
+    # Heuristic: Word followed by (
+    func_calls = re.findall(r'\b(\w+)\s*\(', source_code)
+    tokens.extend(func_calls)
+    
+    # 4. Types/Variables (Type var;) - Hard to do perfectly with regex, picking capitalized words as potential Types
+    # and words before equals
+    
+    # 5. String Literals
+    strings = re.findall(r'"([^"\\]*(?:\\.[^"\\]*)*)"', source_code)
+    for s in strings:
+        tokens.extend(clean_and_tokenize(s))
+        
+    # General cleanup and tokenization of the rest of the code to catch variables etc
+    # Remove comments
+    no_comments = re.sub(r'//.*', '', source_code)
+    no_comments = re.sub(r'/\*.*?\*/', '', no_comments, flags=re.DOTALL)
+    
+    # Extract words
+    words = re.findall(r'\b[a-zA-Z_]\w*\b', no_comments)
+    tokens.extend(words)
+    
+    expanded_tokens = []
+    seen = set()
+    for t in tokens:
+        cleaned_str = split_camel_snake(t)
+        sub = cleaned_str.split()
+        for s in sub:
+            s_lower = s.lower()
+            if s_lower not in CPP_KEYWORDS and (len(s_lower) > 2 or any(c.isdigit() for c in s_lower)):
+                expanded_tokens.append(s_lower)
+
+    return expanded_tokens
+
+def extract_bash_tokens(source_code: str) -> List[str]:
+    """
+    Parses Bash scripts using regex to extract meaningful tokens:
+    - Variable assignments
+    - Function definitions
+    - Commands
+    """
+    tokens = []
+    
+    # 1. Variable Assignments (VAR=val)
+    vars = re.findall(r'\b([a-zA-Z_]\w*)=', source_code)
+    tokens.extend(vars)
+    
+    # 2. Function Definitions (func() or function func)
+    funcs = re.findall(r'\bfunction\s+(\w+)', source_code)
+    funcs2 = re.findall(r'\b(\w+)\s*\(\)', source_code)
+    tokens.extend(funcs)
+    tokens.extend(funcs2)
+    
+    # 3. String Literals
+    strings = re.findall(r'"([^"\\]*(?:\\.[^"\\]*)*)"', source_code)
+    strings_single = re.findall(r"'([^']*)'", source_code)
+    
+    for s in strings + strings_single:
+         tokens.extend(clean_and_tokenize(s))
+    
+    # General extraction of words, filtering typical shell syntax
+    # Remove comments
+    no_comments = re.sub(r'#.*', '', source_code)
+    
+    words = re.findall(r'\b[a-zA-Z0-9_.-]+\b', no_comments)
+    tokens.extend(words)
+    
+    expanded_tokens = []
+    for t in tokens:
+        # Bash variables often use snake_case or CAPS
+        cleaned_str = split_camel_snake(t)
+        sub = cleaned_str.split()
+        for s in sub:
+            s_lower = s.lower()
+            # Remove extension-like tokens if they are just extensions? No, keep everything unless keyword
+            if s_lower not in BASH_KEYWORDS and (len(s_lower) > 2 or any(c.isdigit() for c in s_lower)):
+                # Remove leading/trailing formatting chars
+                s_clean = s_lower.strip('.-_')
+                if len(s_clean) > 1 or any(c.isdigit() for c in s_clean):
+                    expanded_tokens.append(s_clean)
+                    
     return expanded_tokens
 
 def load_documents(dataset_path: str) -> List[Dict]:
@@ -181,24 +313,43 @@ def load_documents(dataset_path: str) -> List[Dict]:
         if file_path.is_file():
             # Determine type based on parent folder or extension
             doc_type = "unknown"
+            tokenizer = clean_and_tokenize # Default
+
             if "confluence" in str(file_path).lower() or file_path.suffix == '.txt':
                 doc_type = "confluence"
             if "jira" in str(file_path).lower():
                 doc_type = "jira"
+            
+            # Code detection - Specific tokenizers override default
             if file_path.suffix == '.java':
                 doc_type = "code"
-            
+                tokenizer = extract_java_tokens
+            elif file_path.suffix in ['.cpp', '.cc', '.cxx', '.c', '.h', '.hpp']:
+                doc_type = "code"
+                tokenizer = extract_cpp_tokens
+            elif file_path.suffix in ['.sh', '.bash']:
+                doc_type = "code"
+                tokenizer = extract_bash_tokens
+            elif file_path.suffix == '.sql':
+                doc_type = "code"
+                # Use default clean_and_tokenize for now, or add extract_sql_tokens later
+                
             # Read content
             try:
                 with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                     content = f.read()
                 
-                # Use specialized tokenizer for Java
-                if doc_type == "code":
-                    tokens = extract_java_tokens(content)
-                else:
-                    tokens = clean_and_tokenize(content)
+                tokens = tokenizer(content)
                 
+                # Check for All-Caps Phrases (Entities) and stick them into the token list
+                capital_phrases = extract_capital_sequences(content)
+                if capital_phrases:
+                    # Treat them as single tokens (underscored) or just add them?
+                    # Adding them as n-grams will happen in FG if we concat, 
+                    # but if we add them as separate tokens, they get indexed as unigrams "RISK MANAGEMENT POLICY"
+                    # which is great for "Exact Match" features.
+                    tokens.extend(capital_phrases)
+
                 # Only add if we have content
                 if tokens:
                     documents.append({
