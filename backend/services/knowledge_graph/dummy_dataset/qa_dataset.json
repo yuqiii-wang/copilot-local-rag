@@ -1,588 +1,132 @@
-{
-  "Trading System Overview": [
-    "dummy_trading_sys_confluence/System_Overview.txt",
-    "dummy_trading_sys_confluence/Architecture_Design.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/TradingSystem.java"
-  ],
-  "Project TRD": [
-    "dummy_trading_sys_confluence/System_Overview.txt",
-    "dummy_trading_sys_jira/TRD-1.txt",
-    "dummy_trading_sys_confluence/Architecture_Design.txt"
-  ],
-  "Architecture Design": [
-    "dummy_trading_sys_confluence/Architecture_Design.txt",
-    "dummy_trading_sys_confluence/System_Overview.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/core/ExecutionEngine.java"
-  ],
-  "Developer Setup": [
-    "dummy_trading_sys_confluence/Developer_Setup.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/TradingSystem.java"
-  ],
-  "How to build the project": [
-    "dummy_trading_sys_confluence/Developer_Setup.txt"
-  ],
-  "Risk Management Policy": [
-    "dummy_trading_sys_confluence/Risk_Management_Policy.txt",
-    "dummy_trading_sys_jira/RSK-1.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/RiskLimit.java"
-  ],
-  "Margin Call Rules": [
-    "dummy_trading_sys_confluence/Risk_Management_Policy.txt",
-    "dummy_trading_sys_confluence/API_Reference_Margin_Service.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/MarginRequirement.java"
-  ],
-  "Pre-Trade Controls": [
-    "dummy_trading_sys_confluence/Risk_Management_Policy.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/core/ExecutionEngine.java",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/RiskLimit.java"
-  ],
-  "User Guide Placing Orders": [
-    "dummy_trading_sys_confluence/User_Guide_Placing_Orders.txt",
-    "dummy_trading_sys_confluence/System_Overview.txt"
-  ],
-  "Placing Orders Help": [
-    "dummy_trading_sys_confluence/User_Guide_Placing_Orders.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/core/ExecutionEngine.java",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Order.java"
-  ],
-  "API Reference": [
-    "dummy_trading_sys_confluence/API_Reference_Margin_Service.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/core/MarketGateway.java"
-  ],
-  "Margin Service API": [
-    "dummy_trading_sys_confluence/API_Reference_Margin_Service.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/MarginRequirement.java"
-  ],
-  "TRD-1": [
-    "dummy_trading_sys_confluence/Risk_Management_Policy.txt",
-    "dummy_trading_sys_jira/TRD-1.txt",
-    "dummy_trading_sys_jira/TRD-2.txt",
-    "dummy_trading_sys_jira/TRD-3.txt",
-    "dummy_trading_sys_jira/TRD-4.txt",
-    "dummy_trading_sys_jira/TRD-5.txt"
-  ],
-  "Core Architecture Ticket": [
-    "dummy_trading_sys_jira/TRD-1.txt",
-    "dummy_trading_sys_confluence/Architecture_Design.txt"
-  ],
-  "TRD-2": [
-    "dummy_trading_sys_jira/TRD-1.txt",
-    "dummy_trading_sys_jira/TRD-2.txt"
-  ],
-  "TRD-3": [
-    "dummy_trading_sys_jira/TRD-1.txt",
-    "dummy_trading_sys_jira/TRD-3.txt"
-  ],
-  "TRD-4": [
-    "dummy_trading_sys_jira/TRD-1.txt",
-    "dummy_trading_sys_jira/TRD-4.txt"
-  ],
-  "TRD-5": [
-    "dummy_trading_sys_jira/TRD-1.txt",
-    "dummy_trading_sys_jira/TRD-5.txt"
-  ],
-  "BUG-209": [
-    "dummy_trading_sys_jira/BUG-209.txt"
-  ],
-  "PnL calculation bug": [
-    "dummy_trading_sys_jira/BUG-209.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Position.java",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Portfolio.java"
-  ],
-  "Realized PnL issue": [
-    "dummy_trading_sys_jira/BUG-209.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Position.java"
-  ],
-  "MKT-101": [
-    "dummy_trading_sys_jira/MKT-101.txt"
-  ],
-  "OPS-12": [
-    "dummy_trading_sys_confluence/Incident_Report_2023_11_05.txt",
-    "dummy_trading_sys_jira/OPS-12.txt"
-  ],
-  "RSK-1": [
-    "dummy_trading_sys_jira/RSK-1.txt",
-    "dummy_trading_sys_jira/RSK-2.txt",
-    "dummy_trading_sys_jira/RSK-3.txt"
-  ],
-  "Risk Management Epic": [
-    "dummy_trading_sys_jira/RSK-1.txt",
-    "dummy_trading_sys_confluence/Risk_Management_Policy.txt"
-  ],
-  "RSK-2": [
-    "dummy_trading_sys_jira/RSK-2.txt",
-    "dummy_trading_sys_jira/TRD-5.txt"
-  ],
-  "RSK-3": [
-    "dummy_trading_sys_jira/RSK-3.txt"
-  ],
-  "Order Class": [
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Order.java",
-    "dummy_trading_sys_java/src/com/trading/dummy/core/ExecutionEngine.java",
-    "dummy_trading_sys_confluence/User_Guide_Placing_Orders.txt"
-  ],
-  "Order Definition": [
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Order.java",
-    "dummy_trading_sys_jira/TRD-4.txt"
-  ],
-  "orderId": [
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Order.java",
-    "dummy_trading_sys_java/src/com/trading/dummy/core/ExecutionEngine.java"
-  ],
-  "Security Class": [
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Security.java",
-    "dummy_trading_sys_java/src/com/trading/dummy/DummySecuritiesLoading.java"
-  ],
-  "Bond Model": [
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Bond.java",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Security.java"
-  ],
-  "Equity Model": [
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Equity.java",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Security.java"
-  ],
-  "Future Model": [
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Future.java",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Security.java"
-  ],
-  "Option Model": [
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Option.java",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Security.java"
-  ],
-  "Trade Class": [
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Trade.java",
-    "dummy_trading_sys_java/src/com/trading/dummy/DummyTradesLoading.java"
-  ],
-  "Position Class": [
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Position.java",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Portfolio.java",
-    "dummy_trading_sys_jira/BUG-209.txt"
-  ],
-  "Portfolio Class": [
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Portfolio.java",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Position.java"
-  ],
-  "RiskLimit Class": [
-    "dummy_trading_sys_java/src/com/trading/dummy/model/RiskLimit.java",
-    "dummy_trading_sys_confluence/Risk_Management_Policy.txt"
-  ],
-  "Collateral": [
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Collateral.java",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/CollateralType.java"
-  ],
-  "CollateralType": [
-    "dummy_trading_sys_java/src/com/trading/dummy/model/CollateralType.java",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Collateral.java"
-  ],
-  "MarginRequirement Class": [
-    "dummy_trading_sys_java/src/com/trading/dummy/model/MarginRequirement.java",
-    "dummy_trading_sys_confluence/API_Reference_Margin_Service.txt"
-  ],
-  "MarketData Class": [
-    "dummy_trading_sys_java/src/com/trading/dummy/model/MarketData.java",
-    "dummy_trading_sys_java/src/com/trading/dummy/core/MarketGateway.java"
-  ],
-  "OptionType": [
-    "dummy_trading_sys_java/src/com/trading/dummy/model/OptionType.java",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Option.java"
-  ],
-  "Side Enum": [
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Side.java",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Order.java"
-  ],
-  "SecurityType": [
-    "dummy_trading_sys_java/src/com/trading/dummy/model/SecurityType.java",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Security.java"
-  ],
-  "ExecutionEngine": [
-    "dummy_trading_sys_java/src/com/trading/dummy/core/ExecutionEngine.java",
-    "dummy_trading_sys_confluence/Architecture_Design.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/TradingSystem.java"
-  ],
-  "Order Matching": [
-    "dummy_trading_sys_java/src/com/trading/dummy/core/ExecutionEngine.java",
-    "dummy_trading_sys_confluence/User_Guide_Placing_Orders.txt"
-  ],
-  "placeOrder": [
-    "dummy_trading_sys_java/src/com/trading/dummy/core/ExecutionEngine.java",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Order.java",
-    "dummy_trading_sys_confluence/User_Guide_Placing_Orders.txt"
-  ],
-  "MarketGateway": [
-    "dummy_trading_sys_java/src/com/trading/dummy/core/MarketGateway.java",
-    "dummy_trading_sys_confluence/System_Overview.txt"
-  ],
-  "MarketResponse": [
-    "dummy_trading_sys_java/src/com/trading/dummy/core/MarketResponse.java",
-    "dummy_trading_sys_java/src/com/trading/dummy/core/MarketGateway.java"
-  ],
-  "MarketException": [
-    "dummy_trading_sys_java/src/com/trading/dummy/core/MarketException.java",
-    "dummy_trading_sys_java/src/com/trading/dummy/core/MarketGateway.java"
-  ],
-  "TradingSystem Main": [
-    "dummy_trading_sys_java/src/com/trading/dummy/TradingSystem.java",
-    "dummy_trading_sys_confluence/System_Overview.txt"
-  ],
-  "Dummy Data Loading": [
-    "dummy_trading_sys_java/src/com/trading/dummy/DummySecuritiesLoading.java",
-    "dummy_trading_sys_java/src/com/trading/dummy/TradingSystem.java"
-  ],
-  "Trade Loading": [
-    "dummy_trading_sys_java/src/com/trading/dummy/DummyTradesLoading.java",
-    "dummy_trading_sys_java/src/com/trading/dummy/TradingSystem.java"
-  ],
-  "Calculate Margin": [
-    "dummy_trading_sys_confluence/Risk_Management_Policy.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/MarginRequirement.java",
-    "dummy_trading_sys_confluence/API_Reference_Margin_Service.txt"
-  ],
-  "Exposure Limit Check": [
-    "dummy_trading_sys_confluence/Risk_Management_Policy.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/core/ExecutionEngine.java",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/RiskLimit.java"
-  ],
-  "Limit Order Logic": [
-    "dummy_trading_sys_java/src/com/trading/dummy/core/ExecutionEngine.java",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Order.java"
-  ],
-  "Market Order Logic": [
-    "dummy_trading_sys_java/src/com/trading/dummy/core/ExecutionEngine.java",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Order.java"
-  ],
-  "Order Status Logic": [
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Order.java",
-    "dummy_trading_sys_confluence/User_Guide_Placing_Orders.txt"
-  ],
-  "Portfolio PnL": [
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Portfolio.java",
-    "dummy_trading_sys_jira/BUG-209.txt"
-  ],
-  "Security Definition": [
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Security.java",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/SecurityType.java"
-  ],
-  "Validation of Orders": [
-    "dummy_trading_sys_java/src/com/trading/dummy/core/ExecutionEngine.java",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Order.java"
-  ],
-  "Risk Manager": [
-    "dummy_trading_sys_jira/RSK-1.txt",
-    "dummy_trading_sys_confluence/Risk_Management_Policy.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/RiskLimit.java"
-  ],
-  "Buy Side": [
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Side.java",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Order.java"
-  ],
-  "Sell Side": [
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Side.java",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Order.java"
-  ],
-  "Short Sell": [
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Side.java",
-    "dummy_trading_sys_confluence/Risk_Management_Policy.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/core/ExecutionEngine.java"
-  ],
-  "Gross Exposure": [
-    "dummy_trading_sys_confluence/Risk_Management_Policy.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/RiskLimit.java"
-  ],
-  "Net Exposure": [
-    "dummy_trading_sys_confluence/Risk_Management_Policy.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/RiskLimit.java"
-  ],
-  "Equity Margin": [
-    "dummy_trading_sys_confluence/Risk_Management_Policy.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Equity.java"
-  ],
-  "Bond Margin": [
-    "dummy_trading_sys_confluence/Risk_Management_Policy.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Bond.java"
-  ],
-  "Margin Call Process": [
-    "dummy_trading_sys_confluence/Risk_Management_Policy.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/MarginRequirement.java"
-  ],
-  "System Capabilities": [
-    "dummy_trading_sys_confluence/System_Overview.txt",
-    "dummy_trading_sys_confluence/Architecture_Design.txt"
-  ],
-  "Modules Overview": [
-    "dummy_trading_sys_confluence/System_Overview.txt",
-    "dummy_trading_sys_confluence/Architecture_Design.txt"
-  ],
-  "New Trading System": [
-    "dummy_trading_sys_confluence/System_Overview.txt",
-    "dummy_trading_sys_jira/TRD-1.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/TradingSystem.java"
-  ],
-  "Fix PnL Bug": [
-    "dummy_trading_sys_jira/BUG-209.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Portfolio.java"
-  ],
-  "Report Bug 209": [
-    "dummy_trading_sys_jira/BUG-209.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Position.java"
-  ],
-  "Ticket MKT-101": [
-    "dummy_trading_sys_jira/MKT-101.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/core/MarketGateway.java"
-  ],
-  "Ticket OPS-12": [
-    "dummy_trading_sys_jira/OPS-12.txt",
-    "dummy_trading_sys_confluence/Developer_Setup.txt"
-  ],
-  "Ticket RSK-2": [
-    "dummy_trading_sys_jira/RSK-2.txt",
-    "dummy_trading_sys_confluence/Risk_Management_Policy.txt"
-  ],
-  "Ticket TRD-3": [
-    "dummy_trading_sys_jira/TRD-3.txt",
-    "dummy_trading_sys_confluence/System_Overview.txt"
-  ],
-  "Ticket TRD-4": [
-    "dummy_trading_sys_jira/TRD-4.txt",
-    "dummy_trading_sys_confluence/User_Guide_Placing_Orders.txt"
-  ],
-  "Ticket TRD-5": [
-    "dummy_trading_sys_jira/TRD-5.txt",
-    "dummy_trading_sys_confluence/User_Guide_Placing_Orders.txt"
-  ],
-  "Set up env": [
-    "dummy_trading_sys_confluence/Developer_Setup.txt",
-    "dummy_trading_sys_jira/OPS-12.txt"
-  ],
-  "Install dependencies": [
-    "dummy_trading_sys_confluence/Developer_Setup.txt",
-    "dummy_trading_sys_confluence/System_Overview.txt"
-  ],
-  "Java Model Package": [
-    "dummy_trading_sys_java/src/com/trading/dummy/model/",
-    "dummy_trading_sys_confluence/Architecture_Design.txt"
-  ],
-  "Java Core Package": [
-    "dummy_trading_sys_java/src/com/trading/dummy/core/",
-    "dummy_trading_sys_confluence/Architecture_Design.txt"
-  ],
-  "Main Class": [
-    "dummy_trading_sys_java/src/com/trading/dummy/TradingSystem.java",
-    "dummy_trading_sys_confluence/Developer_Setup.txt"
-  ],
-  "Structured Product": [
-    "dummy_trading_sys_java/src/com/trading/dummy/model/StructuredProduct.java",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Security.java"
-  ],
-  "Order Timestamp": [
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Order.java",
-    "dummy_trading_sys_confluence/User_Guide_Placing_Orders.txt"
-  ],
-  "Price Band Check": [
-    "dummy_trading_sys_confluence/Risk_Management_Policy.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/core/ExecutionEngine.java"
-  ],
-  "Order Size Limit": [
-    "dummy_trading_sys_confluence/Risk_Management_Policy.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/RiskLimit.java"
-  ],
-  "Maintenance Margin": [
-    "dummy_trading_sys_confluence/Risk_Management_Policy.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/MarginRequirement.java"
-  ],
-  "Initial Margin": [
-    "dummy_trading_sys_confluence/Risk_Management_Policy.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/MarginRequirement.java"
-  ],
-  "Approve Trade": [
-    "dummy_trading_sys_confluence/User_Guide_Placing_Orders.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/core/ExecutionEngine.java"
-  ],
-  "Reject Trade": [
-    "dummy_trading_sys_confluence/User_Guide_Placing_Orders.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/core/ExecutionEngine.java"
-  ],
-  "Cancel Order": [
-    "dummy_trading_sys_confluence/User_Guide_Placing_Orders.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/core/ExecutionEngine.java"
-  ],
-  "Order Limits": [
-    "dummy_trading_sys_confluence/Risk_Management_Policy.txt",
-    "dummy_trading_sys_java/src/com/trading/dummy/model/RiskLimit.java"
-  ],
-  "System Design": [
-    "dummy_trading_sys_confluence/Architecture_Design.txt",
-    "dummy_trading_sys_confluence/System_Overview.txt"
-  ],
-  "Data Models": [
-    "dummy_trading_sys_confluence/System_Overview.txt",
-    "dummy_trading_sys_confluence/Architecture_Design.txt"
-  ],
-  "Limit Price": [
-    "dummy_trading_sys_java/src/com/trading/dummy/model/Order.java",
-    "dummy_trading_sys_confluence/User_Guide_Placing_Orders.txt"
-  ],
-  "Dummy Test Data": [
-    "dummy_trading_sys_java/test/com/trading/dummy/DummyTestBase.java"
-  ],
-  "Apple Details": [
-    "dummy_trading_sys_java/test/com/trading/dummy/EquityTest.java"
-  ],
-  "NVDA Short Sell": [
-    "dummy_trading_sys_java/test/com/trading/dummy/EquityTest.java"
-  ],
-  "Netflix Equity": [
-    "dummy_trading_sys_java/test/com/trading/dummy/EquityTest.java"
-  ],
-  "Disney Option": [
-    "dummy_trading_sys_java/test/com/trading/dummy/OptionTest.java"
-  ],
-  "Bond JPM30 Specs": [
-    "dummy_trading_sys_java/test/com/trading/dummy/BondTest.java"
-  ],
-  "Futures Contract ES-DEC24": [
-    "dummy_trading_sys_java/test/com/trading/dummy/FutureTest.java"
-  ],
-  "Trading Scenarios Test": [
-    "dummy_trading_sys_java/test/com/trading/dummy/EquityTest.java",
-    "dummy_trading_sys_java/test/com/trading/dummy/BondTest.java"
-  ],
-  "Limit Order Test": [
-    "dummy_trading_sys_java/test/com/trading/dummy/OrderTest.java"
-  ],
-  "AAPL ISIN US0378331005": [
-    "dummy_trading_sys_java/test/com/trading/dummy/EquityTest.java"
-  ],
-  "MSFT Price US5949181045": [
-    "dummy_trading_sys_java/test/com/trading/dummy/EquityTest.java"
-  ],
-  "TSLA Borrow Rate US88160R1014": [
-    "dummy_trading_sys_java/test/com/trading/dummy/EquityTest.java"
-  ],
-  "UST10Y Maturity Date US1234567890": [
-    "dummy_trading_sys_java/test/com/trading/dummy/BondTest.java"
-  ],
-  "Option Expiry Dates": [
-    "dummy_trading_sys_java/test/com/trading/dummy/OptionTest.java"
-  ],
-  "Bond Coupon Rates": [
-    "dummy_trading_sys_java/test/com/trading/dummy/BondTest.java"
-  ],
-  "Visa Equity V US92826C8394": [
-    "dummy_trading_sys_java/test/com/trading/dummy/EquityTest.java"
-  ],
-  "Mastercard Equity MA US57636Q1040": [
-    "dummy_trading_sys_java/test/com/trading/dummy/EquityTest.java"
-  ],
-  "Future Multiplier": [
-    "dummy_trading_sys_java/test/com/trading/dummy/FutureTest.java"
-  ],
-  "US02079K3059": [
-    "dummy_trading_sys_java/test/com/trading/dummy/EquityTest.java"
-  ],
-  "USFUTURE1 USFUTURE2": [
-    "dummy_trading_sys_java/test/com/trading/dummy/FutureTest.java"
-  ],
-  "US0378331005": [
-    "dummy_trading_sys_java/test/com/trading/dummy/EquityTest.java",
-    "dummy_trading_sys_java/test/com/trading/dummy/FutureTest.java",
-    "dummy_trading_sys_java/test/com/trading/dummy/OptionTest.java",
-    "dummy_trading_sys_java/test/com/trading/dummy/OrderTest.java",
-    "dummy_trading_sys_java/test/com/trading/dummy/core/ExecutionEngineTest.java",
-    "dummy_trading_sys_java/test/com/trading/dummy/core/MarketGatewayTest.java"
-  ],
-  "US0231351067": [
-    "dummy_trading_sys_java/test/com/trading/dummy/EquityTest.java"
-  ],
-  "US30303M1027": [
-    "dummy_trading_sys_java/test/com/trading/dummy/EquityTest.java"
-  ],
-  "US67066G1040": [
-    "dummy_trading_sys_java/test/com/trading/dummy/EquityTest.java"
-  ],
-  "US46625H1005": [
-    "dummy_trading_sys_java/test/com/trading/dummy/EquityTest.java"
-  ],
-  "US64110L1061": [
-    "dummy_trading_sys_java/test/com/trading/dummy/EquityTest.java",
-    "dummy_trading_sys_java/test/com/trading/dummy/OptionTest.java"
-  ],
-  "US1234567891": [
-    "dummy_trading_sys_java/test/com/trading/dummy/BondTest.java"
-  ],
-  "US037833AG00": [
-    "dummy_trading_sys_java/test/com/trading/dummy/BondTest.java"
-  ],
-  "US46625HABCD": [
-    "dummy_trading_sys_java/test/com/trading/dummy/BondTest.java"
-  ],
-  "US88160RXY12": [
-    "dummy_trading_sys_java/test/com/trading/dummy/BondTest.java"
-  ],
-  "US2546871060": [
-    "dummy_trading_sys_java/test/com/trading/dummy/OptionTest.java"
-  ],
-  "USOPTIONS1": [
-    "dummy_trading_sys_java/test/com/trading/dummy/OptionTest.java"
-  ],
-  "USOPTIONS2": [
-    "dummy_trading_sys_java/test/com/trading/dummy/OptionTest.java"
-  ],
-  "USOPTIONS3": [
-    "dummy_trading_sys_java/test/com/trading/dummy/OptionTest.java"
-  ],
-  "USOPTIONS4": [
-    "dummy_trading_sys_java/test/com/trading/dummy/OptionTest.java"
-  ],
-  "OPT-301": [
-    "dummy_trading_sys_jira/OPT-301.txt"
-  ],
-  "FUT-402": [
-    "dummy_trading_sys_confluence/Futures_Roll_Procedure.txt",
-    "dummy_trading_sys_jira/FUT-402.txt"
-  ],
-  "OPS-15": [
-    "dummy_trading_sys_confluence/Database_Schema_Migration.txt",
-    "dummy_trading_sys_jira/OPS-15.txt"
-  ],
-  "BUG-215": [
-    "dummy_trading_sys_jira/BUG-215.txt"
-  ],
-  "MKT-105": [
-    "dummy_trading_sys_jira/MKT-105.txt"
-  ],
-  "SEC-99": [
-    "dummy_trading_sys_jira/SEC-99.txt"
-  ],
-  "Options Spec": [
-    "dummy_trading_sys_confluence/Options_Trading_Spec.txt"
-  ],
-  "Futures Roll": [
-    "dummy_trading_sys_confluence/Futures_Roll_Procedure.txt"
-  ],
-  "Incident 2023-11-05": [
-    "dummy_trading_sys_confluence/Incident_Report_2023_11_05.txt"
-  ],
-  "Onboarding": [
-    "dummy_trading_sys_confluence/Onboarding_Checklist.txt"
-  ],
-  "DB Migration": [
-    "dummy_trading_sys_confluence/Database_Schema_Migration.txt"
-  ],
-  "Black Scholes": [
-    "dummy_trading_sys_confluence/Options_Trading_Spec.txt",
-    "dummy_trading_sys_jira/OPT-301.txt"
-  ],
-  "Postgres Migration": [
-    "dummy_trading_sys_jira/OPS-15.txt",
-    "dummy_trading_sys_confluence/Database_Schema_Migration.txt"
-  ],
-  "Security Audit": [
-    "dummy_trading_sys_jira/SEC-99.txt"
-  ],
-  "Starting HFT Strategy Engine...": [
-    "dummy_trading_sys_cpp/HFTStrategy.cpp"
-  ],
-  "Should succeed at least once in 10 tries": [
-    "dummy_trading_sys_java/test/com/trading/dummy/core/MarketGatewayTest.java"
-  ]
-}
+[
+  {
+    "query": {
+      "id": "5a422427-0943-46ae-8688-3c707fce8bd7",
+      "timestamp": "2026-02-06T03:48:04.377Z",
+      "question": "what is a trade",
+      "ref_docs": [
+        {
+          "source": "file:///E:/copilot-local-rag/backend/services/knowledge_graph/dummy_dataset/dummy_trading_sys_confluence/User_Guide_Placing_Orders.txt",
+          "type": "confluence page",
+          "title": "User_Guide_Placing_Orders.txt",
+          "comment": "This document provides instructions on how to place orders in the trading system, including order types and execution steps."
+        },
+        {
+          "source": "file:///E:/copilot-local-rag/backend/services/knowledge_graph/dummy_dataset/dummy_trading_sys_java/src/com/trading/dummy/model/Order.java",
+          "type": "code",
+          "title": "Order.java"
+        },
+        {
+          "source": "file:///E:/copilot-local-rag/backend/services/knowledge_graph/dummy_dataset/dummy_trading_sys_java/src/com/trading/dummy/model/Trade.java",
+          "type": "code",
+          "title": "Trade.java",
+          "comment": "This code defines the Trade class, which encapsulates the details of a trade execution in the trading system."
+        },
+        {
+          "source": "file:///E:/copilot-local-rag/backend/services/knowledge_graph/dummy_dataset/dummy_trading_sys_confluence/Risk_Management_Policy.txt",
+          "type": "confluence page",
+          "title": "Risk_Management_Policy.txt"
+        },
+        {
+          "source": "file:///E:/copilot-local-rag/backend/services/knowledge_graph/dummy_dataset/dummy_trading_sys_java/src/com/trading/dummy/core/ExecutionEngine.java",
+          "type": "code",
+          "title": "ExecutionEngine.java"
+        }
+      ],
+      "conversations": [
+        {
+          "ai_assistant": "",
+          "human": ""
+        },
+        {
+          "ai_assistant": "A trade represents a confirmed execution of an order. It typically includes:\n\n- **tradeId**: unique identifier for the execution  \n- **orderId**: link back to the originating order  \n- **security**: the instrument traded  \n- **side**: BUY, SELL, or SELL SHORT  \n- **quantity** and **price**: what was executed  \n- **tradeDate**: timestamp of execution  \n\nIn this system, a trade is created after the market accepts and executes the order.",
+          "human": "System Context:\n\nYou are a helpful assistant. Use the following context to answer the user's question.\n\nFound text from images:\nNone\n\nDownloaded Document Context:\nSource: file:///E:/copilot-local-rag/backend/services/knowledge_graph/dummy_dataset/dummy_trading_sys_confluence/User_Guide_Placing_Orders.txt\nContent:\nTitle: User Guide: Placing Orders\nSpace: User Support / Trading\nAuthor: Product Owner\nLast Updated: 2023-11-05\n\n# How to Place an Order\n\n## 1. Select Security\nIdentify the security you wish to trade by its Symbol (e.g., AAPL) or ISIN.\n\n## 2. Choose Side\n*   **BUY**: You want to purchase shares.\n*   **SELL**: You want to sell shares you own.\n*   **SELL SHORT**: You want to sell shares you do not own (betting on price drop).\n\n## 3. Order Type\n*   **Market Order**: Execute immediately at the best available price. Set `price = 0`.\n*   **Limit Order**: Execute only at the specified price or better. Set `price = 150.00`.\n\n## 4. Execution\nOnce submitted, the system will:\n1.  Status = `NEW`\n2.  Validation & Risk Check.\n3.  If passed: Status = `FILLED` (for Market) or `PENDING` (for Limit).\n4.  If failed: Status = `REJECTED` (e.g., \"Risk Check Failed: Gross Exposure > 1M\").\n\n# Monitoring Positions\nNavigate to the **Portfolio** tab to see your current holdings, Average Cost, and PnL.\n\n\n---\n\nSource: file:///E:/copilot-local-rag/backend/services/knowledge_graph/dummy_dataset/dummy_trading_sys_java/src/com/trading/dummy/model/Order.java\nContent:\npackage com.trading.dummy.model;\n\nimport java.time.LocalDateTime;\nimport java.util.UUID;\n\npublic class Order {\n    private String orderId;\n    private Security security;\n    private Side side;\n    private double quantity;\n    private double price; // Limit price, 0 for Market\n    private LocalDateTime timestamp;\n    private String status;\n\n    public Order(Security security, Side side, double quantity, double price) {\n        this.orderId = UUID.randomUUID().toString();\n        this.security = security;\n        this.side = side;\n        this.quantity = quantity;\n        this.price = price;\n        this.timestamp = LocalDateTime.now();\n        this.status = \"NEW\";\n    }\n\n    public String getOrderId() { return orderId; }\n    public Security getSecurity() { return security; }\n    public Side getSide() { return side; }\n    public double getQuantity() { return quantity; }\n    public double getPrice() { return price; }\n    public LocalDateTime getTimestamp() { return timestamp; }\n    public String getStatus() { return status; }\n    public void setStatus(String status) { this.status = status; }\n}\n\n\n---\n\nSource: file:///E:/copilot-local-rag/backend/services/knowledge_graph/dummy_dataset/dummy_trading_sys_java/src/com/trading/dummy/model/Trade.java\nContent:\npackage com.trading.dummy.model;\n\nimport java.time.LocalDateTime;\n\npublic class Trade {\n    private String tradeId;\n    private String orderId;\n    private Security security;\n    private Side side;\n    private double quantity;\n    private double price;\n    private LocalDateTime tradeDate;\n\n    public Trade(String tradeId, String orderId, Security security, Side side, double quantity, double price) {\n        this.tradeId = tradeId;\n        this.orderId = orderId;\n        this.security = security;\n        this.side = side;\n        this.quantity = quantity;\n        this.price = price;\n        this.tradeDate = LocalDateTime.now();\n    }\n    \n    public String getTradeId() { return tradeId; }\n    public String getOrderId() { return orderId; }\n    public Security getSecurity() { return security; }\n    public Side getSide() { return side; }\n    public double getQuantity() { return quantity; }\n    public double getPrice() { return price; }\n    public LocalDateTime getTradeDate() { return tradeDate; }\n}\n\n\n---\n\nSource: file:///E:/copilot-local-rag/backend/services/knowledge_graph/dummy_dataset/dummy_trading_sys_confluence/Risk_Management_Policy.txt\nContent:\nTitle: Risk Management Policy\nSpace: Compliance / Risk\nAuthor: Chief Risk Officer\nLast Updated: 2023-10-01\n\n# Purpose\nThis document outlines the limitations and controls configured in the Trading System to protect firm capital.\n\n# 1. Pre-Trade Controls\nAll orders must pass the following checks before being sent to the market:\n1.  **Limit Check**: Check if the User has exceeded their assigned Gross Exposure Limit.\n2.  **Price Band**: Limit orders must be within 10% of the last traded price (Not yet implemented, see Ticket TRD-102).\n3.  **Order Size**: Max quantity per order is capped at 10,000 units.\n\n# 2. Margin Requirements\nAccounts must maintain sufficient Equity to cover Margin Requirements.\n\n| Asset Class | Initial Margin (IM) | Maintenance Margin (MM) |\n| :--- | :--- | :--- |\n| **Equity (Major)** | 50% | 25% |\n| **Equity (Penny)** | 100% | 100% |\n| **Govt Bonds** | 5% | 3% |\n| **Cash** | 0% | 0% |\n\n# 3. Margin Call Process\nIf `Total Collateral Value < Maintenance Margin`:\n1.  The account enters \"Margin Call\" state.\n2.  No new opening positions are allowed.\n3.  The user has 24h to post additional Collateral (Cash, T-Bills) or liquidate positions.\n\n\n---\n\nSource: file:///E:/copilot-local-rag/backend/services/knowledge_graph/dummy_dataset/dummy_trading_sys_java/src/com/trading/dummy/core/ExecutionEngine.java\nContent:\npackage com.trading.dummy.core;\n\nimport com.trading.dummy.model.*;\nimport com.trading.dummy.service.*;\nimport java.util.UUID;\nimport java.util.logging.Logger;\nimport java.util.logging.Level;\n\npublic class ExecutionEngine {\n    private static final Logger LOGGER = Logger.getLogger(ExecutionEngine.class.getName());\n    private SimplePricer pricer;\n    private Portfolio portfolio;\n    private RiskManager riskManager;\n    private MarketGateway marketGateway;\n\n    public ExecutionEngine(SimplePricer pricer, Portfolio portfolio, RiskManager riskManager) {\n        this.pricer = pricer;\n        this.portfolio = portfolio;\n        this.riskManager = riskManager;\n        this.marketGateway = new MarketGateway(pricer);\n    }\n\n    public String placeOrder(Order order) {\n        LOGGER.info(\"Received order: \" + order.getSide() + \" \" + order.getQuantity() + \" \" + order.getSecurity().getSymbol());\n        \n        // 1. Validate Order\n        if (order.getQuantity() <= 0) {\n            LOGGER.warning(\"Order quantity invalid: \" + order.getQuantity());\n            return order.getOrderId();\n        }\n\n        // 2. Market Check (if Limit)\n        double marketPrice = pricer.getPrice(order.getSecurity());\n        \n        boolean isMarketOrder = order.getPrice() <= 0;\n        \n        if (!isMarketOrder) {\n            if (order.getSide() == Side.BUY && marketPrice > order.getPrice()) {\n                 LOGGER.info(\"Buy Limit \" + order.getPrice() + \" below Market \" + marketPrice + \". Pending.\");\n                 order.setStatus(\"PENDING\");\n                 return order.getOrderId();\n            }\n            if ((order.getSide() == Side.SELL || order.getSide() == Side.SELL_SHORT) && marketPrice < order.getPrice()) {\n                 LOGGER.info(\"Sell Limit \" + order.getPrice() + \" above Market \" + marketPrice + \". Pending.\");\n                 order.setStatus(\"PENDING\");\n                 return order.getOrderId();\n            }\n        }\n        \n        // 3. Pre-trade Risk Check (Simplified)\n        if (!riskManager.checkRisk(portfolio, pricer)) {\n             LOGGER.severe(\"Order rejected by Risk Manager\");\n             order.setStatus(\"REJECTED_RISK\");\n             return order.getOrderId();\n        }\n\n        // 4. Send to Market Gateway (Simulating external connectivity)\n        try {\n            MarketResponse response = marketGateway.submitOrder(order);\n            \n            // Handle Gateway Response\n            if (!response.isSuccess()) {\n                LOGGER.warning(\"Market rejected order: \" + response.getMessage());\n                order.setStatus(response.getStatus() != null ? response.getStatus() : \"REJECTED_MARKET\");\n                return order.getOrderId();\n            }\n\n            // Handle Messy / Corrupt Data from Market\n            if (Double.isNaN(response.getExecutedPrice()) || response.getExecutedPrice() <= 0) {\n                 LOGGER.severe(\"Received corrupt execution price from market: \" + response.getExecutedPrice());\n                 order.setStatus(\"ERROR_MARKET_DATA\");\n                 return order.getOrderId();\n            }\n\n            // Valid Execution\n            Trade trade = new Trade(UUID.randomUUID().toString(), order.getOrderId(), \n                                    order.getSecurity(), order.getSide(), order.getQuantity(), response.getExecutedPrice());\n            \n            // 5. Post-trade Update\n            portfolio.onTrade(trade);\n            order.setStatus(\"FILLED\");\n            System.out.println(\"Order Filled @ \" + response.getExecutedPrice() + \" (ExchID: \" + response.getExchangeOrderId() + \")\");\n            \n            return order.getOrderId();\n\n        } catch (MarketException me) {\n            // Handle Network / Latency Issues\n            LOGGER.severe(\"Market Connectivity Issue: \" + me.getMessage());\n            order.setStatus(\"REJECTED_NETWORK\"); // Or PENDING_RETRY?\n            return order.getOrderId();\n        }\n    }\n}\n\n\n\nOriginal User Query:\nwhat is a trade\n\n\nUser: what is a trade\n\nRetrieved Context:\nSource: file:///E:/copilot-local-rag/backend/services/knowledge_graph/dummy_dataset/dummy_trading_sys_confluence/User_Guide_Placing_Orders.txt\nContent:\nTitle: User Guide: Placing Orders\nSpace: User Support / Trading\nAuthor: Product Owner\nLast Updated: 2023-11-05\n\n# How to Place an Order\n\n## 1. Select Security\nIdentify the security you wish to trade by its Symbol (e.g., AAPL) or ISIN.\n\n## 2. Choose Side\n*   **BUY**: You want to purchase shares.\n*   **SELL**: You want to sell shares you own.\n*   **SELL SHORT**: You want to sell shares you do not own (betting on price drop).\n\n## 3. Order Type\n*   **Market Order**: Execute immediately at the best available price. Set `price = 0`.\n*   **Limit Order**: Execute only at the specified price or better. Set `price = 150.00`.\n\n## 4. Execution\nOnce submitted, the system will:\n1.  Status = `NEW`\n2.  Validation & Risk Check.\n3.  If passed: Status = `FILLED` (for Market) or `PENDING` (for Limit).\n4.  If failed: Status = `REJECTED` (e.g., \"Risk Check Failed: Gross Exposure > 1M\").\n\n# Monitoring Positions\nNavigate to the **Portfolio** tab to see your current holdings, Average Cost, and PnL.\n\n\n---\n\nSource: file:///E:/copilot-local-rag/backend/services/knowledge_graph/dummy_dataset/dummy_trading_sys_java/src/com/trading/dummy/model/Order.java\nContent:\npackage com.trading.dummy.model;\n\nimport java.time.LocalDateTime;\nimport java.util.UUID;\n\npublic class Order {\n    private String orderId;\n    private Security security;\n    private Side side;\n    private double quantity;\n    private double price; // Limit price, 0 for Market\n    private LocalDateTime timestamp;\n    private String status;\n\n    public Order(Security security, Side side, double quantity, double price) {\n        this.orderId = UUID.randomUUID().toString();\n        this.security = security;\n        this.side = side;\n        this.quantity = quantity;\n        this.price = price;\n        this.timestamp = LocalDateTime.now();\n        this.status = \"NEW\";\n    }\n\n    public String getOrderId() { return orderId; }\n    public Security getSecurity() { return security; }\n    public Side getSide() { return side; }\n    public double getQuantity() { return quantity; }\n    public double getPrice() { return price; }\n    public LocalDateTime getTimestamp() { return timestamp; }\n    public String getStatus() { return status; }\n    public void setStatus(String status) { this.status = status; }\n}\n\n\n---\n\nSource: file:///E:/copilot-local-rag/backend/services/knowledge_graph/dummy_dataset/dummy_trading_sys_java/src/com/trading/dummy/model/Trade.java\nContent:\npackage com.trading.dummy.model;\n\nimport java.time.LocalDateTime;\n\npublic class Trade {\n    private String tradeId;\n    private String orderId;\n    private Security security;\n    private Side side;\n    private double quantity;\n    private double price;\n    private LocalDateTime tradeDate;\n\n    public Trade(String tradeId, String orderId, Security security, Side side, double quantity, double price) {\n        this.tradeId = tradeId;\n        this.orderId = orderId;\n        this.security = security;\n        this.side = side;\n        this.quantity = quantity;\n        this.price = price;\n        this.tradeDate = LocalDateTime.now();\n    }\n    \n    public String getTradeId() { return tradeId; }\n    public String getOrderId() { return orderId; }\n    public Security getSecurity() { return security; }\n    public Side getSide() { return side; }\n    public double getQuantity() { return quantity; }\n    public double getPrice() { return price; }\n    public LocalDateTime getTradeDate() { return tradeDate; }\n}\n\n\n---\n\nSource: file:///E:/copilot-local-rag/backend/services/knowledge_graph/dummy_dataset/dummy_trading_sys_confluence/Risk_Management_Policy.txt\nContent:\nTitle: Risk Management Policy\nSpace: Compliance / Risk\nAuthor: Chief Risk Officer\nLast Updated: 2023-10-01\n\n# Purpose\nThis document outlines the limitations and controls configured in the Trading System to protect firm capital.\n\n# 1. Pre-Trade Controls\nAll orders must pass the following checks before being sent to the market:\n1.  **Limit Check**: Check if the User has exceeded their assigned Gross Exposure Limit.\n2.  **Price Band**: Limit orders must be within 10% of the last traded price (Not yet implemented, see Ticket TRD-102).\n3.  **Order Size**: Max quantity per order is capped at 10,000 units.\n\n# 2. Margin Requirements\nAccounts must maintain sufficient Equity to cover Margin Requirements.\n\n| Asset Class | Initial Margin (IM) | Maintenance Margin (MM) |\n| :--- | :--- | :--- |\n| **Equity (Major)** | 50% | 25% |\n| **Equity (Penny)** | 100% | 100% |\n| **Govt Bonds** | 5% | 3% |\n| **Cash** | 0% | 0% |\n\n# 3. Margin Call Process\nIf `Total Collateral Value < Maintenance Margin`:\n1.  The account enters \"Margin Call\" state.\n2.  No new opening positions are allowed.\n3.  The user has 24h to post additional Collateral (Cash, T-Bills) or liquidate positions.\n\n\n---\n\nSource: file:///E:/copilot-local-rag/backend/services/knowledge_graph/dummy_dataset/dummy_trading_sys_java/src/com/trading/dummy/core/ExecutionEngine.java\nContent:\npackage com.trading.dummy.core;\n\nimport com.trading.dummy.model.*;\nimport com.trading.dummy.service.*;\nimport java.util.UUID;\nimport java.util.logging.Logger;\nimport java.util.logging.Level;\n\npublic class ExecutionEngine {\n    private static final Logger LOGGER = Logger.getLogger(ExecutionEngine.class.getName());\n    private SimplePricer pricer;\n    private Portfolio portfolio;\n    private RiskManager riskManager;\n    private MarketGateway marketGateway;\n\n    public ExecutionEngine(SimplePricer pricer, Portfolio portfolio, RiskManager riskManager) {\n        this.pricer = pricer;\n        this.portfolio = portfolio;\n        this.riskManager = riskManager;\n        this.marketGateway = new MarketGateway(pricer);\n    }\n\n    public String placeOrder(Order order) {\n        LOGGER.info(\"Received order: \" + order.getSide() + \" \" + order.getQuantity() + \" \" + order.getSecurity().getSymbol());\n        \n        // 1. Validate Order\n        if (order.getQuantity() <= 0) {\n            LOGGER.warning(\"Order quantity invalid: \" + order.getQuantity());\n            return order.getOrderId();\n        }\n\n        // 2. Market Check (if Limit)\n        double marketPrice = pricer.getPrice(order.getSecurity());\n        \n        boolean isMarketOrder = order.getPrice() <= 0;\n        \n        if (!isMarketOrder) {\n            if (order.getSide() == Side.BUY && marketPrice > order.getPrice()) {\n                 LOGGER.info(\"Buy Limit \" + order.getPrice() + \" below Market \" + marketPrice + \". Pending.\");\n                 order.setStatus(\"PENDING\");\n                 return order.getOrderId();\n            }\n            if ((order.getSide() == Side.SELL || order.getSide() == Side.SELL_SHORT) && marketPrice < order.getPrice()) {\n                 LOGGER.info(\"Sell Limit \" + order.getPrice() + \" above Market \" + marketPrice + \". Pending.\");\n                 order.setStatus(\"PENDING\");\n                 return order.getOrderId();\n            }\n        }\n        \n        // 3. Pre-trade Risk Check (Simplified)\n        if (!riskManager.checkRisk(portfolio, pricer)) {\n             LOGGER.severe(\"Order rejected by Risk Manager\");\n             order.setStatus(\"REJECTED_RISK\");\n             return order.getOrderId();\n        }\n\n        // 4. Send to Market Gateway (Simulating external connectivity)\n        try {\n            MarketResponse response = marketGateway.submitOrder(order);\n            \n            // Handle Gateway Response\n            if (!response.isSuccess()) {\n                LOGGER.warning(\"Market rejected order: \" + response.getMessage());\n                order.setStatus(response.getStatus() != null ? response.getStatus() : \"REJECTED_MARKET\");\n                return order.getOrderId();\n            }\n\n            // Handle Messy / Corrupt Data from Market\n            if (Double.isNaN(response.getExecutedPrice()) || response.getExecutedPrice() <= 0) {\n                 LOGGER.severe(\"Received corrupt execution price from market: \" + response.getExecutedPrice());\n                 order.setStatus(\"ERROR_MARKET_DATA\");\n                 return order.getOrderId();\n            }\n\n            // Valid Execution\n            Trade trade = new Trade(UUID.randomUUID().toString(), order.getOrderId(), \n                                    order.getSecurity(), order.getSide(), order.getQuantity(), response.getExecutedPrice());\n            \n            // 5. Post-trade Update\n            portfolio.onTrade(trade);\n            order.setStatus(\"FILLED\");\n            System.out.println(\"Order Filled @ \" + response.getExecutedPrice() + \" (ExchID: \" + response.getExchangeOrderId() + \")\");\n            \n            return order.getOrderId();\n\n        } catch (MarketException me) {\n            // Handle Network / Latency Issues\n            LOGGER.severe(\"Market Connectivity Issue: \" + me.getMessage());\n            order.setStatus(\"REJECTED_NETWORK\"); // Or PENDING_RETRY?\n            return order.getOrderId();\n        }\n    }\n}\n\n\n\nprocess-request pslbywvv\n\nAssistant: A **trade** is the executed result of an order, recording details like the order ID, security, side, quantity, price, and execution time.\n\nUser: explain more\n\n"
+        }
+      ],
+      "status": "accepted"
+    }
+  },
+  {
+    "query": {
+      "id": "ebc67058-3d54-433a-9a0a-16b9c21834f5",
+      "timestamp": "2026-02-06T03:57:51.783Z",
+      "question": "define a trade",
+      "ref_docs": [
+        {
+          "source": "file:///E:/copilot-local-rag/backend/services/knowledge_graph/dummy_dataset/dummy_trading_sys_confluence/User_Guide_Placing_Orders.txt",
+          "type": "confluence page",
+          "title": "User_Guide_Placing_Orders.txt"
+        },
+        {
+          "source": "file:///E:/copilot-local-rag/backend/services/knowledge_graph/dummy_dataset/dummy_trading_sys_java/src/com/trading/dummy/model/Order.java",
+          "type": "code",
+          "title": "Order.java"
+        },
+        {
+          "source": "file:///E:/copilot-local-rag/backend/services/knowledge_graph/dummy_dataset/dummy_trading_sys_java/src/com/trading/dummy/model/Trade.java",
+          "type": "code",
+          "title": "Trade.java"
+        },
+        {
+          "source": "file:///E:/copilot-local-rag/backend/services/knowledge_graph/dummy_dataset/dummy_trading_sys_confluence/Risk_Management_Policy.txt",
+          "type": "confluence page",
+          "title": "Risk_Management_Policy.txt"
+        },
+        {
+          "source": "file:///E:/copilot-local-rag/backend/services/knowledge_graph/dummy_dataset/dummy_trading_sys_java/src/com/trading/dummy/core/ExecutionEngine.java",
+          "type": "code",
+          "title": "ExecutionEngine.java"
+        }
+      ],
+      "conversations": [
+        {
+          "ai_assistant": "",
+          "human": ""
+        },
+        {
+          "ai_assistant": "A **trade** is the executed result of an order. In this system it records the trade ID, related order ID, security, side, quantity, executed price, and the execution timestamp.",
+          "human": "define a trade"
+        },
+        {
+          "ai_assistant": "```java\npublic class Trade {\n    private String tradeId;\n    private String orderId;\n    private Security security;\n    private Side side;\n    private double quantity;\n    private double price;\n    private LocalDateTime tradeDate;\n\n    public Trade(String tradeId, String orderId, Security security, Side side, double quantity, double price) {\n        this.tradeId = tradeId;\n        this.orderId = orderId;\n        this.security = security;\n        this.side = side;\n        this.quantity = quantity;\n        this.price = price;\n        this.tradeDate = LocalDateTime.now();\n    }\n\n    public String getTradeId() { return tradeId; }\n    public String getOrderId() { return orderId; }\n    public Security getSecurity() { return security; }\n    public Side getSide() { return side; }\n    public double getQuantity() { return quantity; }\n    public double getPrice() { return price; }\n    public LocalDateTime getTradeDate() { return tradeDate; }\n}\n```",
+          "human": "give code detail"
+        }
+      ],
+      "status": "accepted"
+    }
+  },
+  {
+    "query": {
+      "id": "ebc67058-3d54-433a-9a0a-16b9c21834f5",
+      "timestamp": "2026-02-06T03:57:51.783Z",
+      "question": "define a security",
+      "ref_docs": [
+        {
+          "source": "file:///E:/copilot-local-rag/backend/services/knowledge_graph/dummy_dataset/dummy_trading_sys_confluence/Risk_Management_Policy.txt",
+          "type": "confluence page",
+          "title": "Risk_Management_Policy.txt"
+        },
+        {
+          "source": "file:///E:/copilot-local-rag/backend/services/knowledge_graph/dummy_dataset/dummy_trading_sys_java/src/com/trading/dummy/core/ExecutionEngine.java",
+          "type": "code",
+          "title": "ExecutionEngine.java"
+        }
+      ],
+      "conversations": [
+        {
+          "ai_assistant": "",
+          "human": ""
+        },
+        {
+          "ai_assistant": "A **trade** is the executed result of an order. In this system it records the trade ID, related order ID, security, side, quantity, executed price, and the execution timestamp.",
+          "human": "define a trade"
+        },
+        {
+          "ai_assistant": "```java\npublic class Trade {\n    private String tradeId;\n    private String orderId;\n    private Security security;\n    private Side side;\n    private double quantity;\n    private double price;\n    private LocalDateTime tradeDate;\n\n    public Trade(String tradeId, String orderId, Security security, Side side, double quantity, double price) {\n        this.tradeId = tradeId;\n        this.orderId = orderId;\n        this.security = security;\n        this.side = side;\n        this.quantity = quantity;\n        this.price = price;\n        this.tradeDate = LocalDateTime.now();\n    }\n\n    public String getTradeId() { return tradeId; }\n    public String getOrderId() { return orderId; }\n    public Security getSecurity() { return security; }\n    public Side getSide() { return side; }\n    public double getQuantity() { return quantity; }\n    public double getPrice() { return price; }\n    public LocalDateTime getTradeDate() { return tradeDate; }\n}\n```",
+          "human": "give code detail"
+        }
+      ],
+      "status": "rejected"
+    }
+  }
+]

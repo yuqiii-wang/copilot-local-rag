@@ -2,6 +2,8 @@ export interface RequestData {
     manualText: string;
     ocrText?: string;
     urls?: string[];
+    sessionId?: string;
+    id?: string; // The backend record ID
 }
 
 export class RequestManager {
@@ -25,6 +27,15 @@ export class RequestManager {
 
     public getRequest(id: string): RequestData | undefined {
         return this.requests.get(id);
+    }
+    
+    public getRequestByRecordId(recordId: string): RequestData | undefined {
+        for (const [_, data] of this.requests) {
+            if (data.id === recordId) {
+                return data;
+            }
+        }
+        return undefined;
     }
 
     public deleteRequest(id: string): void {

@@ -12,3 +12,5 @@ uploads
 *.pth
 *.pkl
 *.csv
+offline_records
+data

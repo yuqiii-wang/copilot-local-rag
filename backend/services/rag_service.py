@@ -21,12 +21,33 @@ class RAGService:
         print(f"RAG Feedback [{action}]: Query='{query[:50]}...', AI_Thinking='{len(ai_thinking)} chars', AI_Answer='{len(ai_answer)} chars', Comments='{comments}'")
         
         try:
-            from pgdb.pgdb_manager import pg_manager
-            sql = """
-                INSERT INTO repo_ask.feedback_requests (query, ai_thinking, ai_answer, user_comments, feedback_type)
-                VALUES (%s, %s, %s, %s, %s)
-            """
-            pg_manager.execute_query(sql, (query, ai_thinking, ai_answer, comments, action))
+            from data_manager import data_manager
+            import uuid
+            import datetime
+
+            # Align with FrontendDataSchema
+            # Construct "conversations" from the interaction
+            full_ai_answer = ""
+            if ai_thinking:
+                full_ai_answer += f"<thinking>{ai_thinking}</thinking>\n"
+            full_ai_answer += ai_answer
+            
+            feedback_record = {
+                "query": {
+                    "id": str(uuid.uuid4()),
+                    "timestamp": datetime.datetime.now().isoformat(),
+                    "question": query,
+                    "ref_docs": [],
+                    "conversations": [
+                         {
+                             "human": f"{query}\n\n[Comments: {comments}]" if comments else query,
+                             "ai_assistant": full_ai_answer
+                         }
+                    ],
+                    "status": action
+                }
+            }
+            data_manager.execute_query("STORE_FRONTEND_DATA", [feedback_record])
         except Exception as e:
             print(f"Error saving feedback: {e}")
             

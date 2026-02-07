@@ -81,24 +81,83 @@ class FeatureGenerator:
         """
         print(f"Loading files from {root_dir}")
         
-        # Pre-load QA Dataset to augment document content
-        qa_augmentations = {}
+        # Pre-load QA Dataset to augment document content (QueryData schema)
+        qa_augmentations = {}  # basename -> list of (text, weight, is_comment)
         qa_file_path = os.path.join(root_dir, "qa_dataset.json")
         if os.path.exists(qa_file_path):
             try:
                 import json
                 with open(qa_file_path, 'r') as f:
-                    qa_data = json.load(f)
-                
-                for query, paths in qa_data.items():
-                    query_tokens = clean_and_tokenize(query)
-                    query_str = " ".join(query_tokens)
-                    
-                    for p in paths:
-                         fname = os.path.basename(p)
-                         if fname not in qa_augmentations:
-                             qa_augmentations[fname] = []
-                         qa_augmentations[fname].append(query_str)
+                    qa_list = json.load(f)
+                for rec in qa_list:
+                    q = rec.get('query', {}) or {}
+                    question = (q.get('question') or "").strip()
+                    status = (q.get('status') or "pending").lower()
+                    # status weights: accepted very strong, rejected down-weighted
+                    status_weights = {'accepted': 10.0, 'added_confluence': 5.0, 'pending': 1.0, 'rejected': 0.2}
+                    multiplier = status_weights.get(status, 1.0)
+                    ref_docs = q.get('ref_docs', [])
+                    for idx, ref in enumerate(ref_docs):
+                        # Position multiplier: first doc strongest, then step down; floor at 0.2
+                        pos_mult = max(0.2, 1.0 - idx * 0.2)
+                        src = ref.get('source','')
+                        fname = os.path.basename(src)
+                        comment = ref.get('comment','') or ''
+                        if not question:
+                            continue
+                        qa_augmentations.setdefault(fname, [])
+                        # main question text
+                        qtokens = clean_and_tokenize(question)
+                        qstr = " ".join(qtokens)
+                        eff_mult = multiplier * pos_mult
+                        qa_augmentations[fname].append((qstr, eff_mult, False))
+                        # comment gets additional emphasis
+                        if comment:
+                            ctokens = clean_and_tokenize(comment)
+                            cstr = " ".join(ctokens)
+                            qa_augmentations[fname].append((cstr, eff_mult * 3.0, True))
+
+                        # include any explicit keywords from ref_doc with strong emphasis
+                        kw_list = ref.get('keywords', []) or []
+                        for kw in kw_list:
+                            kw_tokens = clean_and_tokenize(kw)
+                            kw_str = " ".join(kw_tokens)
+                            qa_augmentations[fname].append((kw_str, eff_mult * 10.0, False))
+
+                # Additionally, ingest conversation records (if available) and attach human/AI chat text
+                # to referenced documents. Human messages receive higher base weight than AI assistant.
+                conv_dir = os.path.join(os.getcwd(), 'backend', 'data', 'records')
+                if os.path.isdir(conv_dir):
+                    for conv_file in os.listdir(conv_dir):
+                        if not conv_file.endswith('.json'):
+                            continue
+                        try:
+                            with open(os.path.join(conv_dir, conv_file), 'r', encoding='utf-8') as cf:
+                                conv_list = json.load(cf)
+                            for rec in conv_list:
+                                q = rec.get('query', {}) or {}
+                                ref_docs = q.get('ref_docs', []) or []
+                                conversations = q.get('conversations', []) or []
+                                for conv in conversations:
+                                    human_text = (conv.get('human') or "").strip()
+                                    ai_text = (conv.get('ai_assistant') or "").strip()
+                                    for ref in ref_docs:
+                                        src = ref.get('source', '')
+                                        ref_fname = os.path.basename(src)
+                                        if human_text:
+                                            htokens = clean_and_tokenize(human_text)
+                                            hstr = " ".join(htokens)
+                                            # Human messages get a stronger base multiplier
+                                            qa_augmentations.setdefault(ref_fname, []).append((hstr, 5.0, False))
+                                        if ai_text:
+                                            atokens = clean_and_tokenize(ai_text)
+                                            astr = " ".join(atokens)
+                                            # AI assistant content is included but with lower weight and marked as comment
+                                            qa_augmentations.setdefault(ref_fname, []).append((astr, 1.0, True))
+                        except Exception:
+                            # Ignore malformed conversation files
+                            continue
+
                 print(f"Loaded QA augmentations for {len(qa_augmentations)} files.")
             except Exception as e:
                 print(f"Error loading QA augmentations: {e}")
@@ -109,7 +168,7 @@ class FeatureGenerator:
             for file in files:
                 # Filter for relevant text files
                 if file.endswith(('.txt', '.java', '.md', '.py', '.sql', '.cpp', '.cc', '.h', '.hpp', '.sh')):
-                    file_path = os.path.join(root, file)
+                    file_path = os.path.abspath(os.path.join(root, file))
                     try:
                         with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                             raw_content = f.read()
@@ -134,10 +193,18 @@ class FeatureGenerator:
                         # This pre-processing allows us to use different logic per file type
                         processed_content = " ".join(tokens)
                         
-                        # Apply QA Augmentation
+                        # Apply QA Augmentation (weighted question and comment tokens)
                         if file in qa_augmentations:
-                             augmentation = " ".join(qa_augmentations[file])
-                             processed_content += " " + augmentation
+                             aug_list = qa_augmentations[file]
+                             for item in aug_list:
+                                 try:
+                                     text, w, is_comment = item
+                                 except Exception:
+                                     text = item
+                                     w = 1.0
+                                     is_comment = False
+                                 reps = max(1, int(round(w)))  # repeat according to weight (accepted -> many repeats)
+                                 processed_content += " " + " ".join([text] * reps)
                         
                         # Extract patterns from tokens
                         current_patterns = set()
@@ -153,7 +220,9 @@ class FeatureGenerator:
                         # Timestamp for recency weighting
                         timestamp = os.path.getmtime(file_path)
 
-                        file_list.append((file, processed_content, list(current_patterns), timestamp))
+                        # Store file_path as the ID instead of just filename
+                        # This ensures uniqueness and provides full path context for results
+                        file_list.append((file_path, processed_content, list(current_patterns), timestamp))
                         
                     except Exception as e:
                         print(f"Error reading {file}: {e}")

@@ -29,37 +29,6 @@
         .link-item a { flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 10px; }
         .remove-link-btn { cursor: pointer; color: var(--vscode-errorForeground); font-weight: bold; padding: 0 5px; }
         .remove-link-btn:hover { background-color: var(--vscode-toolbar-hoverBackground); border-radius: 3px; }
-        
-        .feedback-container {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            background-color: var(--vscode-editor-background);
-            border-top: 1px solid var(--vscode-widget-border);
-            padding: 10px;
-            box-sizing: border-box;
-            display: none; /* Hidden by default until AI responds */
-            flex-direction: column;
-            gap: 5px;
-        }
-
-        .feedback-buttons {
-            display: flex;
-            justify-content: space-between;
-            gap: 5px;
-        }
-
-        .feedback-buttons button {
-            width: 100%; 
-            margin-bottom: 0;
-            font-size: 0.9em;
-        }
-        
-        #feedback-comment-area {
-            display: none;
-            margin-top: 5px;
-        }
     </style>
 </head>
 <body>
@@ -110,19 +79,6 @@
     </div>
     <button id="send-btn" style="margin-top: 10px; display: none;">Ask in AI Chat</button>
 
-    <div id="feedback-container" class="feedback-container">
-        <div class="feedback-buttons">
-            <button id="accept-btn" title="Accept Answer">Accept</button>
-            <button id="reject-btn" title="Reject Answer">Reject</button>
-            <button id="add-confluence-btn" title="Add to new Confluence">Add to Confluence</button>
-        </div>
-        <div id="feedback-comment-area">
-             <input type="text" id="feedback-comment" placeholder="Add comments..." style="width: 100%; box-sizing: border-box; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); padding: 4px; margin-bottom: 5px;">
-             <button id="submit-feedback-btn" style="width: 100%">Submit Feedback</button>
-             <button id="cancel-feedback-btn" style="width: 100%; margin-top: 5px;">Cancel</button>
-        </div>
-    </div>
-
     <script>
         const vscode = acquireVsCodeApi();
         
@@ -132,17 +88,6 @@
         const confirmBtn = document.getElementById('confirm-btn');
         const queryBtn = document.getElementById('query-btn');
         const spinner = document.getElementById('loading-spinner');
-        const feedbackContainer = document.getElementById('feedback-container');
-        const acceptBtn = document.getElementById('accept-btn');
-        const rejectBtn = document.getElementById('reject-btn');
-        const addConfluenceBtn = document.getElementById('add-confluence-btn');
-        const feedbackCommentArea = document.getElementById('feedback-comment-area');
-        const feedbackCommentInput = document.getElementById('feedback-comment');
-        const submitFeedbackBtn = document.getElementById('submit-feedback-btn');
-        const cancelFeedbackBtn = document.getElementById('cancel-feedback-btn');
-
-        let currentFeedbackAction = null;
-        let currentFeedbackData = null;
 
         // ... existing code ...
         // Link management elements
@@ -355,60 +300,6 @@
              e.target.value = '';
         });
 
-        // Feedback handling
-        function showFeedbackInput(action) {
-            currentFeedbackAction = action;
-            feedbackCommentArea.style.display = 'block';
-            document.querySelector('.feedback-buttons').style.display = 'none'; // Hide buttons while commenting
-        }
-
-        acceptBtn.addEventListener('click', () => {
-             showFeedbackInput('accept');
-        });
-        
-        rejectBtn.addEventListener('click', () => {
-             showFeedbackInput('reject');
-        });
-
-        addConfluenceBtn.addEventListener('click', () => {
-            // For now treat as accept or generic feedback
-             showFeedbackInput('addConfluence');
-        });
-
-        cancelFeedbackBtn.addEventListener('click', () => {
-             feedbackCommentArea.style.display = 'none';
-             document.querySelector('.feedback-buttons').style.display = 'flex';
-             currentFeedbackAction = null;
-        });
-
-        submitFeedbackBtn.addEventListener('click', () => {
-             const comments = feedbackCommentInput.value;
-             const ocrText = ocrContent.innerText;
-             const manualText = document.getElementById('manual-text-input').value; // Get latest text
-
-             let payload = {
-                 type: 'submitFeedback',
-                 action: currentFeedbackAction,
-                 comments: comments,
-                 manualText: manualText,
-                 ocrText: ocrText
-             };
-
-             if (currentFeedbackData) {
-                 payload = { ...payload, ...currentFeedbackData };
-             }
-
-             vscode.postMessage(payload);
-
-             // Reset UI
-             feedbackCommentArea.style.display = 'none';
-             document.querySelector('.feedback-buttons').style.display = 'flex';
-             feedbackContainer.style.display = 'none'; // Hide feedback after submission? Or keep it? Assuming hide for now.
-             feedbackCommentInput.value = '';
-             currentFeedbackAction = null;
-             currentFeedbackData = null;
-        });
-
         window.addEventListener('message', event => {
             const message = event.data;
             const spinner = document.getElementById('loading-spinner');
@@ -418,16 +309,10 @@
             }
 
             if (message.type === 'processingComplete') {
-                if (feedbackContainer) feedbackContainer.style.display = 'flex';
+                // Processing complete
             }
 
             switch (message.type) {
-                case 'triggerFeedback':
-                    if (message.data) {
-                        currentFeedbackData = message.data;
-                    }
-                    showFeedbackInput(message.action);
-                    break;
                 case 'ragResult':
                     const ragDiv = document.getElementById('rag-result');
                     // ragList is already defined globally now

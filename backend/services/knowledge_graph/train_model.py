@@ -117,25 +117,82 @@ def train():
     ngram_weights_tensor = torch.FloatTensor(ngram_weights)
     X = X * ngram_weights_tensor
 
-    # Load QA Dataset first
-    print("Loading QA Dataset...")
-    with open(QA_FILE, 'r') as f:
-        qa_data = json.load(f)
+    # Load QA Dataset first (QueryData schema)
+    print("Loading QA Dataset (QueryData schema)...")
+    qa_map = {}  # question -> list of dicts {fname, status, comment}
+    try:
+        with open(QA_FILE, 'r') as f:
+            qa_list = json.load(f)
+        for rec in qa_list:
+            q = rec.get('query', {}) or {}
+            question = (q.get('question') or "").strip()
+            status = (q.get('status') or "pending").lower()
+            ref_docs = q.get('ref_docs', [])
+            for idx, ref in enumerate(ref_docs):
+                # Position multiplier: first doc strongest, then step down; floor at 0.2
+                pos_mult = max(0.2, 1.0 - idx * 0.2)
+                src = ref.get('source', '')
+                fname = os.path.basename(src)
+                comment = ref.get('comment', '') or ''
+                keywords = ref.get('keywords', []) or []
+                if not question:
+                    continue
+                qa_map.setdefault(question, []).append({
+                    'fname': fname,
+                    'status': status,
+                    'comment': comment,
+                    'keywords': keywords,
+                    'pos_mult': pos_mult
+                })
+        print(f"Loaded {len(qa_map)} QA queries from {QA_FILE}.")
+    except Exception as e:
+        print(f"Error loading QA dataset: {e}")
+        qa_map = {}
 
-    # 3b. Augment QA Dataset with Indexer results (already run)
-    print("Augmenting QA Dataset with extracted literals...")
-    
+    # Also ingest conversation records (if present) to augment QA priors.
+    # Human messages are treated as strong signals (status='accepted'),
+    # while assistant responses are included with lower weight (status='pending').
+    conv_dir = os.path.join(os.getcwd(), 'backend', 'data', 'records')
+    try:
+        if os.path.isdir(conv_dir):
+            files = [f for f in os.listdir(conv_dir) if f.endswith('.json')]
+            for conv_file in files:
+                with open(os.path.join(conv_dir, conv_file), 'r', encoding='utf-8') as cf:
+                    conv_list = json.load(cf)
+                for rec in conv_list:
+                    q = rec.get('query', {}) or {}
+                    ref_docs = q.get('ref_docs', []) or []
+                    conversations = q.get('conversations', []) or []
+                    for conv in conversations:
+                        human_text = (conv.get('human') or "").strip()
+                        ai_text = (conv.get('ai_assistant') or "").strip()
+                        for ref in ref_docs:
+                            src = ref.get('source', '')
+                            fname_key = os.path.basename(src)
+                            if human_text:
+                                qa_map.setdefault(human_text, []).append({'fname': fname_key, 'status': 'accepted', 'comment': '', 'pos_mult': 1.0})
+                            if ai_text:
+                                qa_map.setdefault(ai_text, []).append({'fname': fname_key, 'status': 'pending', 'comment': '', 'pos_mult': 1.0})
+            print("Augmented QA mapping with conversation records.")
+    except Exception as e:
+        print(f"Error loading conversation records: {e}")
+
+    # 3b. Augment QA mapping with Indexer extracted literals (as pending queries)
+    print("Augmenting QA mapping with extracted literals from code indexers...")
     for indexer in executed_indexers:
         count_lits = 0
         for fname, literals in indexer.file_literals.items():
-             for lit in literals:
-                 clean_lit = lit.strip()
-                 if len(clean_lit) > 2:
-                     if clean_lit not in qa_data:
-                         qa_data[clean_lit] = []
-                     if fname not in qa_data[clean_lit]:
-                        qa_data[clean_lit].append(fname)
+            for lit in literals:
+                clean_lit = lit.strip()
+                if len(clean_lit) > 2:
+                    # treat literal as a short query mapping to this file
+                    if clean_lit not in qa_map:
+                        qa_map[clean_lit] = []
+                    # avoid duplicate entries for same file
+                    if not any(entry['fname'] == fname for entry in qa_map[clean_lit]):
+                        qa_map[clean_lit].append({'fname': fname, 'status': 'pending', 'comment': '', 'pos_mult': 1.0})
                         count_lits += 1
+        print(f"Added {count_lits} literal->file mappings from {indexer.__class__.__name__}")
 
 
     print("Injecting Priors from QA Dataset (and extracted literals)...")
@@ -143,15 +200,25 @@ def train():
     
     vocab_map = fg.vectorizer.vocabulary_ # Word -> Index
     
-    priors_injected_count = 0
-    
-    # Pre-calculate frequency of each query keyword in the QA dataset
-    query_keyword_counts = {}
-    for query in qa_data.keys():
-        for token in clean_and_tokenize(query):
-             query_keyword_counts[token] = query_keyword_counts.get(token, 0) + 1
+    # helper map for lookups since fg.file_map now uses full paths
+    basename_to_idx = {os.path.basename(fpath): idx for fpath, idx in fg.file_map.items()}
 
-    for query, target_files in qa_data.items():
+    priors_injected_count = 0
+
+    # Status weight multipliers
+    status_weights = {'accepted': 10.0, 'added_confluence': 5.0, 'pending': 1.0, 'rejected': 0.2}
+
+    # Pre-calculate frequency of each query keyword in the QA dataset (weighted by status importance)
+    query_keyword_counts = {}
+    for query, targets in qa_map.items():
+        if targets:
+            max_w = max(status_weights.get(t.get('status','pending'), 1.0) for t in targets)
+        else:
+            max_w = 1.0
+        for token in clean_and_tokenize(query):
+            query_keyword_counts[token] = query_keyword_counts.get(token, 0) + max_w
+
+    for query, targets in qa_map.items():
         # Tokenize query to match vocab tokens using the SAME logic as ingestion
         query_tokens = clean_and_tokenize(query)
         
@@ -163,29 +230,53 @@ def train():
                 kw_idx = vocab_map[token]
                 
                 # Dynamic weighting based on Inverse Frequency in QA Dataset
-                # If a token appears in only 1 query, it's highly specific -> Boost its weight significantly
                 freq = query_keyword_counts.get(token, 1) 
                 
                 # Boost based on sequence length (the "sql"/"seq" of keywords)
-                # Longer sequences (n-grams) imply higher specificity and should significantly boost weight.
                 ngram_len = len(token.split())
                 
                 # Power boost for sequences
-                # E.g. "risk" (len 1) -> 5.0
-                # "risk limit" (len 2) -> 25.0
                 current_weight = prior_weight * (5.0 ** ngram_len)
                 
-                for fname in target_files:
-                    # Fix: Dataset paths vs FeatureGenerator keys match
-                    # FeatureGenerator stores just the filename (basename)
-                    fname_key = os.path.basename(fname)
-                    
-                    if fname_key in fg.file_map:
-                        doc_idx = fg.file_map[fname_key]
-                        # Boost Feature: Keyword Presence in Doc
-                        X[doc_idx, kw_idx] += current_weight
+                for entry in targets:
+                    fname_key = entry.get('fname')
+                    status = entry.get('status','pending')
+                    pos_mult = entry.get('pos_mult', 1.0)
+                    weight_multiplier = status_weights.get(status, 1.0) * pos_mult
+                    if fname_key in basename_to_idx:
+                        doc_idx = basename_to_idx[fname_key]
+                        # Boost Feature: Keyword Presence in Doc (status-weighted + position)
+                        X[doc_idx, kw_idx] += current_weight * weight_multiplier
                         priors_injected_count += 1
-                        
+
+                    # Also inject comment tokens if present (strong boost, includes position)
+                    comment = entry.get('comment','') or ''
+                    if comment and fname_key in basename_to_idx:
+                        for ctoken in clean_and_tokenize(comment):
+                            if ctoken in vocab_map:
+                                cidx = vocab_map[ctoken]
+                                comment_boost = 5.0
+                                X[basename_to_idx[fname_key], cidx] += current_weight * weight_multiplier * comment_boost
+                                priors_injected_count += 1
+
+                    # Inject explicit keywords with a large boost
+                    kw_list = entry.get('keywords', []) or []
+                    keyword_boost = 50.0
+                    if kw_list and fname_key in basename_to_idx:
+                        for kw in kw_list:
+                            # allow multi-word keywords as-is
+                            if kw in vocab_map:
+                                kidx = vocab_map[kw]
+                                X[basename_to_idx[fname_key], kidx] += keyword_boost * weight_multiplier
+                                priors_injected_count += 1
+                            else:
+                                # Try tokenized variants
+                                for token in clean_and_tokenize(kw):
+                                    if token in vocab_map:
+                                        tidx = vocab_map[token]
+                                        X[basename_to_idx[fname_key], tidx] += (keyword_boost/5.0) * weight_multiplier
+                                        priors_injected_count += 1
+
     print(f"Injected {priors_injected_count} QA priors into feature matrix.")
 
     # 3b. Inject Code Priors (Strings and Dependencies) - SECOND PASS for Graph Propagation
@@ -200,12 +291,12 @@ def train():
             if token in vocab_map:
                 kw_idx = vocab_map[token]
                 for fname, weight in file_weights.items():
-                     fname_key = os.path.basename(fname)
-                     
-                     if fname_key in fg.file_map: 
-                         doc_idx = fg.file_map[fname_key]
-                         X[doc_idx, kw_idx] += weight
-                         code_prior_count += 1
+                    fname_key = os.path.basename(fname)
+                    
+                    if fname_key in basename_to_idx: 
+                        doc_idx = basename_to_idx[fname_key]
+                        X[doc_idx, kw_idx] += weight
+                        code_prior_count += 1
                      
     print(f"Injected {code_prior_count} Code graph priors into feature matrix.")
 

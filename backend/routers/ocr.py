@@ -3,7 +3,6 @@ import shutil
 import os
 import uuid
 import models as models
-from pgdb.pgdb_manager import pg_manager
 from services import ocr_service
 
 router = APIRouter(
@@ -48,18 +47,4 @@ async def create_ocr_item(file: UploadFile = File(...)):
         print(f"General processing error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/{item_id}", response_model=models.OCRResult)
-def read_ocr_item(item_id: int):
-    query = "SELECT id, filename, ocr_text, created_at FROM repo_ask.ocr_results WHERE id = %s"
-    result = pg_manager.execute_query(query, (item_id,), fetch=True)
-    
-    if not result:
-        raise HTTPException(status_code=404, detail="Item not found")
-        
-    row = result[0]
-    return models.OCRResult(
-        id=row[0],
-        filename=row[1],
-        ocr_text=row[2],
-        created_at=row[3]
-    )
+

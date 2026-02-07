@@ -17,7 +17,17 @@ class KnowledgeGraphService:
         self.dataset_path = str(kg_dir / "dummy_dataset")
         # Use valid trained model path
         self.model_path = kg_dir / "query_model.pth"
-        self._initialize()
+        # Initialization is now async via load_async()
+    
+    async def load_async(self):
+        """Asynchronous initialization wrapper"""
+        if self.model is not None:
+             return
+        
+        print("Scheduling Knowledge Graph initialization...")
+        import asyncio
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, self._initialize)
 
     def _initialize(self):
         print("Initializing Knowledge Graph Service...")
@@ -183,10 +193,15 @@ class KnowledgeGraphService:
             if score > 0.01:
                 print(f" - {Path(docs[idx]['id']).name}: {score:.4f}")
         
+        # Dynamic threshold: Filter out docs with score lower than 10% of top score
+        top_score = scored_docs[0][1] if scored_docs else 0
+        min_score = max(0.01, top_score * 0.1)
+
         for idx, score in scored_docs:
-            if score > 0.01: # Threshold
+            if score >= min_score:
                 doc = docs[idx]
                 results.append({
+                    "id": Path(doc['path']).as_uri(), # Consistent URI format
                     "title": f"[{doc.get('type', 'file').upper()}] {Path(doc['id']).name}",
                     "link": doc['path'], # Serving local path for demo
                     "score": score,

@@ -6,8 +6,21 @@ import { RequestManager } from "./requestManager";
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
   _view?: vscode.WebviewView;
+  // State tracking for feedback
+  private _lastDownloads: any[] = [];
+  private _lastRagResults: any[] = [];
+  private _lastOcrText: string = "";
+  private _currentRecordId: string | null = null; // Track current session ID
+  private _lastQuery: string = "";
 
   constructor(private readonly _extensionUri: vscode.Uri) {}
+
+  private _generateUUID(): string {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+          var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+          return v.toString(16);
+      });
+  }
 
   public triggerFeedback(action: string, data?: any) {
     if (this._view) {
@@ -50,6 +63,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                 const fileBuffer = Buffer.from(data.data);
                 const result = await executeOCRRequest(fileBuffer, data.fileName);
                 
+                this._lastOcrText = result.ocr_text || "";
+
                 webviewView.webview.postMessage({
                     type: 'ocrResult',
                     text: result.ocr_text || '_No text found_'
@@ -65,6 +80,11 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         }
         case "processAndChat": {
             try {
+                const currentQuery = data.query || "";
+                if (currentQuery !== this._lastQuery || !this._currentRecordId) {
+                    this._currentRecordId = this._generateUUID();
+                    this._lastQuery = currentQuery;
+                }
                 let contextContent = "";
                 
                 // If there are URLs, download content for them
@@ -74,7 +94,10 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                         headers: {
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify({ urls: data.urls })
+                        body: JSON.stringify({ 
+                            urls: data.urls,
+                            query: data.manualText || data.query || "" 
+                        })
                      });
 
                     if (response.ok) {
@@ -87,6 +110,13 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                             const downloads = Array.isArray(data) ? data : (data.downloads || []);
 
                             if (Array.isArray(downloads)) {
+                                this._lastDownloads = downloads; // Log for feedback
+                                const missing = downloads.filter((d: any) => d.found === false);
+                                if (missing.length > 0) {
+                                    const missingMsg = missing.map((d: any) => d.url).join(', ');
+                                    vscode.window.showWarningMessage(`File(s) not found: ${missingMsg}`);
+                                }
+
                                 contextContent = downloads
                                     .map((d: any) => `Source: ${d.url}\nContent:\n${d.content}\n`)
                                     .join('\n---\n\n');
@@ -111,7 +141,24 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                 
                 const finalQuery = '@repo-ask ' + parts.join('\n\n');
                 
-                vscode.commands.executeCommand('workbench.action.chat.open', { query: finalQuery });
+                // Prepare request data for participant
+                const reqManager = RequestManager.getInstance();
+                // We pass the prompt via command hack or just let the user see it
+                // Better approach: pass ID via hidden context if possible, or just rely on state.
+                // CURRENT HACK: We embed a request ID in the prompt "process-request <id>"
+                
+                const requestId = reqManager.createRequest({
+                    manualText: data.manualText,
+                    ocrText: data.ocrText,
+                    urls: data.urls,
+                    id: this._currentRecordId // Pass the backend record ID so ChatParticipant can reference it in buttons
+                });
+                
+                vscode.commands.executeCommand('workbench.action.chat.open', { query: finalQuery + `\n\nprocess-request ${requestId}` });
+                
+                // Record the docs immediately (Step 1)
+                await this._recordInitialDocs(backendUrl, data.manualText, data.ocrText, this._lastQuery, "", this._currentRecordId);
+
                 webviewView.webview.postMessage({ type: 'processingComplete' });
                 webviewView.webview.postMessage({ type: 'processingComplete' });
             } catch (error: any) {
@@ -125,6 +172,11 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         }
         case "queryRag": {
             try {
+                const currentQuery = data.text || "";
+                if (currentQuery !== this._lastQuery || !this._currentRecordId) {
+                    this._currentRecordId = this._generateUUID();
+                    this._lastQuery = currentQuery;
+                }
                 const skip = data.skip || 0;
                 // Call backend RAG service with the query parameter
                 const response = await fetch(`${backendUrl}/rag/retrieve`, {
@@ -141,7 +193,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                 if (!response.ok) {
                     throw new Error(`Backend error: ${response.statusText}`);
                 }
-                const results = await response.json();
+                const results = await response.json() as any[];
+                this._lastRagResults = results; // Log for feedback
                 
                 webviewView.webview.postMessage({
                     type: 'ragResult',
@@ -161,34 +214,23 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             try {
                 const action = data.action; 
                 
-                // Use provided query/thinking/answer if available (from Chat Interaction), else fallback to current sidebar state
-                let query = data.query;
-                if (!query) {
-                    const manualText = data.manualText || "";
-                    const ocrText = data.ocrText || "";
-                    if (manualText) query = manualText;
-                    if (ocrText) query += (query ? "\n\nFound text from images\n" : "Found text from images\n") + ocrText;
+                if (!this._currentRecordId) {
+                     this._currentRecordId = this._generateUUID();
+                     await this._recordInitialDocs(backendUrl, "", "", data.query, data.ai_answer, this._currentRecordId);
                 }
-                
-                const ai_thinking = data.ai_thinking || "";
-                const ai_answer = data.ai_answer || "";
 
-                // Determine endpoint based on action
-                let endpoint = '';
-                if (action === 'accept' || action === 'addConfluence') endpoint = '/rag/feedback/accept';
-                else if (action === 'reject') endpoint = '/rag/feedback/reject';
-                
-                if (endpoint) {
-                     const response = await fetch(`${backendUrl}${endpoint}`, {
+                if (this._currentRecordId) {
+                    // Step 2: Update status
+                    const endpoint = '/data/record_feedback';
+                    const response = await fetch(`${backendUrl}${endpoint}`, {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            query: query,
-                            ai_thinking: ai_thinking,
-                            ai_answer: ai_answer,
-                            user_comments: data.comments || ""
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            id: this._currentRecordId,
+                            status: action === 'addConfluence' ? 'added_confluence' : (action === 'accept' ? 'accepted' : 'rejected'),
+                            conversations: [
+                                { ai_assistant: data.ai_answer || "", human: data.query || this._lastQuery || "" }
+                            ]
                         })
                     });
                     
@@ -197,7 +239,10 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                     } else {
                         vscode.window.showErrorMessage("Failed to submit feedback.");
                     }
+                } else {
+                     vscode.window.showErrorMessage("Could not associate feedback with a record.");
                 }
+
             } catch (error: any) {
                 vscode.window.showErrorMessage(`Feedback Error: ${error.message}`);
             }
@@ -205,6 +250,92 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         }
       }
     });
+  }
+
+  private async _recordInitialDocs(backendUrl: string, manualText: string, ocrText: string, userQuery: string, aiAnswer: string = "", sessionId: string | null = null) {
+      try {
+            // Helper to determine type
+            const getDocType = (source: string) => {
+                const lower = source.toLowerCase();
+                if (lower.includes('jira') || lower.includes('/browse/')) return 'jira';
+                if (lower.includes('confluence') || lower.includes('/wiki/')) return 'confluence page';
+                return 'code';
+            };
+
+            // Collect docs from state
+            const allDocs: any[] = [
+                ...this._lastDownloads.map(d => ({ 
+                    source: d.url, 
+                    type: getDocType(d.url),
+                    title: d.title || path.basename(d.url) || d.url,
+                    comment: d.comment || undefined,
+                    keywords: d.keywords || undefined
+                })),
+                ...this._lastRagResults.map((r: any) => {
+                    const src = r.id || r.link || 'graph';
+                    return { 
+                        source: src, 
+                        type: getDocType(src),
+                        title: r.title || r.metadata?.title || path.basename(src) || 'RAG Result'
+                    };
+                })
+            ];
+
+            if (this._lastOcrText) {
+                allDocs.push({ 
+                    source: 'user_upload',
+                    type: 'code', // Default to code for OCR snippets as they are likely code screenshots in this context
+                    content: this._lastOcrText.substring(0, 200) + '...',
+                    title: 'OCR Image Upload'
+                });
+            }
+
+            // Deduplicate docs based on normalized source
+            const seenSources = new Set<string>();
+            const refDocs = [];
+            
+            for (const doc of allDocs) {
+                // simple normalization: remove file:/// prefix and decode, lower case
+                let norm = doc.source.toLowerCase();
+                if (norm.startsWith('file:///')) norm = norm.substring(8);
+                if (norm.startsWith('file://')) norm = norm.substring(7);
+                norm = decodeURIComponent(norm).replace(/\\/g, '/'); // standardize slashes
+                
+                if (!seenSources.has(norm)) {
+                    seenSources.add(norm);
+                    refDocs.push(doc);
+                }
+            }
+
+            const payload = {
+                query: {
+                    id: sessionId, // Use frontend generated UUID
+                    timestamp: new Date().toISOString(),
+                    question: userQuery || manualText || (ocrText ? "OCR extraction" : ""),
+                    ref_docs: refDocs,
+                    conversations: [
+                         { ai_assistant: "", human: "" },
+                         { ai_assistant: aiAnswer, human: userQuery || "" }
+                    ],
+                    status: "pending"
+                }
+            };
+            
+            const response = await fetch(`${backendUrl}/data/record_docs`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (response.ok) {
+                const res = await response.json() as any; // Fix unknown type syntax error
+                if (res.id) {
+                    this._currentRecordId = res.id;
+                }
+            }
+      } catch (e) {
+          console.error("Failed to record initial docs", e);
+      }
   }
 
   private _getHtmlForWebview(webview: vscode.Webview) {

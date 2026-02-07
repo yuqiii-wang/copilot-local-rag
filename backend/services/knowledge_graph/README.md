@@ -2,15 +2,28 @@
 
 This service builds a Hypergraph-based Knowledge Graph to link code, documentation (Confluence), and issue tracking (Jira) entities based on semantic similarity and shared keywords.
 
+The model is learning the weighted connection between a Document and a Keyword.
+
+Input: A sparse matrix $X$ where $X_{ij}$ represents the initial "strength" of Keyword $j$ in Document $i$.
+
+This strength comes from:
+
+* TF-IDF: Actual word count in the file.
+* Code Priors: Imported dependencies or variable usage.
+* QA History: Previous human queries associated with the file.
+
+Output: A reconstructed matrix where the model predicts what the strength of the connection should be, based on the context of the entire graph.
+
 ## Architecture
 
 ### 1. Tokenization & Indexing
 The system uses specialized tokenization strategies for different file types:
 
-*   **Java Code (`java_code_indexer.py`, `tokenization.py`)**:
-    *   Uses `javalang` to parse Abstract Syntax Trees (AST).
-    *   Extracts structural tokens: Class names, Method names, Variable types.
-    *   Extracts String Literals (e.g., error messages, business keys like "USOPTIONS4").
+*   **Code Indexers (`code_indexer/`)**:
+    *   **Java**: `javalang` AST parsing for classes, methods, and *String Literals*.
+    *   **C++**: Regex/Clang-based extraction for includes and definitions.
+    *   **SQL**: Table and column extraction.
+    *   **Bash**: Command and argument parsing.
     *   **Dependency Graph**: Builds a directed graph of class dependencies to propagate context (e.g., if A uses B, keywords in B are relevant to A).
 *   **Text/Docs (`tokenization.py`)**:
     *   Regex-based pattern matching (UUIDs, ISINs, CUSIPs, Dates).
@@ -21,12 +34,11 @@ The system uses specialized tokenization strategies for different file types:
 *   **Vectorization**: Uses `TfidfVectorizer` to convert documents into sparse vectors.
 *   **Settings**: 
     *   N-grams: 1 to 5 (captures phrases).
-    *   Min DF: 2 (filters noise).
+    *   **Min DF: 1** (Allows unique code literals).
     *   Max DF: 0.85 (filters stopwords).
-*   **Hypergraph Structure**: 
-    *   **Nodes**: Documents (Files).
-    *   **Hyperedges**: Keywords (Tokens).
-    *   An index is built where a Document is connected to a Keyword if the TF-IDF score is non-zero.
+*   **Augmentations**:
+    *   **Recency Weighting**: Recently modified files receive a small weight boost (up to 5%).
+    *   **QA Text Injection**: Text from known QA pairs is appended to document content to artificially increase term frequency for relevant keywords.
 
 ### 3. Model: Keyword Reconstruction HGNN (`graph_model.py`)
 A Hypergraph Neural Network (HGNN) is trained to reconstruct the keyword features of documents, learning latent relationships between files that share similar terminology.
@@ -40,12 +52,17 @@ A Hypergraph Neural Network (HGNN) is trained to reconstruct the keyword feature
 ### 4. Training & Prior Injection (`train_model.py`)
 The training process is "Self-Supervised Reconstruction" with "Hard Priors".
 
-1.  **Input Features ($X$)**: TF-IDF Matrix.
+1.  **Input Features ($X$)**: Log-transformed TF-IDF Matrix (`log1p`).
 2.  **Prior Injection**:
-    *   **QA Dataset**: Known QA pairs (Query -> File) are injected into $X$ with high weight, teaching the model that specific tokens imply specific files.
-    *   **Code Dependencies**: If File A relies on File B, keywords from B are injected into A's feature vector (Softened by distance decay).
-3.  **Loss Function**: `SmoothL1Loss` (Huber Loss) to handle outliers/bursty terms.
-4.  **Optimization**: AdamW with Cosine Annealing Learning Rate scheduler.
+    *   **QA Dataset**: Known QA pairs are injected.
+    *   **Conversation Records**: Past chat interactions (Human/AI) are treated as signals.
+    *   **N-Gram Boosting**: Longer phrases (e.g., "margin call procedure") are boosted exponentially ($length^{2.5}$) over single words.
+    *   **Code Literals**: Hardcoded strings in code are treated as "pending queries" mapping to their source file.
+    *   **Structural Patterns**: Files sharing regex patterns (ISINs, UUIDs) receive a connection boost.
+3.  **Loss Function**: **Weighted MSE Loss**.
+    *   Standard MSE is dominated by zeros (sparsity > 99%).
+    *   We apply a **20x weight** to non-zero targets to force the model to respect known signals (avoiding "zero-collapse").
+4.  **Optimization**: AdamW with Cosine Annealing Learning Rate scheduler. (500 Epochs).
 
 ## Design Rationale & Evolution
 

@@ -1,7 +1,7 @@
 import os
 import random
 import json
-from pgdb.pgdb_manager import pg_manager
+from data_manager import data_manager
 
 # from paddleocr import PaddleOCR
 
@@ -22,7 +22,7 @@ def save_ocr_result(filename: str, ocr_text: str, raw_data: list, image_path: st
             VALUES (%s, %s, %s)
             RETURNING id, created_at;
         """
-        result_id = pg_manager.execute_query(query_ocr, (filename, ocr_text, image_binary), fetch=True)
+        result_id = data_manager.execute_query(query_ocr, (filename, ocr_text, image_binary), fetch=True)
         
         if result_id:
             ocr_id = result_id[0][0]
@@ -55,7 +55,7 @@ def save_ocr_result(filename: str, ocr_text: str, raw_data: list, image_path: st
                                 ocr_id, text, conf,
                                 x1, y1, x2, y2, x3, y3, x4, y4
                             )
-                            pg_manager.execute_query(bbox_query, params)
+                            data_manager.execute_query(bbox_query, params)
                         except Exception as bbox_err:
                             print(f"DEBUG: Failed to insert bbox #{i}: {bbox_err}")
                 else:
