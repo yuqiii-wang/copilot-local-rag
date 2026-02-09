@@ -33,10 +33,11 @@ The system uses specialized tokenization strategies for different file types:
 ### 2. Feature Generation (`feature_generator.py`)
 *   **Vectorization**: Uses `TfidfVectorizer` to convert documents into sparse vectors.
 *   **Settings**: 
-    *   N-grams: 1 to 5 (captures phrases).
+    *   N-grams: 1 to 5 (captures phrases). Uses space delimiters to match vectorizer format.
     *   **Min DF: 1** (Allows unique code literals).
     *   Max DF: 0.85 (filters stopwords).
 *   **Augmentations**:
+    *   **Topic Modeling (NMF)**: Extracts 10 latent topics (e.g., "Risk", "Order Management") to group documents thematically.
     *   **Recency Weighting**: Recently modified files receive a small weight boost (up to 5%).
     *   **QA Text Injection**: Text from known QA pairs is appended to document content to artificially increase term frequency for relevant keywords.
 
@@ -56,7 +57,8 @@ The training process is "Self-Supervised Reconstruction" with "Hard Priors".
 2.  **Prior Injection**:
     *   **QA Dataset**: Known QA pairs are injected.
     *   **Conversation Records**: Past chat interactions (Human/AI) are treated as signals.
-    *   **N-Gram Boosting**: Longer phrases (e.g., "margin call procedure") are boosted exponentially ($length^{2.5}$) over single words.
+    *   **N-Gram Boosting**: Longer phrases (e.g., "margin call procedure") are boosted exponentially ($3.5^{length}$) over single words.
+    *   **Topic Injection**: Latent topic scores (NMF) are appended to the node feature matrix ($X$) and create new "Topic Hyperedges" connecting conceptually related documents.
     *   **Code Literals**: Hardcoded strings in code are treated as "pending queries" mapping to their source file.
     *   **Structural Patterns**: Files sharing regex patterns (ISINs, UUIDs) receive a connection boost.
 3.  **Loss Function**: **Weighted MSE Loss**.

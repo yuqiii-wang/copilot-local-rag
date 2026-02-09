@@ -14,3 +14,4 @@ uploads
 *.csv
 offline_records
 data
+.pytest_cache

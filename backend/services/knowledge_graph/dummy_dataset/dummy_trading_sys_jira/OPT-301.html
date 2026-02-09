@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<style>
+    body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; color: #172b4d; }
+    .issue-header { margin-bottom: 20px; border-bottom: 2px solid #dfe1e6; padding-bottom: 10px; }
+    .issue-key { color: #0052cc; font-size: 14px; margin-bottom: 5px; }
+    .issue-summary { font-size: 24px; font-weight: 500; margin: 0; }
+    .meta-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-bottom: 30px; background: #f4f5f7; padding: 15px; border-radius: 5px; }
+    .meta-item { display: flex; flex-direction: column; }
+    .meta-label { font-size: 12px; font-weight: bold; color: #5e6c84; text-transform: uppercase; }
+    .meta-value { font-size: 14px; color: #172b4d; }
+    h2 { font-size: 18px; border-bottom: 1px solid #dfe1e6; padding-bottom: 5px; margin-top: 30px; }
+    code { background-color: #f4f5f7; padding: 2px 4px; border-radius: 3px; font-family: monospace; }
+</style>
+
+<title>[OPT-301] Implement Options Pricing Model (Black-Scholes)</title>
+</head>
+<body>
+<div class="issue-header">
+<div class="issue-key"><a href="#">OPT-301</a></div>
+<h1 class="issue-summary">Implement Options Pricing Model (Black-Scholes)</h1>
+</div>
+<div class="meta-grid">
+<div class="meta-item"><span class="meta-label">Type</span><span class="meta-value">Story</span></div>
+<div class="meta-item"><span class="meta-label">Status</span><span class="meta-value">Open</span></div>
+<div class="meta-item"><span class="meta-label">Priority</span><span class="meta-value">Medium</span></div>
+</div>
+<div class="description">
+<p><b>Assignee:</b> quant_dev_1</p>
+<h2>Description</h2>
+<p>We need to implement a standard pricing model for the new Option securities.</p>
+<p>Currently, the system accepts manual price updates, but we need theoretical values for risk estimation.</p>
+<br>
+<h2>Requirements</h2>
+<p>- Implement Black-Scholes-Merton formula in `com.trading.dummy.analytics`.</p>
+<p>- Support Call and Put pricing.</p>
+<p>- Inputs needed: Underlying Price, Strike, Time to Expiry, Risk-Free Rate, Volatility.</p>
+<p>- Update `SimplePricer` to use this for theoretical val if market data is stale.</p>
+<br>
+<h2>Acceptance Criteria</h2>
+<p>- Unit tests validating calculation against known values.</p>
+<p>- Integration with the Margin Service for "haircut" calculation on options.</p>
+<br>
+</div>
+</body>
+</html>

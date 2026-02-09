@@ -9,6 +9,18 @@ PATTERN_ISIN = r'^[A-Za-z]{2}[A-Za-z0-9]{9}[0-9]$'
 PATTERN_CUSIP = r'^[A-Z0-9]{9}$'
 # Ticker: 3 to 5 uppercase letters (Simple heuristic to avoid noise, e.g. "THE")
 PATTERN_TICKER = r'^[A-Z]{3,5}$' 
+
+# Email
+PATTERN_EMAIL = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+# SEDOL: 7 chars (no vowels to avoid acronyms, ends with check digit)
+PATTERN_SEDOL = r'^[B-DF-HJ-NP-TV-Z0-9]{6}[0-9]$'
+# LEI: 20 alphanumeric characters (Legal Entity Identifier)
+PATTERN_LEI = r'^[A-Z0-9]{20}$'
+# FIGI: 12 alphanumeric characters (no vowels)
+PATTERN_FIGI = r'^[B-DF-HJ-NP-TV-Z0-9]{12}$'
+# OSI Option Symbol: Root (1-6 letters) + YYMMDD + C/P + Strike (8 digits)
+PATTERN_OPTION_OSI = r'^[A-Z]{1,6}\d{6}[CP]\d{8}$'
+
 # Dates: YYYY-MM-DD or DD/MM/YYYY
 PATTERN_DATE_ISO = r'^\d{4}-\d{2}-\d{2}$'
 PATTERN_DATE_COMMON = r'^\d{2}/\d{2}/\d{4}$'
@@ -30,9 +42,14 @@ PATTERN_DATE_COMPACT = r'^\d{8}$'
 PATTERN_DIGIT_CAPS = r'^\d+[.,\-/%]*[A-Z]+$'
 
 PATTERNS = [
+    ("EMAIL", re.compile(PATTERN_EMAIL)),
+    ("OPTION_OSI", re.compile(PATTERN_OPTION_OSI)),
     ("UUID", re.compile(PATTERN_UUID)),
     ("ISIN", re.compile(PATTERN_ISIN)),
+    ("LEI", re.compile(PATTERN_LEI)),
+    ("FIGI", re.compile(PATTERN_FIGI)),
     ("CUSIP", re.compile(PATTERN_CUSIP)),
+    ("SEDOL", re.compile(PATTERN_SEDOL)),
     ("DATE_ISO", re.compile(PATTERN_DATE_ISO)),
     ("DATE_COMMON", re.compile(PATTERN_DATE_COMMON)),
     ("DATE_COMPACT", re.compile(PATTERN_DATE_COMPACT)),
@@ -78,6 +95,29 @@ def generate_structural_regex(text: str) -> str:
                 
     return "".join(regex_parts)
 
+def generate_ngrams(tokens: list, n_min: int = 1, n_max: int = 5) -> list[str]:
+    """
+    Generates n-grams from a list of tokens, from n_min to n_max.
+    e.g. ["hello", "world"] -> ["hello", "world", "hello_world"]
+    """
+    ngrams = []
+    
+    # 1. Add single tokens (unigrams)
+    if n_min <= 1:
+        ngrams.extend(tokens)
+        
+    start_n = max(2, n_min)
+    
+    # 2. Add n-grams (bigrams, trigrams etc)
+    for n in range(start_n, n_max + 1):
+        if len(tokens) < n:
+            continue
+        # Using " " to join tokens to match TfidfVectorizer's default n-gram generation
+        phrases = [" ".join(tokens[i:i+n]) for i in range(len(tokens) - n + 1)]
+        ngrams.extend(phrases)
+        
+    return ngrams
+
 def identify_pattern(token: str) -> str:
     """
     Checks if the token matches any registered pattern.
@@ -93,10 +133,10 @@ def identify_pattern(token: str) -> str:
 
 def extract_capital_sequences(text: str) -> list[str]:
     """
-    Extracts sequences of 2 or more uppercase words (potential entities/names).
-    Example: "RISK MANAGEMENT POLICY" -> ["RISK MANAGEMENT POLICY"]
+    Extracts sequences of 2 or more capitalized words (potential entities/names).
+    Example: "Risk Management Policy" -> ["Risk Management Policy"]
     """
-    # Finds consecutive words starting with A-Z and containing upper/digits/underscores
+    # Finds consecutive words starting with A-Z
     # Must be at least 2 words long
-    pattern = r'\b[A-Z][A-Z0-9_]+(?:\s+[A-Z][A-Z0-9_]+)+\b'
+    pattern = r'\b[A-Z]\w*(?:\s+[A-Z]\w*)+\b'
     return re.findall(pattern, text)

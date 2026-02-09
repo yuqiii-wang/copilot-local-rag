@@ -1,5 +1,5 @@
 class RAGService:
-    def get_dummy_search_results(self, query: str = "", skip: int = 0, limit: int = 5):
+    def get_search_results(self, query: str = "", skip: int = 0, limit: int = 5):
         # --- Integration with Knowledge Graph Service ---
         filtered = [] # Default empty
         try:

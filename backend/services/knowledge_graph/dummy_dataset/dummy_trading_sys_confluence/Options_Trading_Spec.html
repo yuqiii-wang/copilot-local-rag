@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<style>
+    body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; color: #172b4d; }
+    h1 { font-size: 2.5em; margin-bottom: 10px; }
+    .meta { color: #6b778c; font-size: 14px; margin-bottom: 30px; border-bottom: 1px solid #dfe1e6; padding-bottom: 10px; }
+    .label { font-weight: bold; color: #42526e; }
+    code { background-color: #f4f5f7; padding: 2px 4px; border-radius: 3px; font-family: monospace; }
+    pre { background-color: #f4f5f7; padding: 10px; border-radius: 5px; overflow-x: auto; }
+</style>
+
+<title>Options Trading Specification</title>
+</head>
+<body>
+<h1>Options Trading Specification</h1>
+<div class="meta">
+<div><span class="label">Space:</span> Product / Derivatives</div>
+<div><span class="label">Author:</span> Head Trader</div>
+<div><span class="label">Last Updated:</span> 2024-01-20</div>
+</div>
+<div class="content">
+<h1>Overview</h1>
+<p>This document outlines the behavior for the new Option security types (<code>com.trading.dummy.model.Option</code>).</p>
+<h1>Supported Types</h1>
+<ul>
+<li>  <b>Call</b>: Buyer has right to buy underlying.</li>
+<li>  <b>Put</b>: Buyer has right to sell underlying.</li>
+<li>  <b>Style</b>: American (Exercisable any time) - <i>For Release 1, we will treat as European for valuation.</i></li>
+</ul>
+<h1>Booking Model</h1>
+<p>Options are booked as standard <code>Security</code> objects but with extra fields:</p>
+<ul>
+<li>  `strikePrice` (double)</li>
+<li>  `expiryDate` (LocalDate)</li>
+<li>  `optionType` (Enum: Call/Put)</li>
+<li>  `underlying` (Security reference)</li>
+</ul>
+<h1>Valuation</h1>
+<p>We use the Black-Scholes model.</p>
+<p>$$ C = S_t N(d_1) - K e^{-rt} N(d_2) $$</p>
+<p>Where:</p>
+<ul>
+<li>  $S_t$: Spot price of underlying</li>
+<li>  $K$: Strike price</li>
+<li>  $r$: Risk-free rate (Global config)</li>
+<li>  $t$: Time to maturity</li>
+</ul>
+<h1>Margin Impact</h1>
+<p>Options are risky. Long options require 100% premium payment upfront.</p>
+<p>Short options are subject to <b>Span-like</b> scanning range risk.</p>
+<p>For the Dummy system, we use a simplified rule:</p>
+<ul>
+<li>  Short Call Margin = 20% of Underlying Value - Out of Money Amount.</li>
+</ul>
+</div>
+</body>
+</html>

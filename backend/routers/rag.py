@@ -15,6 +15,6 @@ class QueryRequest(BaseModel):
 
 @router.post("/retrieve")
 async def retrieve(request: QueryRequest):
-    return rag_service.get_dummy_search_results(request.query, skip=request.skip, limit=request.limit)
+    return rag_service.get_search_results(request.query, skip=request.skip, limit=request.limit)
 
 

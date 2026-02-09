@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<style>
+    body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; color: #172b4d; }
+    h1 { font-size: 2.5em; margin-bottom: 10px; }
+    .meta { color: #6b778c; font-size: 14px; margin-bottom: 30px; border-bottom: 1px solid #dfe1e6; padding-bottom: 10px; }
+    .label { font-weight: bold; color: #42526e; }
+    code { background-color: #f4f5f7; padding: 2px 4px; border-radius: 3px; font-family: monospace; }
+    pre { background-color: #f4f5f7; padding: 10px; border-radius: 5px; overflow-x: auto; }
+</style>
+
+<title>Architecture Design Document</title>
+</head>
+<body>
+<h1>Architecture Design Document</h1>
+<div class="meta">
+<div><span class="label">Space:</span> Engineering / Trading Platform</div>
+<div><span class="label">Author:</span> System Architect</div>
+<div><span class="label">Last Updated:</span> 2023-10-20</div>
+</div>
+<div class="content">
+<h1>System Context</h1>
+<p>The Trading System acts as the central hub between the User (UI/API) and the Market (Exchange/Simulator).</p>
+<pre><code class='mermaid'>
+graph TD
+    User --&gt;|Submit Order| ExecutionEngine
+    ExecutionEngine --&gt;|Check Risk| RiskManager
+    ExecutionEngine --&gt;|Get Price| Pricer
+    Pricer --&gt;|Feed| MarketData
+    ExecutionEngine --&gt;|Update| Portfolio
+    Portfolio --&gt;|Calc Margin| MarginService
+</code></pre>
+<h1>Component Details</h1>
+<h2>Execution Engine</h2>
+<p>The <code>ExecutionEngine</code> is the single entry point for order flow. It orchestrates the validation, risk check, and execution steps.</p>
+<ul>
+<li>  <b>Synchronous Processing</b>: Currently, orders are processed sequentially to ensure correct state.</li>
+<li>  <b>Matching</b>: Simple internal matching logic against the latest market price (Simulated Exchange).</li>
+</ul>
+<h2>Risk Manager</h2>
+<p>The <code>RiskManager</code> enforces limits defined in <code>RiskLimit</code>.</p>
+<ul>
+<li>  <b>Gross Exposure</b>: Sum of absolute value of all positions.</li>
+<li>  <b>Net Exposure</b>: Sum of net value of all positions.</li>
+</ul>
+<h2>Pricing</h2>
+<p>The <code>SimplePricer</code> maintains an in-memory map of the latest <code>MarketData</code> for every security.</p>
+<ul>
+<li>  <i>Future Improvement</i>: Connect to a real-time feed (Bloomberg/Reuters).</li>
+</ul>
+<h1>Data Persistence</h1>
+<ul>
+<li>  Currently In-Memory only (ArrayList/HashMap).</li>
+<li>  <i>Roadmap</i>: Integrate a Database (Postgres/Oracle) for Trade and Position persistence.</li>
+</ul>
+</div>
+</body>
+</html>

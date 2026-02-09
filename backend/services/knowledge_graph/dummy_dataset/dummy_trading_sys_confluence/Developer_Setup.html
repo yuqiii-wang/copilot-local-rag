@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<style>
+    body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; color: #172b4d; }
+    h1 { font-size: 2.5em; margin-bottom: 10px; }
+    .meta { color: #6b778c; font-size: 14px; margin-bottom: 30px; border-bottom: 1px solid #dfe1e6; padding-bottom: 10px; }
+    .label { font-weight: bold; color: #42526e; }
+    code { background-color: #f4f5f7; padding: 2px 4px; border-radius: 3px; font-family: monospace; }
+    pre { background-color: #f4f5f7; padding: 10px; border-radius: 5px; overflow-x: auto; }
+</style>
+
+<title>Developer Setup Guide</title>
+</head>
+<body>
+<h1>Developer Setup Guide</h1>
+<div class="meta">
+<div><span class="label">Space:</span> Engineering / Trading Platform</div>
+<div><span class="label">Author:</span> DevOps Team</div>
+<div><span class="label">Last Updated:</span> 2023-10-25</div>
+</div>
+<div class="content">
+<h1>Prerequisites</h1>
+<ul>
+<li>  <b>Java JDK</b>: Version 17 or higher.</li>
+<li>  <b>IDE</b>: IntelliJ IDEA or Eclipse.</li>
+<li>  <b>Build Tool</b>: Maven or Gradle (currently manual classpath in dummy project).</li>
+</ul>
+<h1>Installation</h1>
+<p>1.  Clone the repository:</p>
+<p>    <code>git clone https://github.com/dummy-corp/trading-sys-java.git</code></p>
+<p>2.  Navigate to <code>src/</code>.</p>
+<p>3.  Compile the project:</p>
+<p>    <code>javac com/trading/dummy/TradingSystem.java</code></p>
+<h1>Running the Simulation</h1>
+<p>Execute the main class to run the standard simulation scenario:</p>
+<p><code>java com.trading.dummy.TradingSystem</code></p>
+<h1>Project Structure</h1>
+<ul>
+<li>  `src/com/trading/dummy/model`: POJOs.</li>
+<li>  `src/com/trading/dummy/service`: Logic services.</li>
+<li>  `src/com/trading/dummy/core`: Application logic.</li>
+</ul>
+<h1>Debugging</h1>
+<ul>
+<li>  Logs are currently printed to `System.out`.</li>
+<li>  Common issue: `NullPointerException` if Price is missing for a Security. Ensure you add `MarketData` to the `Pricer` before trading.</li>
+</ul>
+</div>
+</body>
+</html>

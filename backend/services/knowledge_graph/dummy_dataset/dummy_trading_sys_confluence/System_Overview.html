@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<style>
+    body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; color: #172b4d; }
+    h1 { font-size: 2.5em; margin-bottom: 10px; }
+    .meta { color: #6b778c; font-size: 14px; margin-bottom: 30px; border-bottom: 1px solid #dfe1e6; padding-bottom: 10px; }
+    .label { font-weight: bold; color: #42526e; }
+    code { background-color: #f4f5f7; padding: 2px 4px; border-radius: 3px; font-family: monospace; }
+    pre { background-color: #f4f5f7; padding: 10px; border-radius: 5px; overflow-x: auto; }
+</style>
+
+<title>Trading System Overview</title>
+</head>
+<body>
+<h1>Trading System Overview</h1>
+<div class="meta">
+<div><span class="label">Space:</span> Engineering / Trading Platform</div>
+<div><span class="label">Author:</span> Tech Lead</div>
+<div><span class="label">Last Updated:</span> 2023-10-15</div>
+</div>
+<div class="content">
+<h1>Introduction</h1>
+<p>Welcome to the documentation for the new dummy Trading System (Project TRD). This system is designed to handle multi-asset securities trading with real-time risk checks and margin calculations.</p>
+<h1>Key Capabilities</h1>
+<ul>
+<li>  <b>Multi-Asset Support</b>: Currently supports Equities, with architecture in place for Bonds, Options, and Futures.</li>
+<li>  <b>Order Management</b>: Supports Market and Limit orders with basic lifecycle (New -> Filled/Rejected).</li>
+<li>  <b>Real-time Risk</b>: Pre-trade validation for Gross and Net exposure limits.</li>
+<li>  <b>Portfolio Management</b>: Real-time position tracking and PnL calculation.</li>
+<li>  <b>Margin Engine</b>: Initial and Maintenance margin calculations based on asset risk profiles.</li>
+</ul>
+<h1>High-Level Modules</h1>
+<p>1.  <b>Core Engine</b>: <code>com.trading.dummy.core</code> - Handles order matching and routing.</p>
+<p>2.  <b>Models</b>: <code>com.trading.dummy.model</code> - Data structures (Security, Trade, Position).</p>
+<p>3.  <b>Services</b>: <code>com.trading.dummy.service</code> - Business logic (Risk, Margin, Pricing).</p>
+<h1>Getting Started</h1>
+<ul>
+<li>  See [Developer Setup] for building the project.</li>
+<li>  See [Architecture Design] for system diagrams.</li>
+</ul>
+</div>
+</body>
+</html>

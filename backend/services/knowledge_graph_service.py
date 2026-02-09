@@ -1,22 +1,25 @@
 import torch
 import sys
-from pathlib import Path
+import os
 from typing import List, Dict
 from services.knowledge_graph.graph_model import KeywordReconstructionHGNN
 from services.knowledge_graph.feature_generator import generate_features
 from services.knowledge_graph.tokenization import clean_and_tokenize
+from services.knowledge_graph import feature_weights
+from config import config
+import numpy as np
 
 # Add knowledge graph directory to path
-current_dir = Path(__file__).parent
-kg_dir = current_dir / "knowledge_graph"
+current_dir = os.path.dirname(os.path.abspath(__file__))
+kg_dir = os.path.join(current_dir, "knowledge_graph")
 
 class KnowledgeGraphService:
     def __init__(self):
         self.model = None
         self.data = None
-        self.dataset_path = str(kg_dir / "dummy_dataset")
+        self.dataset_path = os.path.join(kg_dir, "dummy_dataset")
         # Use valid trained model path
-        self.model_path = kg_dir / "query_model.pth"
+        self.model_path = os.path.join(kg_dir, "query_model.pth")
         # Initialization is now async via load_async()
     
     async def load_async(self):
@@ -31,15 +34,24 @@ class KnowledgeGraphService:
 
     def _initialize(self):
         print("Initializing Knowledge Graph Service...")
-        # 1. Load Data & Features 
-        # Prefer loading the same feature generator used in training to match vocabulary
-        fg_path = kg_dir / "feature_gen.pkl"
+        
+        fg_path = os.path.join(kg_dir, "feature_gen.pkl")
+        
+        # Check if model or feature generator exists, if not train
+        if not os.path.exists(fg_path) or not os.path.exists(self.model_path):
+            print("Model or feature generator missing. Triggering training...")
+            try:
+                from services.knowledge_graph.train_model import train
+                train()
+                print("Training completed.")
+            except Exception as e:
+                print(f"Error running training: {e}")
         
         try:
             # We must use the same generator to ensure 'vocab' indices align with model weights
             from services.knowledge_graph.feature_generator import FeatureGenerator
             fg = FeatureGenerator()
-            fg.load(str(fg_path))
+            fg.load(fg_path)
             # Reconstruct the 'data' dict expected by the service
             coo = fg.features.tocoo()
             row = torch.from_numpy(coo.row.astype('int64'))
@@ -47,15 +59,22 @@ class KnowledgeGraphService:
             hyperedge_index = torch.stack([row, col], dim=0)
             
             # Replicate Training Preprocessing: N-Gram Boosting
-            # Must match train_model.py logic (currently ^2.5)
+            # Must match train_model.py logic (using centralized feature_weights)
             features_tensor = torch.from_numpy(fg.features.toarray()).float()
             
             vocab_list = fg.vectorizer.get_feature_names_out()
-            ngram_weights = [len(w.split()) ** 2.5 for w in vocab_list] 
+            ngram_weights = [feature_weights.get_ngram_boost(w) for w in vocab_list] 
             ngram_weights_tensor = torch.FloatTensor(ngram_weights)
             
             features_tensor = features_tensor * ngram_weights_tensor
             
+            # Augment with Topic Features if available (must match train_model.py)
+            if hasattr(fg, 'doc_topic_matrix') and fg.doc_topic_matrix is not None:
+                topic_features = torch.FloatTensor(fg.doc_topic_matrix)
+                topic_features = topic_features * 10.0 # Match training scale
+                features_tensor = torch.cat([features_tensor, topic_features], dim=1)
+                print(f"Augmented features with {fg.doc_topic_matrix.shape[1]} topics.")
+
             # Log transform features to match training distribution
             features_array = torch.log1p(features_tensor).numpy()
 
@@ -69,8 +88,10 @@ class KnowledgeGraphService:
             
             self.vocab = self.data['vocab']
             self.num_features = self.data['node_features'].shape[1]
-            self.num_keywords = len(self.vocab)
-            print(f"Loaded features from {fg_path}. Vocab size: {self.num_keywords}")
+            # Crucial: The model output dimension (num_keywords) covers {Vocab + Topics}
+            # So we set it to the full feature dimension
+            self.num_keywords = self.num_features 
+            print(f"Loaded features from {fg_path}. Input dim: {self.num_features}")
 
         except Exception as e:
             print(f"Failed to load trained feature generator: {e}. Falling back to regeneration (Model mismatch risk!).")
@@ -89,7 +110,7 @@ class KnowledgeGraphService:
         )
         
         # 3. Load State Dict
-        if self.model_path.exists():
+        if os.path.exists(self.model_path):
             try:
                 self.model.load_state_dict(torch.load(self.model_path))
                 self.model.eval()
@@ -179,6 +200,11 @@ class KnowledgeGraphService:
              # Log scale boost to prevent explosion, but reward multiple hits
              doc_scores = doc_scores * (1.0 + torch.log1p(shared_counts))
         
+        # Normalize scores using Softmax as requested
+        # We multiply by 100 to maintain percentage-like scaling consistent with UI expectations
+        if doc_scores.numel() > 0:
+            doc_scores = torch.softmax(doc_scores, dim=0) * config.SCORE_NORMALIZATION_FACTOR
+
         # Get top results
         results = []
         docs = self.data['docs']

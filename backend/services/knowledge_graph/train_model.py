@@ -10,7 +10,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import numpy as np
-import pickle
 import csv
 from services.knowledge_graph.feature_generator import FeatureGenerator
 from services.knowledge_graph.graph_model import KeywordReconstructionHGNN
@@ -22,47 +21,55 @@ from services.knowledge_graph.code_indexer import (
     SqlCodeIndexer
 )
 
+from services.knowledge_graph.tokenization_utils import generate_ngrams
+from services.knowledge_graph import feature_weights
+from config import config
+
 # Configuration
 MAX_FEATURES = None # Extract every word
 HIDDEN_DIM = 128
 LEARNING_RATE = 0.001 # Reduced to improve stability
 EPOCHS = 500 
-DATASET_DIR = "services/knowledge_graph/dummy_dataset"
+
+if config.DEBUG:
+    DATASET_DIR = "services/knowledge_graph/dummy_dataset"
+else:
+    DATASET_DIR = "services/knowledge_graph/real_dataset"
+
 QA_FILE = os.path.join(DATASET_DIR, "qa_dataset.json")
 MODEL_SAVE_PATH = "services/knowledge_graph/query_model.pth"
 FEATURE_GEN_PATH = "services/knowledge_graph/feature_gen.pkl"
 RESULTS_CSV_PATH = "services/knowledge_graph/hypergraph_results.csv"
 
-def generate_ngrams(tokens, n_range=(1, 5)):
-    """Generate n-grams from a list of tokens."""
-    ngrams = []
-    for n in range(n_range[0], n_range[1] + 1):
-        for i in range(len(tokens) - n + 1):
-            ngram = " ".join(tokens[i:i+n])
-            ngrams.append(ngram)
-    return ngrams
-
 def train():
     # 0. Run Indexers FIRST to extract literals
     print("Running Code Indexers to capture literals for Vocabulary...")
     
-    indexer_configs = [
-        (JavaCodeIndexer, os.path.join("services", "knowledge_graph", "dummy_dataset", "dummy_trading_sys_java")),
-        (CppCodeIndexer, os.path.join("services", "knowledge_graph", "dummy_dataset", "dummy_traing_sys_cpp")),
-        (BashCodeIndexer, os.path.join("services", "knowledge_graph", "dummy_dataset")),
-        (SqlCodeIndexer, os.path.join("services", "knowledge_graph", "dummy_dataset", "dummy_trading_system_sql"))
-    ]
+    # Map extensions to indexers
+    extension_indexer_map = {
+        '.java': JavaCodeIndexer,
+        '.cpp': CppCodeIndexer, '.hpp': CppCodeIndexer, '.h': CppCodeIndexer, '.c': CppCodeIndexer, '.cc': CppCodeIndexer,
+        '.sh': BashCodeIndexer, '.bash': BashCodeIndexer,
+        '.sql': SqlCodeIndexer
+    }
+
+    active_indexer_classes = set()
+    print(f"Scanning {DATASET_DIR} for code files...")
+    if os.path.exists(DATASET_DIR):
+        for root, _, files in os.walk(DATASET_DIR):
+            for file in files:
+                ext = os.path.splitext(file)[1].lower()
+                if ext in extension_indexer_map:
+                    active_indexer_classes.add(extension_indexer_map[ext])
+    else:
+        print(f"Warning: Dataset directory {DATASET_DIR} does not exist.")
 
     executed_indexers = []
     all_extracted_literals = []
 
-    for IndexerClass, root_path in indexer_configs:
-        if not os.path.exists(root_path):
-            print(f"Skipping {IndexerClass.__name__}: path {root_path} not found")
-            continue
-            
-        print(f"Running {IndexerClass.__name__} on {root_path}")
-        indexer = IndexerClass(root_path)
+    for IndexerClass in active_indexer_classes:
+        print(f"Running {IndexerClass.__name__} on {DATASET_DIR}")
+        indexer = IndexerClass(DATASET_DIR)
         indexer.index_project()
         executed_indexers.append(indexer)
         
@@ -104,6 +111,31 @@ def train():
     col = torch.from_numpy(coo.col.astype(np.int64))
     hyperedge_index = torch.stack([row, col], dim=0)
 
+    # 2b. Add Topic Hyperedges (NMF)
+    total_hyperedges = vocab_size
+    if hasattr(fg, 'doc_topic_matrix') and fg.doc_topic_matrix is not None:
+        print("Constructing Topic Hyperedges...")
+        doc_topic = fg.doc_topic_matrix
+        n_topics = doc_topic.shape[1]
+        
+        # Link documents to their top topics (using simple threshold)
+        rows, cols = np.where(doc_topic > 0.01) # Low threshold to capture weak links too
+        
+        # Shift topic indices by vocab_size so they form new hyperedges
+        # Hyperedge IDs: 0..vocab-1 (Keywords), vocab..vocab+topics-1 (Topics)
+        topic_indices = cols + vocab_size
+        
+        t_row = torch.from_numpy(rows.astype(np.int64))
+        t_col = torch.from_numpy(topic_indices.astype(np.int64))
+        
+        topic_hyperedge_index = torch.stack([t_row, t_col], dim=0)
+        
+        # Merge
+        hyperedge_index = torch.cat([hyperedge_index, topic_hyperedge_index], dim=1)
+        print(f"Added {len(t_row)} topic edges.")
+        
+        total_hyperedges = vocab_size + n_topics
+
     # 3. Prepare Node Features (X) with Priors
     # Base Features: TF-IDF Matrix [Docs, Keywords]
     X_check = fg.features.toarray()
@@ -113,7 +145,7 @@ def train():
     print("Boosting features based on N-Gram length...")
     vocab_list = fg.vectorizer.get_feature_names_out()
     # Boost: length^2.5 to strongly favor longest matches as requested
-    ngram_weights = [len(w.split()) ** 2.5 for w in vocab_list] 
+    ngram_weights = [feature_weights.get_ngram_boost(w) for w in vocab_list] 
     ngram_weights_tensor = torch.FloatTensor(ngram_weights)
     X = X * ngram_weights_tensor
 
@@ -130,11 +162,14 @@ def train():
             ref_docs = q.get('ref_docs', [])
             for idx, ref in enumerate(ref_docs):
                 # Position multiplier: first doc strongest, then step down; floor at 0.2
-                pos_mult = max(0.2, 1.0 - idx * 0.2)
+                pos_mult = feature_weights.calculate_qa_position_weight(idx, 1.0)
                 src = ref.get('source', '')
                 fname = os.path.basename(src)
                 comment = ref.get('comment', '') or ''
                 keywords = ref.get('keywords', []) or []
+                score = ref.get('score')
+                if score is None:
+                    score = 0.0
                 if not question:
                     continue
                 qa_map.setdefault(question, []).append({
@@ -142,7 +177,8 @@ def train():
                     'status': status,
                     'comment': comment,
                     'keywords': keywords,
-                    'pos_mult': pos_mult
+                    'pos_mult': pos_mult,
+                    'score': score
                 })
         print(f"Loaded {len(qa_map)} QA queries from {QA_FILE}.")
     except Exception as e:
@@ -169,10 +205,14 @@ def train():
                         for ref in ref_docs:
                             src = ref.get('source', '')
                             fname_key = os.path.basename(src)
+                            score = ref.get('score')
+                            if score is None:
+                                score = 0.0
+                                
                             if human_text:
-                                qa_map.setdefault(human_text, []).append({'fname': fname_key, 'status': 'accepted', 'comment': '', 'pos_mult': 1.0})
+                                qa_map.setdefault(human_text, []).append({'fname': fname_key, 'status': 'accepted', 'comment': '', 'pos_mult': 1.0, 'score': score})
                             if ai_text:
-                                qa_map.setdefault(ai_text, []).append({'fname': fname_key, 'status': 'pending', 'comment': '', 'pos_mult': 1.0})
+                                qa_map.setdefault(ai_text, []).append({'fname': fname_key, 'status': 'pending', 'comment': '', 'pos_mult': 1.0, 'score': score})
             print("Augmented QA mapping with conversation records.")
     except Exception as e:
         print(f"Error loading conversation records: {e}")
@@ -206,7 +246,7 @@ def train():
     priors_injected_count = 0
 
     # Status weight multipliers
-    status_weights = {'accepted': 10.0, 'added_confluence': 5.0, 'pending': 1.0, 'rejected': 0.2}
+    status_weights = feature_weights.STATUS_WEIGHTS
 
     # Pre-calculate frequency of each query keyword in the QA dataset (weighted by status importance)
     query_keyword_counts = {}
@@ -223,7 +263,7 @@ def train():
         query_tokens = clean_and_tokenize(query)
         
         # PRIOR INJECTION UPDATE: Use N-Grams to match sequence order
-        query_ngrams = generate_ngrams(query_tokens, n_range=(1, 7))
+        query_ngrams = generate_ngrams(query_tokens, n_min=1, n_max=7)
         
         for token in query_ngrams:
             if token in vocab_map:
@@ -232,21 +272,27 @@ def train():
                 # Dynamic weighting based on Inverse Frequency in QA Dataset
                 freq = query_keyword_counts.get(token, 1) 
                 
-                # Boost based on sequence length (the "sql"/"seq" of keywords)
+                # Boost based on sequence length (the "min=1, n_max=5f keywords)
                 ngram_len = len(token.split())
                 
                 # Power boost for sequences
-                current_weight = prior_weight * (5.0 ** ngram_len)
+                current_weight = prior_weight * feature_weights.get_qa_sequence_boost(ngram_len, 1.0)
                 
                 for entry in targets:
                     fname_key = entry.get('fname')
                     status = entry.get('status','pending')
                     pos_mult = entry.get('pos_mult', 1.0)
+                    
+                    # Score Normalization: 0..100 -> 1.0..2.0
+                    raw_score = entry.get('score')
+                    if raw_score is None: raw_score = 0.0
+                    score_mult = 1.0 + (float(raw_score) / config.SCORE_NORMALIZATION_FACTOR)
+                    
                     weight_multiplier = status_weights.get(status, 1.0) * pos_mult
                     if fname_key in basename_to_idx:
                         doc_idx = basename_to_idx[fname_key]
                         # Boost Feature: Keyword Presence in Doc (status-weighted + position)
-                        X[doc_idx, kw_idx] += current_weight * weight_multiplier
+                        X[doc_idx, kw_idx] += current_weight * weight_multiplier * score_mult
                         priors_injected_count += 1
 
                     # Also inject comment tokens if present (strong boost, includes position)
@@ -255,26 +301,26 @@ def train():
                         for ctoken in clean_and_tokenize(comment):
                             if ctoken in vocab_map:
                                 cidx = vocab_map[ctoken]
-                                comment_boost = 5.0
-                                X[basename_to_idx[fname_key], cidx] += current_weight * weight_multiplier * comment_boost
+                                comment_boost = feature_weights.QA_COMPONENT_BOOSTS['comment']
+                                X[basename_to_idx[fname_key], cidx] += current_weight * weight_multiplier * comment_boost * score_mult
                                 priors_injected_count += 1
 
                     # Inject explicit keywords with a large boost
                     kw_list = entry.get('keywords', []) or []
-                    keyword_boost = 50.0
+                    keyword_boost = feature_weights.QA_COMPONENT_BOOSTS['keywords']
                     if kw_list and fname_key in basename_to_idx:
                         for kw in kw_list:
                             # allow multi-word keywords as-is
                             if kw in vocab_map:
                                 kidx = vocab_map[kw]
-                                X[basename_to_idx[fname_key], kidx] += keyword_boost * weight_multiplier
+                                X[basename_to_idx[fname_key], kidx] += keyword_boost * current_weight * weight_multiplier * score_mult
                                 priors_injected_count += 1
                             else:
                                 # Try tokenized variants
-                                for token in clean_and_tokenize(kw):
-                                    if token in vocab_map:
-                                        tidx = vocab_map[token]
-                                        X[basename_to_idx[fname_key], tidx] += (keyword_boost/5.0) * weight_multiplier
+                                for kw_token in clean_and_tokenize(kw):
+                                    if kw_token in vocab_map:
+                                        tidx = vocab_map[kw_token]
+                                        X[basename_to_idx[fname_key], tidx] += (keyword_boost/5.0) * current_weight * weight_multiplier * score_mult
                                         priors_injected_count += 1
 
     print(f"Injected {priors_injected_count} QA priors into feature matrix.")
@@ -285,7 +331,10 @@ def train():
     
     for indexer in executed_indexers:
         # We reuse the already executed indexers
-        priors = indexer.get_code_priors(hard_weight=2.0, decay=0.5)
+        priors = indexer.get_code_priors(
+            hard_weight=feature_weights.CODE_GRAPH_WEIGHTS['hard_link'], 
+            decay=feature_weights.CODE_GRAPH_WEIGHTS['decay_factor']
+        )
         
         for token, file_weights in priors.items():
             if token in vocab_map:
@@ -312,26 +361,35 @@ def train():
                     idx = vocab_map[pat]
                     # Specific Boost for Structural Patterns
                     # This ensures documents with similar structures (e.g. both have ISINs) are linked
-                    X[i, idx] += 5.0 # Significant boost
+                    X[i, idx] += feature_weights.PATTERN_WEIGHT # Significant boost
                     pattern_inject_count += 1
         print(f"Injected {pattern_inject_count} pattern signals.")
 
+    # 3d. Augment X with Topic Weights (if available) - for Reconstruction of Topics
+    if hasattr(fg, 'doc_topic_matrix') and fg.doc_topic_matrix is not None:
+         print(f"Augmenting Node Features with {fg.doc_topic_matrix.shape[1]} NMF topics...")
+         topic_features = torch.FloatTensor(fg.doc_topic_matrix)
+         # Scale topics to match TF-IDF scale (approx) before log
+         topic_features = topic_features * 10.0 
+         X = torch.cat([X, topic_features], dim=1)
+    
     # Log-transform features to handle skewness and large priors (100.0 -> ~4.6)
     print("Log-transforming features for better numerical stability...")
     X = torch.log1p(X)
 
     # 4. Initialize Model
-    # Input: [Docs, Keywords]
-    # Output: [Docs, Keywords] (Reconstructed/Predicted Links)
+    # Input: [Docs, Features] (Content + Topics)
+    # Output: [Docs, Features] (Reconstructed/Predicted Links)
     
-    print(f"Model Input Dimension: {vocab_size}")
+    input_dim = X.shape[1]
+    print(f"Model Input Dimension: {input_dim}")
     
     # KeywordReconstructionHGNN args: in_channels, hidden_channels, num_keywords
     # Since we are predicting keywords for doc nodes, num_keywords is the output dim
     model = KeywordReconstructionHGNN(
-        in_channels=vocab_size,
+        in_channels=input_dim,
         hidden_channels=HIDDEN_DIM,
-        num_keywords=vocab_size 
+        num_keywords=input_dim
     )
     
     optimizer = optim.AdamW(model.parameters(), lr=LEARNING_RATE, weight_decay=1e-4) # AdamW for better regularization
@@ -361,7 +419,7 @@ def train():
         # Create a weight matrix: Boost importance of non-zero targets
         # Non-zero entries get 20x weight
         weights = torch.ones_like(X)
-        weights[X > 0] = 20.0 
+        weights[X > 0] = feature_weights.TRAINING_WEIGHTS['non_zero_loss_multiplier'] 
         
         loss = (element_loss * weights).mean()
         
@@ -408,7 +466,7 @@ def train():
             doc_types[name] = d_type
 
         count = 0
-        threshold = 0.5 # Loosened threshold to allow more entities (TF-IDF often < 1.0)
+        threshold = feature_weights.TRAINING_WEIGHTS['inference_threshold'] # Loosened threshold to allow more entities (TF-IDF often < 1.0)
         
         for k_idx, keyword in enumerate(vocab_list):
             # Get docs for this keyword

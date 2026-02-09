@@ -15,6 +15,7 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 load_env(os.path.join(basedir, '.env'))
 
 class Config:
-    pass
+    SCORE_NORMALIZATION_FACTOR = 100.0
+    DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'
 
 config = Config()

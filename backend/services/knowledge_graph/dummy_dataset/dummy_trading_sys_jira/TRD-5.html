@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<style>
+    body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; color: #172b4d; }
+    .issue-header { margin-bottom: 20px; border-bottom: 2px solid #dfe1e6; padding-bottom: 10px; }
+    .issue-key { color: #0052cc; font-size: 14px; margin-bottom: 5px; }
+    .issue-summary { font-size: 24px; font-weight: 500; margin: 0; }
+    .meta-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-bottom: 30px; background: #f4f5f7; padding: 15px; border-radius: 5px; }
+    .meta-item { display: flex; flex-direction: column; }
+    .meta-label { font-size: 12px; font-weight: bold; color: #5e6c84; text-transform: uppercase; }
+    .meta-value { font-size: 14px; color: #172b4d; }
+    h2 { font-size: 18px; border-bottom: 1px solid #dfe1e6; padding-bottom: 5px; margin-top: 30px; }
+    code { background-color: #f4f5f7; padding: 2px 4px; border-radius: 3px; font-family: monospace; }
+</style>
+
+<title>[TRD-5] Core Execution Engine Logic</title>
+</head>
+<body>
+<div class="issue-header">
+<div class="issue-key"><a href="#">TRD-5</a></div>
+<h1 class="issue-summary">Core Execution Engine Logic</h1>
+</div>
+<div class="meta-grid">
+<div class="meta-item"><span class="meta-label">Type</span><span class="meta-value">Story</span></div>
+<div class="meta-item"><span class="meta-label">Status</span><span class="meta-value">In Progress</span></div>
+</div>
+<div class="description">
+<p><b>Parent:</b> TRD-1</p>
+<p><b>Assignee:</b> Tech Lead</p>
+<h2>Description</h2>
+<p>The heart of the system.</p>
+<p>Need a class `ExecutionEngine` that connects everything.</p>
+<br>
+<h2>Flow</h2>
+<p>1. Receive Order.</p>
+<p>2. Validate Order parameters.</p>
+<p>3. Check Market Price (via Pricer).</p>
+<p>4. Check Pre-trade Risk (via RiskManager).</p>
+<p>5. Execute (Simulate fill).</p>
+<p>6. Update Portfolio.</p>
+<br>
+<h2>Constraint</h2>
+<p>- For now, simulate fills against a static/simple MarketData provider.</p>
+<p>- Market Orders fill at current Ask/Bid.</p>
+<p>- Limit Orders fill only if price crosses.</p>
+<br>
+<h2>Current Implementation</h2>
+<p>- Basic flow is working.</p>
+<p>- Need to integrate RiskManager call (Dependence on RSK-2).</p>
+<br>
+</div>
+</body>
+</html>

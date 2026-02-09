@@ -6,9 +6,9 @@
       "question": "what is a trade",
       "ref_docs": [
         {
-          "source": "file:///E:/copilot-local-rag/backend/services/knowledge_graph/dummy_dataset/dummy_trading_sys_confluence/User_Guide_Placing_Orders.txt",
+          "source": "file:///E:/copilot-local-rag/backend/services/knowledge_graph/dummy_dataset/dummy_trading_sys_confluence/User_Guide_Placing_Orders.html",
           "type": "confluence page",
-          "title": "User_Guide_Placing_Orders.txt",
+          "title": "User_Guide_Placing_Orders.html",
           "comment": "This document provides instructions on how to place orders in the trading system, including order types and execution steps."
         },
         {
@@ -23,9 +23,9 @@
           "comment": "This code defines the Trade class, which encapsulates the details of a trade execution in the trading system."
         },
         {
-          "source": "file:///E:/copilot-local-rag/backend/services/knowledge_graph/dummy_dataset/dummy_trading_sys_confluence/Risk_Management_Policy.txt",
+          "source": "file:///E:/copilot-local-rag/backend/services/knowledge_graph/dummy_dataset/dummy_trading_sys_confluence/Risk_Management_Policy.html",
           "type": "confluence page",
-          "title": "Risk_Management_Policy.txt"
+          "title": "Risk_Management_Policy.html"
         },
         {
           "source": "file:///E:/copilot-local-rag/backend/services/knowledge_graph/dummy_dataset/dummy_trading_sys_java/src/com/trading/dummy/core/ExecutionEngine.java",
@@ -53,9 +53,9 @@
       "question": "define a trade",
       "ref_docs": [
         {
-          "source": "file:///E:/copilot-local-rag/backend/services/knowledge_graph/dummy_dataset/dummy_trading_sys_confluence/User_Guide_Placing_Orders.txt",
+          "source": "file:///E:/copilot-local-rag/backend/services/knowledge_graph/dummy_dataset/dummy_trading_sys_confluence/User_Guide_Placing_Orders.html",
           "type": "confluence page",
-          "title": "User_Guide_Placing_Orders.txt"
+          "title": "User_Guide_Placing_Orders.html"
         },
         {
           "source": "file:///E:/copilot-local-rag/backend/services/knowledge_graph/dummy_dataset/dummy_trading_sys_java/src/com/trading/dummy/model/Order.java",
@@ -68,9 +68,9 @@
           "title": "Trade.java"
         },
         {
-          "source": "file:///E:/copilot-local-rag/backend/services/knowledge_graph/dummy_dataset/dummy_trading_sys_confluence/Risk_Management_Policy.txt",
+          "source": "file:///E:/copilot-local-rag/backend/services/knowledge_graph/dummy_dataset/dummy_trading_sys_confluence/Risk_Management_Policy.html",
           "type": "confluence page",
-          "title": "Risk_Management_Policy.txt"
+          "title": "Risk_Management_Policy.html"
         },
         {
           "source": "file:///E:/copilot-local-rag/backend/services/knowledge_graph/dummy_dataset/dummy_trading_sys_java/src/com/trading/dummy/core/ExecutionEngine.java",
@@ -102,9 +102,9 @@
       "question": "define a security",
       "ref_docs": [
         {
-          "source": "file:///E:/copilot-local-rag/backend/services/knowledge_graph/dummy_dataset/dummy_trading_sys_confluence/Risk_Management_Policy.txt",
+          "source": "file:///E:/copilot-local-rag/backend/services/knowledge_graph/dummy_dataset/dummy_trading_sys_confluence/Risk_Management_Policy.html",
           "type": "confluence page",
-          "title": "Risk_Management_Policy.txt"
+          "title": "Risk_Management_Policy.html"
         },
         {
           "source": "file:///E:/copilot-local-rag/backend/services/knowledge_graph/dummy_dataset/dummy_trading_sys_java/src/com/trading/dummy/core/ExecutionEngine.java",

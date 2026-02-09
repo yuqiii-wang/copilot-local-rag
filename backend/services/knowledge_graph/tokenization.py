@@ -3,6 +3,9 @@ import re
 import javalang
 from pathlib import Path
 from typing import List, Dict, Tuple
+from html.parser import HTMLParser
+import re
+import javalang
 from services.knowledge_graph.tokenization_utils import identify_pattern, extract_capital_sequences
 
 # Java language keywords to exclude (Still useful for regex fallback or general cleaning)
@@ -102,6 +105,40 @@ def tokenize_log_message(text: str) -> List[str]:
     """
     tokens = clean_and_tokenize(text)
     return tokens
+
+class StructuralHTMLParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.segments = [] # List of (tokens, tags)
+        self.current_tags = []
+
+    def handle_starttag(self, tag, attrs):
+        attr_dict = {k: v for k, v in attrs} if attrs else {}
+        self.current_tags.append({'name': tag, 'attrs': attr_dict})
+
+    def handle_endtag(self, tag):
+        # find the last occurrence of tag
+        for i in range(len(self.current_tags) - 1, -1, -1):
+            if self.current_tags[i]['name'] == tag:
+                del self.current_tags[i]
+                break
+
+    def handle_data(self, data):
+        tokens = clean_and_tokenize(data)
+        if tokens:
+            self.segments.append((tokens, [t.copy() for t in self.current_tags]))
+
+def extract_html_segments(text: str) -> List[Tuple[List[str], List[Dict]]]:
+    """
+    Parses HTML and returns a list of segments, where each segment is (tokens, tags).
+    """
+    parser = StructuralHTMLParser()
+    try:
+        parser.feed(text)
+        return parser.segments
+    except Exception:
+        # Fallback
+        return [(clean_and_tokenize(text), [])]
 
 def extract_java_tokens(source_code: str) -> List[str]:
     """

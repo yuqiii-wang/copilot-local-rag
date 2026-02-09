@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
 from routers import ocr, rag, download, data_router
 from data_manager import data_manager
 
@@ -40,7 +41,7 @@ app.mount('/admin/static', StaticFiles(directory='admin'), name='admin-static')
 
 @app.get("/")
 def read_root():
-    return {"message": "PaddleOCR API"}
+    return RedirectResponse(url="/admin/")
 
 if __name__ == "__main__":
     import uvicorn

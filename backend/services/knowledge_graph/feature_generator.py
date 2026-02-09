@@ -4,9 +4,45 @@ import pickle
 import numpy as np
 import torch
 from sklearn.feature_extraction.text import TfidfVectorizer
-from services.knowledge_graph.tokenization_utils import identify_pattern
+from sklearn.decomposition import NMF
+from services.knowledge_graph.tokenization_utils import identify_pattern, generate_ngrams
 # Import both tokenization methods
-from services.knowledge_graph.tokenization import clean_and_tokenize, extract_java_tokens, extract_cpp_tokens, extract_bash_tokens
+from services.knowledge_graph.tokenization import (
+    clean_and_tokenize, 
+    extract_java_tokens, 
+    extract_cpp_tokens, 
+    extract_bash_tokens,
+    extract_html_segments
+)
+from services.knowledge_graph import feature_weights
+
+def extract_html_tokens_with_weights(text):
+    # Weights managed in feature_weights.py
+    
+    segments = extract_html_segments(text)
+    weighted_tokens = []
+    
+    for tokens, tags in segments:
+        multiplier = 1.0
+        for tag_info in tags:
+            # tag_info is now a dict from updated StructuralHTMLParser
+            w = feature_weights.calculate_html_weight(tag_info, len(tokens))
+            multiplier = max(multiplier, w)
+        
+        multiplier = int(round(multiplier))
+        
+        for _ in range(multiplier):
+            weighted_tokens.extend(tokens)
+
+        # For high-weight sections, add n-gram phrases (bigrams/trigrams) to capture context
+        if multiplier >= 3 and len(tokens) > 1:
+            # Generate bigrams and trigrams using centralized util
+            ngrams = generate_ngrams(tokens, n_min=2, n_max=3)
+            # Repeat n-grams too
+            for _ in range(multiplier):
+                weighted_tokens.extend(ngrams)
+                
+    return weighted_tokens
 
 def whitespace_tokenizer(text):
     return text.split()
@@ -61,7 +97,7 @@ class FeatureGenerator:
         self.vectorizer = TfidfVectorizer(
             max_features=max_features, 
             min_df=1, # Allow unique terms (essential for code literals appearing only once)
-            max_df=0.85, 
+            max_df=0.95, # Increased from 0.85 to allow common terms like 'API' that might appear in most docs
             stop_words=None, # We handle stop words in tokenization
             ngram_range=(1, 5),
             tokenizer=whitespace_tokenizer, # Input is already space-separated tokens
@@ -93,13 +129,12 @@ class FeatureGenerator:
                     q = rec.get('query', {}) or {}
                     question = (q.get('question') or "").strip()
                     status = (q.get('status') or "pending").lower()
-                    # status weights: accepted very strong, rejected down-weighted
-                    status_weights = {'accepted': 10.0, 'added_confluence': 5.0, 'pending': 1.0, 'rejected': 0.2}
-                    multiplier = status_weights.get(status, 1.0)
+                    # status weights moved to feature_weights
+                    multiplier = feature_weights.STATUS_WEIGHTS.get(status, 1.0)
                     ref_docs = q.get('ref_docs', [])
                     for idx, ref in enumerate(ref_docs):
-                        # Position multiplier: first doc strongest, then step down; floor at 0.2
-                        pos_mult = max(0.2, 1.0 - idx * 0.2)
+                        # Position multiplier moved to feature_weights
+                        pos_mult = feature_weights.calculate_qa_position_weight(idx, 1.0)
                         src = ref.get('source','')
                         fname = os.path.basename(src)
                         comment = ref.get('comment','') or ''
@@ -115,17 +150,17 @@ class FeatureGenerator:
                         if comment:
                             ctokens = clean_and_tokenize(comment)
                             cstr = " ".join(ctokens)
-                            qa_augmentations[fname].append((cstr, eff_mult * 3.0, True))
+                            qa_augmentations[fname].append((cstr, eff_mult * feature_weights.QA_COMPONENT_BOOSTS['comment'], True))
 
                         # include any explicit keywords from ref_doc with strong emphasis
                         kw_list = ref.get('keywords', []) or []
                         for kw in kw_list:
                             kw_tokens = clean_and_tokenize(kw)
                             kw_str = " ".join(kw_tokens)
-                            qa_augmentations[fname].append((kw_str, eff_mult * 10.0, False))
+                            qa_augmentations[fname].append((kw_str, eff_mult * feature_weights.QA_COMPONENT_BOOSTS['keywords'], False))
 
                 # Additionally, ingest conversation records (if available) and attach human/AI chat text
-                # to referenced documents. Human messages receive higher base weight than AI assistant.
+                # to referenced documents. Human messages receive higher base weight than AI assistant., '.html'
                 conv_dir = os.path.join(os.getcwd(), 'backend', 'data', 'records')
                 if os.path.isdir(conv_dir):
                     for conv_file in os.listdir(conv_dir):
@@ -147,13 +182,13 @@ class FeatureGenerator:
                                         if human_text:
                                             htokens = clean_and_tokenize(human_text)
                                             hstr = " ".join(htokens)
-                                            # Human messages get a stronger base multiplier
-                                            qa_augmentations.setdefault(ref_fname, []).append((hstr, 5.0, False))
+                                            # Human messages get a stronger base multiplier from feature_weights
+                                            qa_augmentations.setdefault(ref_fname, []).append((hstr, feature_weights.STATUS_WEIGHTS['human_msg'], False))
                                         if ai_text:
                                             atokens = clean_and_tokenize(ai_text)
                                             astr = " ".join(atokens)
                                             # AI assistant content is included but with lower weight and marked as comment
-                                            qa_augmentations.setdefault(ref_fname, []).append((astr, 1.0, True))
+                                            qa_augmentations.setdefault(ref_fname, []).append((astr, feature_weights.STATUS_WEIGHTS['ai_msg'], True))
                         except Exception:
                             # Ignore malformed conversation files
                             continue
@@ -167,7 +202,7 @@ class FeatureGenerator:
         for root, dirs, files in os.walk(root_dir):
             for file in files:
                 # Filter for relevant text files
-                if file.endswith(('.txt', '.java', '.md', '.py', '.sql', '.cpp', '.cc', '.h', '.hpp', '.sh')):
+                if file.endswith(('.txt', '.java', '.md', '.py', '.sql', '.cpp', '.cc', '.h', '.hpp', '.sh', '.html')):
                     file_path = os.path.abspath(os.path.join(root, file))
                     try:
                         with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
@@ -186,6 +221,8 @@ class FeatureGenerator:
                             tokens = extract_cpp_tokens(raw_content)
                         elif file.endswith('.sh'):
                             tokens = extract_bash_tokens(raw_content)
+                        elif file.endswith('.html'):
+                            tokens = extract_html_tokens_with_weights(raw_content)
                         else:
                             tokens = clean_and_tokenize(raw_content)
                             
@@ -239,11 +276,17 @@ class FeatureGenerator:
         self.file_map = {name: i for i, name in enumerate(self.doc_names)}
         self.reverse_file_map = {i: name for i, name in enumerate(self.doc_names)}
 
-    def fit(self):
+    def fit(self, n_topics=10):
         print("Fitting TfidfVectorizer...")
         self.features = self.vectorizer.fit_transform(self.doc_contents)
         self._apply_time_weights()
         print(f"Feature matrix shape: {self.features.shape}")
+        
+        # Fit NMF Topic Model
+        print(f"Fitting NMF with {n_topics} topics...")
+        self.nmf = NMF(n_components=n_topics, random_state=42, init='nndsvd')
+        self.doc_topic_matrix = self.nmf.fit_transform(self.features)
+        
         return self.features
 
     def transform(self, texts):
@@ -265,9 +308,9 @@ class FeatureGenerator:
                 # Normalize to 0-1
                 t_norm = (timestamps - t_min) / denom
                 
-                # Apply small weight boost (max 5%) to recent files
+                # Apply small weight boost to recent files
                 # This ensures recently updated files have slightly higher importance
-                boost = 1.0 + (0.05 * t_norm)
+                boost = 1.0 + (feature_weights.RECENCY_MAX_BOOST * t_norm)
                 
                 print("Applying recency weighting to features...")
                 diag_M = diags(boost)
@@ -282,7 +325,9 @@ class FeatureGenerator:
                 'doc_names': self.doc_names,
                 'doc_contents': self.doc_contents, # Save contents to allow feature reconstruction
                 'doc_patterns': self.doc_patterns,
-                'doc_timestamps': self.doc_timestamps
+                'doc_timestamps': self.doc_timestamps,
+                'nmf': getattr(self, 'nmf', None),
+                'doc_topic_matrix': getattr(self, 'doc_topic_matrix', None)
             }, f)
         print(f"Feature generator saved to {output_path}")
 
@@ -295,6 +340,8 @@ class FeatureGenerator:
             self.doc_names = data['doc_names']
             self.doc_patterns = data.get('doc_patterns', [])
             self.doc_timestamps = data.get('doc_timestamps', [])
+            self.nmf = data.get('nmf', None)
+            self.doc_topic_matrix = data.get('doc_topic_matrix', None)
             
             # Try to load doc contents if saved, otherwise we can't regenerate features easily without reloading data
             if 'doc_contents' in data:

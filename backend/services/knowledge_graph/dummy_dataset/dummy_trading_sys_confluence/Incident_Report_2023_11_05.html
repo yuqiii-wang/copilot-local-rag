@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<style>
+    body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; color: #172b4d; }
+    h1 { font-size: 2.5em; margin-bottom: 10px; }
+    .meta { color: #6b778c; font-size: 14px; margin-bottom: 30px; border-bottom: 1px solid #dfe1e6; padding-bottom: 10px; }
+    .label { font-weight: bold; color: #42526e; }
+    code { background-color: #f4f5f7; padding: 2px 4px; border-radius: 3px; font-family: monospace; }
+    pre { background-color: #f4f5f7; padding: 10px; border-radius: 5px; overflow-x: auto; }
+</style>
+
+<title>Incident Report 2023-11-05</title>
+</head>
+<body>
+<h1>Incident Report 2023-11-05</h1>
+<div class="meta">
+<div><span class="label">Space:</span> Engineering / Incidents</div>
+<div><span class="label">Author:</span> SRE Team</div>
+</div>
+<div class="content">
+<p>Date: 2023-11-06</p>
+<h1>Summary</h1>
+<p>At 09:30 AM EST, the Trading System became unresponsive. </p>
+<p>Market Data updates stopped processing, and Order placement timed out.</p>
+<h1>Root Cause</h1>
+<p>A JVM Garbage Collection (GC) "Stop-the-world" pause lasted for 45 seconds.</p>
+<p>This was caused by the <code>DummyTradesLoading</code> class creating 10 million <code>Order</code> objects in a loop during a stress test that was accidentally run in the PROD environment configuration.</p>
+<h1>Timeline</h1>
+<ul>
+<li>  09:30:00 - Deployment of PR #123 (Performance Test).</li>
+<li>  09:30:15 - Memory usage spiked to 8GB (Heap Max).</li>
+<li>  09:30:20 - Full GC initiated.</li>
+<li>  09:31:05 - System recovered, but 500 orders were rejected by gateway timeouts.</li>
+</ul>
+<h1>Action Items</h1>
+<p>1.  [High] Separate Prod and Test configurations strictly (Ticket OPS-122).</p>
+<p>2.  [Medium] Optimize <code>Order</code> object memory footprint (maybe use flyweight pattern for Security references).</p>
+<p>3.  [Low] Add alerting for GC pause times > 1s.</p>
+</div>
+</body>
+</html>

@@ -264,21 +264,22 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
             // Collect docs from state
             const allDocs: any[] = [
+                ...this._lastRagResults.map((r: any) => {
+                    const src = r.id || r.link || 'graph';
+                    return { 
+                        source: src, 
+                        type: getDocType(src),
+                        title: r.title || r.metadata?.title || path.basename(src) || 'RAG Result',
+                        score: r.score
+                    };
+                }),
                 ...this._lastDownloads.map(d => ({ 
                     source: d.url, 
                     type: getDocType(d.url),
                     title: d.title || path.basename(d.url) || d.url,
                     comment: d.comment || undefined,
                     keywords: d.keywords || undefined
-                })),
-                ...this._lastRagResults.map((r: any) => {
-                    const src = r.id || r.link || 'graph';
-                    return { 
-                        source: src, 
-                        type: getDocType(src),
-                        title: r.title || r.metadata?.title || path.basename(src) || 'RAG Result'
-                    };
-                })
+                }))
             ];
 
             if (this._lastOcrText) {

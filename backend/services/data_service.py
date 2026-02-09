@@ -21,6 +21,7 @@ class RefDoc(BaseModel):
     title: str
     source: str
     type: str
+    score: Optional[float] = None
     comment: Optional[str] = None
     keywords: Optional[List[str]] = None
 
@@ -194,6 +195,8 @@ def process_update_docs(raw_data: dict):
                             dest['comment'] = new_ref.get('comment')
                         if new_ref.get('keywords'):
                             dest['keywords'] = new_ref.get('keywords')
+                        if 'score' in new_ref and new_ref['score'] is not None:
+                            dest['score'] = new_ref['score']
                     else:
                         # append new ref
                         existing_docs.append(new_ref)

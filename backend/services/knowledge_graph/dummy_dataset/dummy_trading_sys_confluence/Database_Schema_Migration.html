@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<style>
+    body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; color: #172b4d; }
+    h1 { font-size: 2.5em; margin-bottom: 10px; }
+    .meta { color: #6b778c; font-size: 14px; margin-bottom: 30px; border-bottom: 1px solid #dfe1e6; padding-bottom: 10px; }
+    .label { font-weight: bold; color: #42526e; }
+    code { background-color: #f4f5f7; padding: 2px 4px; border-radius: 3px; font-family: monospace; }
+    pre { background-color: #f4f5f7; padding: 10px; border-radius: 5px; overflow-x: auto; }
+</style>
+
+<title>Database Schema Migration Plan</title>
+</head>
+<body>
+<h1>Database Schema Migration Plan</h1>
+<div class="meta">
+<div><span class="label">Space:</span> Architecture / Data</div>
+<div><span class="label">Author:</span> Database Admin</div>
+<div><span class="label">Last Updated:</span> 2024-01-15</div>
+</div>
+<div class="content">
+<h1>Goal</h1>
+<p>Migrate from in-memory objects to PostgreSQL (Ticket OPS-15).</p>
+<h1>Proposed Schema</h1>
+<h2>Table: SECURITIES</h2>
+<p>| Column | Type | Notes |</p>
+<p>| :--- | :--- | :--- |</p>
+<p>| symbol | VARCHAR(20) | PK |</p>
+<p>| isin | VARCHAR(12) | Unique |</p>
+<p>| type | VARCHAR(10) | EQUITY, BOND, etc. |</p>
+<p>| exchange | VARCHAR(20) | |</p>
+<p>| currency | CHAR(3) | |</p>
+<p>| attributes | JSONB | Stores strike, expiry, coupon, etc. |</p>
+<h2>Table: ORDERS</h2>
+<p>| Column | Type | Notes |</p>
+<p>| :--- | :--- | :--- |</p>
+<p>| order_id | UUID | PK |</p>
+<p>| symbol | VARCHAR(20) | FK |</p>
+<p>| side | CHAR(4) | BUY/SELL |</p>
+<p>| quantity | DECIMAL | |</p>
+<p>| status | VARCHAR(15) | NEW, FILLED, REJECTED |</p>
+<p>| created_at | TIMESTAMP | |</p>
+<h1>Migration Strategy</h1>
+<p>1.  We will use <b>Liquibase</b> to manage version control of the schema.</p>
+<p>2.  The existing <code>DummySecuritiesLoading</code> class will be converted to a <code>@PostConstruct</code> bean that checks if the DB is empty, and if so, populates it (Seed Data).</p>
+<p>3.  Test Plan: Run <code>DummyDataTest</code> pointing to a Testcontainer Postgres.</p>
+</div>
+</body>
+</html>

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<style>
+    body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; color: #172b4d; }
+    h1 { font-size: 2.5em; margin-bottom: 10px; }
+    .meta { color: #6b778c; font-size: 14px; margin-bottom: 30px; border-bottom: 1px solid #dfe1e6; padding-bottom: 10px; }
+    .label { font-weight: bold; color: #42526e; }
+    code { background-color: #f4f5f7; padding: 2px 4px; border-radius: 3px; font-family: monospace; }
+    pre { background-color: #f4f5f7; padding: 10px; border-radius: 5px; overflow-x: auto; }
+</style>
+
+<title>API Reference: Margin Service</title>
+</head>
+<body>
+<h1>API Reference: Margin Service</h1>
+<div class="meta">
+<div><span class="label">Space:</span> Engineering / API Docs</div>
+<div><span class="label">Author:</span> Backend Team</div>
+<div><span class="label">Last Updated:</span> 2023-11-10</div>
+</div>
+<div class="content">
+<h1>MarginService</h1>
+<p>The <code>MarginService</code> calculates the capital requirements for a given portfolio.</p>
+<h2>Class: `com.trading.dummy.service.MarginService`</h2>
+<h3>`calculateMargin(Portfolio, Pricer)`</h3>
+<p> Calculates the total Initial and Maintenance margin for all open positions.</p>
+<p><b>Parameters:</b></p>
+<ul>
+<li>  `portfolio`: The user's portfolio object containing all positions.</li>
+<li>  `pricer`: The service interface to retrieve current asset prices.</li>
+</ul>
+<p><b>Returns:</b></p>
+<ul>
+<li>  `MarginRequirement`: Object containing:</li>
+<li>  `initialMargin` (double): Amount needed to open the positions.</li>
+<li>  `maintenanceMargin` (double): Minimum amount needed to keep positions open.</li>
+</ul>
+<h2>logic</h2>
+<pre><code class='java'>
+// Logic Snippet
+if (security.getType() == SecurityType.EQUITY) {
+    totalInitial += absValue * 0.50;
+    totalMaintenance += absValue * 0.25;
+}
+</code></pre>
+<p>*Note: Currently hardcoded for Equities. Bonds and Options logic coming in Release 2.0.*</p>
+</div>
+</body>
+</html>
