@@ -1,0 +1,37 @@
+body { font-family: Arial, Helvetica, sans-serif; background:#f7f9fb; color:#222; margin: 20px }
+.container { max-width:1100px; margin: 20px auto; padding: 20px; background: #fff; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05) }
+header { display:flex; align-items:center; justify-content:space-between }
+header h1 { margin:0 }
+.subtitle { margin:4px 0 0 0; color:#666 }
+.controls { display:flex; gap:8px }
+.btn { padding:8px 12px; border-radius:6px; border:1px solid #d0d7de; background:#fff; cursor:pointer }
+.btn.primary { background:#0366d6; color:#fff; border-color:#0366d6 }
+.btn.small { padding:6px 8px; font-size:0.9rem }
+.btn.danger { background:#ff4d4f; color:#fff; border:1px solid #ff4d4f }
+.spinner { margin-left:8px; font-size:20px }
+.record-footer { margin-top:8px; display:flex; justify-content:flex-end }
+.files-summary { margin:8px 0 12px 0; display:flex; gap:8px; flex-wrap:wrap }
+.file-chip { background:#eef6ff; padding:6px 8px; border-radius:12px; display:inline-flex; align-items:center; gap:6px; transition: background 120ms ease, transform 120ms ease }
+.file-chip:hover { background: #dbeeff; transform: translateY(-1px); }
+.file-chip .file-name { cursor: pointer }
+.file-chip .chip-close { background: transparent; border: none; color: #666; margin-left:6px; cursor: pointer }
+.file-chip .chip-close:hover { color: #ff4d4f }
+.btn-wrap { display:flex; gap:8px }  h2 { margin-top:20px }
+.graph-wrap { display:flex; justify-content:center; }
+#graph { width:70%; max-width:70%; border:1px solid #e1e4e8; box-shadow:0 2px 6px rgba(0,0,0,0.04); border-radius:6px }
+.records { margin-top:12px }
+.record { border:1px solid #eceff4; padding:12px; border-radius:6px; margin-bottom:12px; background:#fff }
+.record-heading { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:8px }
+.record-meta { color:#333 }
+.refdoc { padding:10px; border-left:3px solid #f1f5f9; margin-bottom:8px; background:#f9fbfd }
+textarea { width:100%; height:70px; margin-top:6px; margin-bottom:6px }
+.kw-input { width:100%; margin-bottom:6px }
+.pager { display:flex; gap:8px; align-items:center; margin-bottom:12px }
+.section-header { display:flex; justify-content:space-between; align-items:center; margin-top:20px; }
+.section-header h2 { margin:0; }
+
+/* Modal */
+.modal { position:fixed; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center; z-index:1000 }
+.modal-content { background:#fff; padding:16px; border-radius:8px; width:80%; max-height:80%; overflow:auto; position:relative }
+.modal .close { position:absolute; top:8px; right:8px; background:#eee; border-radius:50%; width:32px; height:32px; border:none; cursor:pointer }
+.pre { white-space:pre-wrap; font-family:monospace; }

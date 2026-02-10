@@ -258,7 +258,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             const getDocType = (source: string) => {
                 const lower = source.toLowerCase();
                 if (lower.includes('jira') || lower.includes('/browse/')) return 'jira';
-                if (lower.includes('confluence') || lower.includes('/wiki/')) return 'confluence page';
+                if (lower.includes('confluence') || lower.includes('/wiki/')) return 'confluence';
                 return 'code';
             };
 

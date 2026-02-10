@@ -1,8 +1,10 @@
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
-from typing import Optional
+from typing import Optional, List
 import os
 from services import data_service
+from config import config
+from pydantic import BaseModel
 import queue
 import asyncio
 import contextlib
@@ -30,6 +32,81 @@ async def update_doc(payload: dict):
     if not success:
         raise HTTPException(status_code=404, detail='Record not found or failed to update')
     return {'status': 'ok'}
+
+class ManualDoc(BaseModel):
+    url: str
+    score: float
+
+class ManualRecordRequest(BaseModel):
+    question: str
+    docs: List[ManualDoc]
+
+@router.post('/manual_record')
+async def add_manual_record(req: ManualRecordRequest):
+    # Normalize scores: sum should be Config.SCORE_NORMALIZATION_FACTOR (100)
+    total_score = sum(d.score for d in req.docs)
+    norm_docs = []
+    
+    # If no scores provided (or all 0), apply heuristic: 60% rule
+    # 1 file: 100
+    # 2 files: 60, 40
+    # 3 files: 60, 24, 16 (recursive 60% of remainder)
+    heuristic_scores = []
+    if total_score == 0 and req.docs:
+        remaining = float(config.SCORE_NORMALIZATION_FACTOR)
+        count = len(req.docs)
+        for i in range(count):
+            if i == count - 1:
+                heuristic_scores.append(remaining)
+            else:
+                val = remaining * 0.6
+                heuristic_scores.append(val)
+                remaining -= val
+
+    for i, d in enumerate(req.docs):
+        if total_score > 0:
+            norm_score = (d.score / total_score) * config.SCORE_NORMALIZATION_FACTOR
+        elif heuristic_scores:
+            norm_score = heuristic_scores[i]
+        else:
+            norm_score = 0
+            
+        # Determine type based on extension
+        _, ext = os.path.splitext(d.url)
+        ext = ext.lower()
+        # Common code extensions (aligned with indexers + common web/backend langs)
+        code_exts = {
+            '.py', '.js', '.ts', '.tsx', '.jsx', 
+            '.java', '.cpp', '.hpp', '.h', '.c', '.cc', 
+            '.sh', '.bash', '.sql', '.go', '.rs', '.php', '.rb',
+            '.css', '.scss', '.json', '.xml', '.yml', '.yaml'
+        }
+        
+        doc_type = "code" if ext in code_exts else "confluence"
+
+        norm_docs.append({
+            "source": d.url,
+            "title": d.url, # Use URL as title
+            "type": doc_type,
+            "score": norm_score,
+            "comment": "",
+            "keywords": []
+        })
+
+    payload = {
+        "query": {
+            "question": req.question,
+            "conversations": [], # Required empty list
+            "ref_docs": norm_docs,
+            "status": "accepted" # Treat manual entries as accepted
+        }
+    }
+    
+    new_id = data_service.process_initial_docs(payload)
+    if not new_id:
+         raise HTTPException(status_code=500, detail="Failed to save record")
+         
+    return {"status": "ok", "id": new_id}
 
 # Status flags for background jobs
 training_running = False

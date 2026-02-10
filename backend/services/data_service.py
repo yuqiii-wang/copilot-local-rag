@@ -71,12 +71,31 @@ def save_memory_to_disk_by_date():
     for date_key, recs in per_date.items():
         data_manager.overwrite_date(date_key, recs)
 
+def _convert_to_file_url(path: str) -> str:
+    """Helper: Converts local Windows paths to file:/// URLs for consistency."""
+    if not path:
+        return path
+    s = str(path).strip()
+    if s.lower().startswith("file:"):
+        return s
+    # Windows path detection (Drive letter or backslash)
+    if ":" in s or "\\" in s:
+        clean_path = s.replace('\\', '/')
+        return f"file:///{clean_path}"
+    return s
+
 def process_initial_docs(raw_data: dict):
     """
     Step 1: Save the initial query, docs, and conversation.
     Returns the generated ID.
     """
     try:
+        # Pre-process: Convert Windows paths in sources to file:/// URLs
+        if 'query' in raw_data and 'ref_docs' in raw_data['query']:
+            for doc in raw_data['query']['ref_docs']:
+                if 'source' in doc:
+                    doc['source'] = _convert_to_file_url(doc['source'])
+
         # Validate and parse input
         data = FrontendDataSchema(**raw_data)
         
@@ -168,6 +187,11 @@ def process_update_docs(raw_data: dict):
         if not isinstance(new_refs, list):
             print("ref_docs must be a list")
             return False
+
+        # Pre-process: Convert Windows paths to file:/// URLs
+        for nr in new_refs:
+            if 'source' in nr:
+                nr['source'] = _convert_to_file_url(nr['source'])
 
         found = False
         for record in MEMORY_CACHE:

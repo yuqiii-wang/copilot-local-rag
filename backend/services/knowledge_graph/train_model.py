@@ -29,7 +29,7 @@ from config import config
 MAX_FEATURES = None # Extract every word
 HIDDEN_DIM = 128
 LEARNING_RATE = 0.001 # Reduced to improve stability
-EPOCHS = 500 
+EPOCHS = 200 
 
 if config.DEBUG:
     DATASET_DIR = "services/knowledge_graph/dummy_dataset"
@@ -189,16 +189,31 @@ def train():
     # Human messages are treated as strong signals (status='accepted'),
     # while assistant responses are included with lower weight (status='pending').
     conv_dir = os.path.join(os.getcwd(), 'backend', 'data', 'records')
+    if not os.path.exists(conv_dir):
+        conv_dir = os.path.join(os.getcwd(), 'data', 'records')
+    
     try:
         if os.path.isdir(conv_dir):
             files = [f for f in os.listdir(conv_dir) if f.endswith('.json')]
             for conv_file in files:
+                print(f"Loading records from {conv_file}...")
                 with open(os.path.join(conv_dir, conv_file), 'r', encoding='utf-8') as cf:
                     conv_list = json.load(cf)
                 for rec in conv_list:
                     q = rec.get('query', {}) or {}
                     ref_docs = q.get('ref_docs', []) or []
                     conversations = q.get('conversations', []) or []
+                    # Add main question if present (handles records with empty conversations)
+                    main_question = (q.get('question') or "").strip()
+                    rec_status = q.get('status') or 'accepted'
+                    if main_question:
+                         for ref in ref_docs:
+                            src = ref.get('source', '')
+                            fname_key = os.path.basename(src)
+                            score = ref.get('score')
+                            if score is None: score = 0.0
+                            qa_map.setdefault(main_question, []).append({'fname': fname_key, 'status': rec_status, 'comment': '', 'pos_mult': 1.0, 'score': score})
+
                     for conv in conversations:
                         human_text = (conv.get('human') or "").strip()
                         ai_text = (conv.get('ai_assistant') or "").strip()
@@ -209,7 +224,8 @@ def train():
                             if score is None:
                                 score = 0.0
                                 
-                            if human_text:
+                            # Avoid duplicates if conversation text matches the main question perfectly
+                            if human_text and human_text != main_question:
                                 qa_map.setdefault(human_text, []).append({'fname': fname_key, 'status': 'accepted', 'comment': '', 'pos_mult': 1.0, 'score': score})
                             if ai_text:
                                 qa_map.setdefault(ai_text, []).append({'fname': fname_key, 'status': 'pending', 'comment': '', 'pos_mult': 1.0, 'score': score})
@@ -270,13 +286,21 @@ def train():
                 kw_idx = vocab_map[token]
                 
                 # Dynamic weighting based on Inverse Frequency in QA Dataset
-                freq = query_keyword_counts.get(token, 1) 
+                freq = query_keyword_counts.get(token, 1.0)
+                
+                # Apply IDF-like penalty to common QA words (e.g. "check", "how")
+                # Freq is weighted sum of status weights.
+                # If freq=10 (accepted status=10), idf=1.0. If freq=100 (10 approved queries), idf=0.31
+                # We use sqrt to dampen it softly.
+                # Base freq for 1 accepted query is 10.0.
+                idf_factor = (10.0 / freq) ** 0.5
+                if idf_factor > 1.0: idf_factor = 1.0 # Cap at 1.0
                 
                 # Boost based on sequence length (the "min=1, n_max=5f keywords)
                 ngram_len = len(token.split())
                 
                 # Power boost for sequences
-                current_weight = prior_weight * feature_weights.get_qa_sequence_boost(ngram_len, 1.0)
+                current_weight = prior_weight * feature_weights.get_qa_sequence_boost(ngram_len, 1.0) * idf_factor
                 
                 for entry in targets:
                     fname_key = entry.get('fname')

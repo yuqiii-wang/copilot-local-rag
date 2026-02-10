@@ -148,54 +148,55 @@ def extract_java_tokens(source_code: str) -> List[str]:
     - Method names and invocations
     - String literals (logs)
     """
-    tokens = []
+    identifiers = []
+    literal_tokens = []
     try:
         tree = javalang.parse.parse(source_code)
         
         for path, node in tree:
             # 1. Class/Interface Definitions
             if isinstance(node, (javalang.tree.ClassDeclaration, javalang.tree.InterfaceDeclaration)):
-                tokens.append(node.name)
+                identifiers.append(node.name)
                 # Extends/Implements used as types are captured in specific node fields or generally in Type nodes
                 if hasattr(node, 'extends') and node.extends:
                     if isinstance(node.extends, list):
                         for ext in node.extends:
-                             if hasattr(ext, 'name'): tokens.append(ext.name)
+                             if hasattr(ext, 'name'): identifiers.append(ext.name)
                     elif hasattr(node.extends, 'name'):
-                        tokens.append(node.extends.name)
+                        identifiers.append(node.extends.name)
                 if hasattr(node, 'implements') and node.implements:
                     for imp in node.implements:
-                        if hasattr(imp, 'name'): tokens.append(imp.name)
+                        if hasattr(imp, 'name'): identifiers.append(imp.name)
 
             # 2. Fields (Variables defined in class)
             elif isinstance(node, javalang.tree.FieldDeclaration):
                 if node.type and hasattr(node.type, 'name'):
-                    tokens.append(node.type.name) # Dependency on Type
+                    identifiers.append(node.type.name) # Dependency on Type
                 for declarator in node.declarators:
-                    tokens.append(declarator.name) # Variable Name
+                    identifiers.append(declarator.name) # Variable Name
 
             # 3. Local Variables
             elif isinstance(node, javalang.tree.LocalVariableDeclaration):
                  if node.type and hasattr(node.type, 'name'):
-                     tokens.append(node.type.name)
+                     identifiers.append(node.type.name)
                  for declarator in node.declarators:
-                     tokens.append(declarator.name)
+                     identifiers.append(declarator.name)
 
             # 4. Method Definitions
             elif isinstance(node, javalang.tree.MethodDeclaration):
-                tokens.append(node.name)
+                identifiers.append(node.name)
                 # Return type
                 if node.return_type and hasattr(node.return_type, 'name'):
-                    tokens.append(node.return_type.name)
+                    identifiers.append(node.return_type.name)
 
             # 5. Method Invocations
             elif isinstance(node, javalang.tree.MethodInvocation):
-                 tokens.append(node.member)
+                 identifiers.append(node.member)
 
             # 6. Class Instantiation (new ClassName)
             elif isinstance(node, javalang.tree.ClassCreator):
                  if node.type and hasattr(node.type, 'name'):
-                     tokens.append(node.type.name)
+                     identifiers.append(node.type.name)
 
             # 7. String Literals (Potential Logs)
             elif isinstance(node, javalang.tree.Literal):
@@ -203,23 +204,21 @@ def extract_java_tokens(source_code: str) -> List[str]:
                 val = str(node.value)
                 if val.startswith('"') and val.endswith('"'):
                     content = val[1:-1]
-                    # Tokenize the content of the string
+                    # Tokenize the content of the string - these are already clean and should NOT be split further if unique
                     sub_tokens = clean_and_tokenize(content)
-                    tokens.extend(sub_tokens)
+                    literal_tokens.extend(sub_tokens)
     
     except Exception as e:
         # Fallback to regex if parsing fails
         # print(f"Warning: Javalang parse failed, falling back to regex. Error: {e}")
         return clean_and_tokenize(source_code)
         
-    # Post-process: Clean extracted tokens using basic rules (camelCase splitting etc)
-    # Because javalang gives "CamelCase", we might want "Camel", "Case" too?
-    # The requirement says "extract every word". 
-    # If we return 'TradingSystem', the vectorizer might just count 'TradingSystem'.
-    # If we want 'Trading' and 'System', we need to split.
+    # Post-process: Clean extracted tokens using basic rules
     
     expanded_tokens = []
-    for t in tokens:
+    
+    # Process Identifiers (Split CamelCase/SnakeCase)
+    for t in identifiers:
         # Split camel/snake case
         cleaned_str = split_camel_snake(t)
         # Split by space and add
@@ -227,6 +226,9 @@ def extract_java_tokens(source_code: str) -> List[str]:
         for s in sub:
             if s.lower() not in JAVA_KEYWORDS and (len(s) > 2 or any(c.isdigit() for c in s)):
                 expanded_tokens.append(s.lower())
+
+    # Add Literal Tokens directly (they obey clean_and_tokenize rules, preserving dash-ids like AAPL-OCT-160-C)
+    expanded_tokens.extend(literal_tokens)
                 
     return expanded_tokens
 
@@ -239,21 +241,22 @@ def extract_cpp_tokens(source_code: str) -> List[str]:
     - Variable types
     - String literals
     """
-    tokens = []
+    identifiers = []
+    literal_tokens = []
     
     # 1. Includes
     includes = re.findall(r'#include\s*[<"]([^>"]+)[>"]', source_code)
-    tokens.extend(includes)
+    identifiers.extend(includes)
     
     # 2. Class/Struct Definitions (class MyClass, struct MyStruct)
     class_defs = re.findall(r'\b(class|struct)\s+(\w+)', source_code)
     for _, name in class_defs:
-        tokens.append(name)
+        identifiers.append(name)
         
     # 3. Function Definitions/Declarations (Type FuncName(...))
     # Heuristic: Word followed by (
     func_calls = re.findall(r'\b(\w+)\s*\(', source_code)
-    tokens.extend(func_calls)
+    identifiers.extend(func_calls)
     
     # 4. Types/Variables (Type var;) - Hard to do perfectly with regex, picking capitalized words as potential Types
     # and words before equals
@@ -261,26 +264,31 @@ def extract_cpp_tokens(source_code: str) -> List[str]:
     # 5. String Literals
     strings = re.findall(r'"([^"\\]*(?:\\.[^"\\]*)*)"', source_code)
     for s in strings:
-        tokens.extend(clean_and_tokenize(s))
+        # Tokenize content of string literals (preserve dash-ids)
+        literal_tokens.extend(clean_and_tokenize(s))
         
     # General cleanup and tokenization of the rest of the code to catch variables etc
     # Remove comments
     no_comments = re.sub(r'//.*', '', source_code)
     no_comments = re.sub(r'/\*.*?\*/', '', no_comments, flags=re.DOTALL)
     
-    # Extract words
+    # Extract words (identifiers)
     words = re.findall(r'\b[a-zA-Z_]\w*\b', no_comments)
-    tokens.extend(words)
+    identifiers.extend(words)
     
     expanded_tokens = []
-    seen = set()
-    for t in tokens:
+    
+    # Process Identifiers
+    for t in identifiers:
         cleaned_str = split_camel_snake(t)
         sub = cleaned_str.split()
         for s in sub:
             s_lower = s.lower()
             if s_lower not in CPP_KEYWORDS and (len(s_lower) > 2 or any(c.isdigit() for c in s_lower)):
                 expanded_tokens.append(s_lower)
+
+    # Add Literals direct
+    expanded_tokens.extend(literal_tokens)
 
     return expanded_tokens
 
@@ -291,34 +299,35 @@ def extract_bash_tokens(source_code: str) -> List[str]:
     - Function definitions
     - Commands
     """
-    tokens = []
+    identifiers = []
+    literal_tokens = []
     
     # 1. Variable Assignments (VAR=val)
     vars = re.findall(r'\b([a-zA-Z_]\w*)=', source_code)
-    tokens.extend(vars)
+    identifiers.extend(vars)
     
     # 2. Function Definitions (func() or function func)
     funcs = re.findall(r'\bfunction\s+(\w+)', source_code)
     funcs2 = re.findall(r'\b(\w+)\s*\(\)', source_code)
-    tokens.extend(funcs)
-    tokens.extend(funcs2)
+    identifiers.extend(funcs)
+    identifiers.extend(funcs2)
     
     # 3. String Literals
     strings = re.findall(r'"([^"\\]*(?:\\.[^"\\]*)*)"', source_code)
     strings_single = re.findall(r"'([^']*)'", source_code)
     
     for s in strings + strings_single:
-         tokens.extend(clean_and_tokenize(s))
+         literal_tokens.extend(clean_and_tokenize(s))
     
     # General extraction of words, filtering typical shell syntax
     # Remove comments
     no_comments = re.sub(r'#.*', '', source_code)
     
     words = re.findall(r'\b[a-zA-Z0-9_.-]+\b', no_comments)
-    tokens.extend(words)
+    identifiers.extend(words)
     
     expanded_tokens = []
-    for t in tokens:
+    for t in identifiers:
         # Bash variables often use snake_case or CAPS
         cleaned_str = split_camel_snake(t)
         sub = cleaned_str.split()
@@ -330,6 +339,9 @@ def extract_bash_tokens(source_code: str) -> List[str]:
                 s_clean = s_lower.strip('.-_')
                 if len(s_clean) > 1 or any(c.isdigit() for c in s_clean):
                     expanded_tokens.append(s_clean)
+
+    # Add Literals
+    expanded_tokens.extend(literal_tokens)
                     
     return expanded_tokens
 
