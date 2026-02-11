@@ -1,5 +1,7 @@
 import os
 import sys
+import pickle
+import copy
 
 # Add current working directory to path so we can run this as a script from backend/
 sys.path.append(os.getcwd())
@@ -11,9 +13,11 @@ import torch.nn.functional as F
 import torch.optim as optim
 import numpy as np
 import csv
+from sklearn.preprocessing import normalize
 from services.knowledge_graph.feature_generator import FeatureGenerator
 from services.knowledge_graph.graph_model import KeywordReconstructionHGNN
 from services.knowledge_graph.tokenization import clean_and_tokenize
+from services.knowledge_graph.keyword_expander import KeywordExpander
 from services.knowledge_graph.code_indexer import (
     JavaCodeIndexer,
     CppCodeIndexer,
@@ -21,7 +25,6 @@ from services.knowledge_graph.code_indexer import (
     SqlCodeIndexer
 )
 
-from services.knowledge_graph.tokenization_utils import generate_ngrams
 from services.knowledge_graph import feature_weights
 from config import config
 
@@ -39,6 +42,7 @@ else:
 QA_FILE = os.path.join(DATASET_DIR, "qa_dataset.json")
 MODEL_SAVE_PATH = "services/knowledge_graph/query_model.pth"
 FEATURE_GEN_PATH = "services/knowledge_graph/feature_gen.pkl"
+KEYWORD_EXPANDER_PATH = "services/knowledge_graph/keyword_expander.pkl"
 RESULTS_CSV_PATH = "services/knowledge_graph/hypergraph_results.csv"
 
 def train():
@@ -188,9 +192,10 @@ def train():
     # Also ingest conversation records (if present) to augment QA priors.
     # Human messages are treated as strong signals (status='accepted'),
     # while assistant responses are included with lower weight (status='pending').
-    conv_dir = os.path.join(os.getcwd(), 'backend', 'data', 'records')
-    if not os.path.exists(conv_dir):
-        conv_dir = os.path.join(os.getcwd(), 'data', 'records')
+    
+    # Correctly resolve path to data/records relative to this script
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    conv_dir = os.path.abspath(os.path.join(current_dir, '..', '..', 'data', 'records'))
     
     try:
         if os.path.isdir(conv_dir):
@@ -233,6 +238,23 @@ def train():
     except Exception as e:
         print(f"Error loading conversation records: {e}")
 
+    # === KEYWORD EXPANDER BUILD ===
+    print("Building Keyword Expander from QA records...")
+    # Convert qa_map back to record list structure for the expander
+    # Only include records from JSON/Conversations (before code literals are added)
+    expander_records = []
+    for q_text, targets in qa_map.items():
+         expander_records.append({
+             'question': q_text,
+             'ref_docs': [{'source': t['fname']} for t in targets]
+         })
+    
+    keyword_expander = KeywordExpander()
+    # We pass the fit feature_generator which contains doc_names and doc_contents
+    keyword_expander.build(fg, expander_records)
+    keyword_expander.save(KEYWORD_EXPANDER_PATH)
+    # === END KEYWORD EXPANDER ===
+
     # 3b. Augment QA mapping with Indexer extracted literals (as pending queries)
     print("Augmenting QA mapping with extracted literals from code indexers...")
     for indexer in executed_indexers:
@@ -252,7 +274,7 @@ def train():
 
 
     print("Injecting Priors from QA Dataset (and extracted literals)...")
-    prior_weight = 10.0 # Increased from 1.0 to 10.0 to ensure QA priors dominate feature space
+    prior_weight = feature_weights.PRIOR_INJECTION_WEIGHT # Used to be hardcoded 10.0
     
     vocab_map = fg.vectorizer.vocabulary_ # Word -> Index
     
@@ -274,61 +296,108 @@ def train():
         for token in clean_and_tokenize(query):
             query_keyword_counts[token] = query_keyword_counts.get(token, 0) + max_w
 
+    # Calculate and Save Inverse Question Frequency (IQF) stats for Service
+    print("Calculating Inverse Question Frequency (IQF)...")
+    qa_idf_stats = {}
+    total_questions = len(qa_map)
+    for token, freq in query_keyword_counts.items():
+        # log(N / df). Using slightly smoothed simple version.
+        # Ensure minimum frequency 1.0
+        df = max(1.0, freq)
+        iqf = np.log(total_questions / df + 1.0) + 1.0 # +1 to ensure base weight at least 1
+        qa_idf_stats[token] = iqf
+    
+    qa_idf_path = os.path.join(os.path.dirname(MODEL_SAVE_PATH), 'question_idf.pkl')
+    with open(qa_idf_path, 'wb') as f:
+        pickle.dump(qa_idf_stats, f)
+    print(f"Saved IQF stats for {len(qa_idf_stats)} tokens to {qa_idf_path}")
+
     for query, targets in qa_map.items():
         # Tokenize query to match vocab tokens using the SAME logic as ingestion
         query_tokens = clean_and_tokenize(query)
         
-        # PRIOR INJECTION UPDATE: Use N-Grams to match sequence order
-        query_ngrams = generate_ngrams(query_tokens, n_min=1, n_max=7)
+        # EXPAND QUERY TOKENS
+        # Use keyword expander to find latent tokens AND sequence combinations
+        # e.g. "order sec" -> "order security"
+        tokens_to_inject = keyword_expander.generate_expanded_ngrams(query_tokens)
         
-        for token in query_ngrams:
-            if token in vocab_map:
-                kw_idx = vocab_map[token]
+        # 1. Calculate Per-Query Total Weight for Normalization
+        # This ensures that terms in a query compete for the total prior weight.
+        # Unique terms (high IQF) get a larger share of the signal.
+        token_stats = []
+        total_query_weight = 0.0
+        
+        for token, modification_weight in tokens_to_inject.items():
+            if token not in vocab_map: continue
+            
+            parts = token.split()
+            if parts:
+               iqfs = [qa_idf_stats.get(p, 1.0) for p in parts]
+               iqf_val = sum(iqfs) / len(iqfs)
+            else:
+               iqf_val = 1.0
+               
+            ngram_len = len(parts)
+            seq_boost = feature_weights.get_qa_sequence_boost(ngram_len, 1.0)
+            
+            # AMPLIFIED IDF: Cube the IQF to make unique tokens dominate the weight distribution
+            # "sec" (IQF~2 -> 8) vs "US123" (IQF~5 -> 125). Ratio 1:15 instead of 1:2.5
+            # This prevents common words in specific queries from "stealing" the prior signal.
+            raw_w = (iqf_val ** 3.0) * seq_boost * modification_weight
+            token_stats.append({
+                'token': token,
+                'raw_w': raw_w
+            })
+            total_query_weight += raw_w
+            
+        if total_query_weight < 1e-6: total_query_weight = 1.0
+        
+        # 2. Inject Normalized Priors
+        for stat in token_stats:
+            token = stat['token']
+            kw_idx = vocab_map[token]
+            
+            # Relative Importance: How much does this token contribute to THIS query?
+            # [0.0 - 1.0]
+            relative_ratio = stat['raw_w'] / total_query_weight
+            
+            # Apply Prior Weight: The total energy injected for this query is prior_weight
+            current_weight = prior_weight * relative_ratio
+             
+            for entry in targets:
+                fname_key = entry.get('fname')
+                status = entry.get('status','pending')
+                pos_mult = entry.get('pos_mult', 1.0)
                 
-                # Dynamic weighting based on Inverse Frequency in QA Dataset
-                freq = query_keyword_counts.get(token, 1.0)
+                # BUG FIX: Score Normalization
+                raw_score = entry.get('score')
+                if raw_score is None: raw_score = 50.0
                 
-                # Apply IDF-like penalty to common QA words (e.g. "check", "how")
-                # Freq is weighted sum of status weights.
-                # If freq=10 (accepted status=10), idf=1.0. If freq=100 (10 approved queries), idf=0.31
-                # We use sqrt to dampen it softly.
-                # Base freq for 1 accepted query is 10.0.
-                idf_factor = (10.0 / freq) ** 0.5
-                if idf_factor > 1.0: idf_factor = 1.0 # Cap at 1.0
+                # Normalize 0-100 to 0.2-2.0
+                if raw_score > 0:
+                   score_mult = max(0.2, raw_score / 50.0)
+                else:
+                   score_mult = 1.0 
                 
-                # Boost based on sequence length (the "min=1, n_max=5f keywords)
-                ngram_len = len(token.split())
+                weight_multiplier = status_weights.get(status, 1.0) * pos_mult
                 
-                # Power boost for sequences
-                current_weight = prior_weight * feature_weights.get_qa_sequence_boost(ngram_len, 1.0) * idf_factor
-                
-                for entry in targets:
-                    fname_key = entry.get('fname')
-                    status = entry.get('status','pending')
-                    pos_mult = entry.get('pos_mult', 1.0)
+                if fname_key in basename_to_idx:
+                    doc_idx = basename_to_idx[fname_key]
+                    # Boost Feature: Keyword Presence in Doc
+                    X[doc_idx, kw_idx] += current_weight * weight_multiplier * score_mult
+                    priors_injected_count += 1
                     
-                    raw_score = entry.get('score')
-                    if raw_score is None: raw_score = 50.0
-                    
-                    if raw_score > 0:
-                        score_mult = raw_score
-                    else:
-                        score_mult = 1.0
-                    
-                    weight_multiplier = status_weights.get(status, 1.0) * pos_mult
-                    if fname_key in basename_to_idx:
-                        doc_idx = basename_to_idx[fname_key]
-                        # Boost Feature: Keyword Presence in Doc (status-weighted + position)
-                        X[doc_idx, kw_idx] += current_weight * weight_multiplier * score_mult
-                        priors_injected_count += 1
-
                     # Also inject comment tokens if present (strong boost, includes position)
+                    # Note: Since we loop through query tokens, summing relative_ratio = 1.0
+                    # Effectively we inject the comment exactly 'Once' (weighted by prior_weight sum)
                     comment = entry.get('comment','') or ''
                     if comment and fname_key in basename_to_idx:
                         for ctoken in clean_and_tokenize(comment):
                             if ctoken in vocab_map:
                                 cidx = vocab_map[ctoken]
                                 comment_boost = feature_weights.QA_COMPONENT_BOOSTS['comment']
+                                # Use current_weight ensures comment injection is also "distributed" logic 
+                                # essentially scaling comment importance by query importance is fine
                                 X[basename_to_idx[fname_key], cidx] += current_weight * weight_multiplier * comment_boost * score_mult
                                 priors_injected_count += 1
 
@@ -392,17 +461,52 @@ def train():
                     pattern_inject_count += 1
         print(f"Injected {pattern_inject_count} pattern signals.")
 
+    # 3c-2. Inject Filename Prefix/Partial Matching
+    print("Injecting Filename Prefix Matches...")
+    filename_match_count = 0
+    
+    fn_boost = feature_weights.FILENAME_WEIGHT
+    
+    # Pre-compute prefixes for speed
+    prefix_to_docs = {}
+    for fname, doc_idx in basename_to_idx.items():
+        clean_name = fname.lower().replace('.', ' ').replace('_', ' ').replace('-', ' ')
+        parts = clean_name.split()
+        for p in parts:
+             if len(p) < 3: continue
+             for l in range(3, len(p) + 1):
+                 prefix = p[:l]
+                 if prefix not in prefix_to_docs:
+                     prefix_to_docs[prefix] = []
+                 if doc_idx not in prefix_to_docs[prefix]:
+                     prefix_to_docs[prefix].append(doc_idx)
+    
+    for token, kw_idx in vocab_map.items():
+        t_low = token.lower()
+        if t_low in prefix_to_docs:
+             docs = prefix_to_docs[t_low]
+             for d_idx in docs:
+                 X[d_idx, kw_idx] += fn_boost
+                 filename_match_count += 1
+                 
+    print(f"Injected {filename_match_count} filename prefix matches.")
+
     # 3d. Augment X with Topic Weights (if available) - for Reconstruction of Topics
     if hasattr(fg, 'doc_topic_matrix') and fg.doc_topic_matrix is not None:
-         print(f"Augmenting Node Features with {fg.doc_topic_matrix.shape[1]} NMF topics...")
-         topic_features = torch.FloatTensor(fg.doc_topic_matrix)
-         # Scale topics to match TF-IDF scale (approx) before log
-         topic_features = topic_features * 10.0 
-         X = torch.cat([X, topic_features], dim=1)
+        print(f"Augmenting Node Features with {fg.doc_topic_matrix.shape[1]} NMF topics...")
+        topic_features = torch.FloatTensor(fg.doc_topic_matrix)
+        # Scale topics to match TF-IDF scale (approx) before log
+        topic_features = topic_features * feature_weights.INFERENCE_WEIGHTS['topic_feature_scale']
+        X = torch.cat([X, topic_features], dim=1)
     
     # Log-transform features to handle skewness and large priors (100.0 -> ~4.6)
     print("Log-transforming features for better numerical stability...")
     X = torch.log1p(X)
+
+    # Save the fully engineered features including priors for inference
+    feat_save_path = os.path.join(os.path.dirname(MODEL_SAVE_PATH), 'node_features.pt')
+    print(f"Saving enhanced node features to {feat_save_path}")
+    torch.save(X, feat_save_path)
 
     # 4. Initialize Model
     # Input: [Docs, Features] (Content + Topics)
@@ -442,6 +546,11 @@ def train():
 
     loss_fn = nn.MSELoss(reduction='none')
 
+    start_check_epoch = int(EPOCHS * 0.75)
+    best_loss = float('inf')
+    best_model_state = None
+    print(f"Will track lowest loss model starting from epoch {start_check_epoch} (Last 25% of training)...")
+
     for epoch in range(EPOCHS):
         optimizer.zero_grad()
         
@@ -466,12 +575,23 @@ def train():
         optimizer.step()
         scheduler.step()
         
+        # Track best model in last 25%
+        if epoch >= start_check_epoch:
+             current_loss = loss.item()
+             if current_loss < best_loss:
+                 best_loss = current_loss
+                 best_model_state = copy.deepcopy(model.state_dict())
+        
         if (epoch + 1) % 20 == 0 or epoch == 0:
             # Get current LR
             current_lr = optimizer.param_groups[0]['lr']
             print(f"Epoch [{epoch+1}/{EPOCHS}], Loss: {loss.item():.6f}, LR: {current_lr:.6f}")
 
     # 6. Save Model
+    if best_model_state is not None:
+        print(f"Restoring best model state from last 25% of epochs (Loss: {best_loss:.6f})...")
+        model.load_state_dict(best_model_state)
+
     torch.save(model.state_dict(), MODEL_SAVE_PATH)
     print(f"Model saved to {MODEL_SAVE_PATH}")
     
@@ -521,6 +641,61 @@ def train():
                 
                 writer.writerow([keyword, doc_name, f"{score:.4f}", d_type])
                 count += 1
+        
+        # Add Co-occurrence Keyword-Keyword Edges (context-based)
+        print("Calculating Keyword Co-occurrence from Document Context...")
+        # Normalize columns to unit length -> Dot product becomes Cosine Similarity
+        # This ensures the score is [0,1] and independent of document length/count
+        X_norm = normalize(fg.features, norm='l2', axis=0)
+
+        # Calculate Co-occurrence: (Vocab x Docs) @ (Docs x Vocab) -> (Vocab x Vocab)
+        # Element (i, j) is Cosine Similarity between keyword i and keyword j
+        word_co_occurrence = X_norm.T @ X_norm
+        word_co_occurrence.setdiag(0)
+        word_co_occurrence.eliminate_zeros()
+        
+        # Hard limit on edges to prevent CSV explosion
+        # (Small datasets with few docs cause many 1.0 co-occurrences)
+        MAX_COOCCURRENCE_EDGES = 1000
+        
+        coo_kw = word_co_occurrence.tocoo()
+        row, col, data = coo_kw.row, coo_kw.col, coo_kw.data
+        
+        if len(data) > MAX_COOCCURRENCE_EDGES:
+            print(f"Found {len(data)} co-occurrence edges. Keeping top {MAX_COOCCURRENCE_EDGES}...")
+            # argsort is ascending, so take last N
+            top_indices = np.argsort(data)[-MAX_COOCCURRENCE_EDGES:]
+            # Reverse for descending order in CSV (optional)
+            top_indices = top_indices[::-1]
+            
+            row = row[top_indices]
+            col = col[top_indices]
+            data = data[top_indices]
+
+        vocab_names = fg.vectorizer.get_feature_names_out()
+        co_occur_count = 0
+        
+        for i, j, v in zip(row, col, data):
+             src_kw = vocab_names[i]
+             tgt_kw = vocab_names[j]
+             writer.writerow([src_kw, tgt_kw, f"{v:.4f}", 'keyword_cooccurrence'])
+             co_occur_count += 1
+             count += 1
+        
+        print(f"Appended {co_occur_count} context-based keyword co-occurrence edges.")
+
+        # Add Latent Keyword-Keyword Edges
+        print("Appending Keyword-Keyword latent edges to CSV...")
+        if keyword_expander and hasattr(keyword_expander, 'keyword_edges'):
+            latent_count = 0
+            for src, tgts in keyword_expander.keyword_edges.items():
+                for tgt, sc in tgts.items():
+                    if sc > 0.5:
+                        # Format: Keyword=src, Document ID=tgt (pseudo-doc), Type=keyword
+                        writer.writerow([src, tgt, f"{sc:.4f}", 'keyword'])
+                        latent_count += 1
+                        count += 1
+            print(f"Appended {latent_count} latent keyword edges.")
                 
     print(f"Saved {count} connections to {RESULTS_CSV_PATH}")
 

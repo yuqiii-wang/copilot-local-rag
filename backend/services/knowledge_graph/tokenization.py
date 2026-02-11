@@ -222,8 +222,8 @@ def extract_java_tokens(source_code: str) -> List[str]:
         tree = javalang.parse.parse(source_code)
         
         for path, node in tree:
-            # 1. Class/Interface Definitions
-            if isinstance(node, (javalang.tree.ClassDeclaration, javalang.tree.InterfaceDeclaration)):
+            # 1. Class/Interface/Enum Definitions
+            if isinstance(node, (javalang.tree.ClassDeclaration, javalang.tree.InterfaceDeclaration, javalang.tree.EnumDeclaration)):
                 identifiers.append(node.name)
                 # Extends/Implements used as types are captured in specific node fields or generally in Type nodes
                 if hasattr(node, 'extends') and node.extends:

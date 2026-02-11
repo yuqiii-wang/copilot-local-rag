@@ -133,8 +133,13 @@ class FeatureGenerator:
                             qa_augmentations[fname].append((kw_str, eff_mult * feature_weights.QA_COMPONENT_BOOSTS['keywords'], False))
 
                 # Additionally, ingest conversation records (if available) and attach human/AI chat text
-                # to referenced documents. Human messages receive higher base weight than AI assistant., '.html'
-                conv_dir = os.path.join(os.getcwd(), 'backend', 'data', 'records')
+                # to referenced documents. Human messages receive higher base weight than AI assistant.
+                
+                # Correctly resolve path to data/records relative to this script
+                current_dir = os.path.dirname(os.path.abspath(__file__))
+                # relative path: ../../data/records
+                conv_dir = os.path.abspath(os.path.join(current_dir, '..', '..', 'data', 'records'))
+                
                 if os.path.isdir(conv_dir):
                     for conv_file in os.listdir(conv_dir):
                         if not conv_file.endswith('.json'):
@@ -157,11 +162,18 @@ class FeatureGenerator:
                                     src = ref.get('source', '')
                                     ref_fname = os.path.basename(src)
                                     
+                                    # Incorporate Score from Feedback (0-100)
+                                    # We normalize to 0.2-2.0 range to modify the base status weight
+                                    raw_score = ref.get('score')
+                                    if raw_score is None: raw_score = 50.0
+                                    score_mult = max(0.2, raw_score / 50.0) # 100->2.0, 50->1.0, 20->0.4
+
                                     # Add main question
                                     if main_question:
                                         qtokens = clean_and_tokenize(main_question)
                                         qstr = " ".join(qtokens)
-                                        qa_augmentations.setdefault(ref_fname, []).append((qstr, base_mult, False))
+                                        # Apply score multiplier to question association
+                                        qa_augmentations.setdefault(ref_fname, []).append((qstr, base_mult * score_mult, False))
                                     
                                     # Add comments (strong boost)
                                     comment = ref.get('comment','')
@@ -239,6 +251,16 @@ class FeatureGenerator:
                         # Join tokens into a string for TfidfVectorizer
                         # This pre-processing allows us to use different logic per file type
                         processed_content = " ".join(tokens)
+
+                        # AUGMENTATION: Inject Filename Tokens (High Importance)
+                        fname = os.path.basename(file_path)
+                        # clean_and_tokenize handles splitting camelCase, underscores etc.
+                        fname_tokens = clean_and_tokenize(fname)
+                        if fname_tokens:
+                            fname_str = " ".join(fname_tokens)
+                            # Repeat based on weight to ensure high TF score
+                            reps = max(1, int(round(feature_weights.FILENAME_WEIGHT)))
+                            processed_content += " " + " ".join([fname_str] * reps)
                         
                         # Apply QA Augmentation (weighted question and comment tokens)
                         if file in qa_augmentations:

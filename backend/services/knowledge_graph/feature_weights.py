@@ -67,6 +67,10 @@ CODE_GRAPH_WEIGHTS = {
 # Used in train_model.py.
 PATTERN_WEIGHT = 5.0
 
+# Filename Weights
+# Boost for tokens found in the filename (very important).
+FILENAME_WEIGHT = 20.0
+
 # Recency Weighting
 # Max percentage boost for most recent files within the dataset.
 # Used in feature_generator.py.
@@ -80,7 +84,69 @@ TRAINING_WEIGHTS = {
     'inference_threshold': 0.5        # Minimum score to be considered a valid link in CSV output
 }
 
+# Expansion Weights
+# Used in keyword_expander.py to determine expansion weight based on edge score.
+EXPANSION_WEIGHTS = {
+    'base': 0.3,
+    'thresholds': [
+        (8.0, 2.5), # Score threshold, Target Weight (or base for dynamic calc)
+        (5.0, 1.8),
+        (3.0, 1.0),
+        (1.0, 0.8)
+    ],
+    'high_score_multiplier': 0.25 # For scores >= 8.0, weight = score * this
+}
+
+# Inference / Query Weights
+# Used in knowledge_graph_service.py during query processing.
+INFERENCE_WEIGHTS = {
+    'topic_feature_scale': 10.0,      # Scaling factor for NMF topic features
+    'identifier_boost': 3.0,          # Boost for identifiers (digits/uppercase > 4)
+    'result_min_score': 0.01,         # Absolute minimum score to return
+    'result_ratio_threshold': 0.1,    # Only return results with score >= top_score * this
+    'word_count_power': 3.0,          # Power for word count boosting (count ^ 3)
+    'shared_match_boost_log': True,   # Whether to apply log1p(shared_counts) boost
+    'apply_idf_boost': True,          # Apply global Inverse Document Frequency boost
+    'idf_scale': 1.0                  # Scaling factor for IDF (matched_weight *= idf * scale)
+}
+
+# Config / Priors
+PRIOR_INJECTION_WEIGHT = 10.0   # Weight for injected QA priors in train_model.py
+
+# Latent Edge Construction Weights
+# Used in keyword_expander.py
+LATENT_WEIGHTS = {
+    'prefix_match': 10.0,    # Strong boost for prefix matches (sec -> security)
+    'consonant_match': 5.0, # Strong boost for consonant matches
+    'base_latent': 0.1       # Base weight for co-occurrence without pattern match
+}
+
 # --- Logic / Helper Functions ---
+
+def get_expansion_weight(score: float) -> float:
+    """
+    Calculates the weight for a keyword expansion based on the edge score.
+    """
+    w = EXPANSION_WEIGHTS['base']
+    
+    # Check thresholds in descending order
+    # Currently hardcoded in the loop, but logic reflects:
+    # >= 8.0: Dynamic
+    # >= 5.0: 1.8
+    # >= 3.0: 1.0
+    # >= 1.0: 0.8
+    
+    # Use the defined constants
+    thresholds = sorted(EXPANSION_WEIGHTS['thresholds'], key=lambda x: x[0], reverse=True)
+    
+    for thresh, weight_val in thresholds:
+        if score >= thresh:
+            if thresh >= 8.0:
+                # Dynamic calculation for very high scores
+                return max(weight_val, score * EXPANSION_WEIGHTS['high_score_multiplier'])
+            return weight_val
+            
+    return w
 
 def get_html_weight(tag: str) -> float:
     """Returns the weight for a specific HTML tag, default 1.0."""

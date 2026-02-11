@@ -6,6 +6,7 @@ from typing import List, Dict
 from services.knowledge_graph.graph_model import KeywordReconstructionHGNN
 from services.knowledge_graph.feature_generator import generate_features
 from services.knowledge_graph.tokenization import clean_and_tokenize
+from services.knowledge_graph.keyword_expander import KeywordExpander
 from services.knowledge_graph import feature_weights
 from config import config
 import numpy as np
@@ -21,6 +22,8 @@ class KnowledgeGraphService:
         self.dataset_path = os.path.join(kg_dir, "dummy_dataset")
         # Use valid trained model path
         self.model_path = os.path.join(kg_dir, "query_model.pth")
+        self.expander_path = os.path.join(kg_dir, "keyword_expander.pkl")
+        self.expander = None
         # Initialization is now async via load_async()
     
     async def load_async(self):
@@ -61,23 +64,42 @@ class KnowledgeGraphService:
             
             # Replicate Training Preprocessing: N-Gram Boosting
             # Must match train_model.py logic (using centralized feature_weights)
-            features_tensor = torch.from_numpy(fg.features.toarray()).float()
             
-            vocab_list = fg.vectorizer.get_feature_names_out()
-            ngram_weights = [feature_weights.get_ngram_boost(w) for w in vocab_list] 
-            ngram_weights_tensor = torch.FloatTensor(ngram_weights)
-            
-            features_tensor = features_tensor * ngram_weights_tensor
-            
-            # Augment with Topic Features if available (must match train_model.py)
-            if hasattr(fg, 'doc_topic_matrix') and fg.doc_topic_matrix is not None:
-                topic_features = torch.FloatTensor(fg.doc_topic_matrix)
-                topic_features = topic_features * 10.0 # Match training scale
-                features_tensor = torch.cat([features_tensor, topic_features], dim=1)
-                print(f"Augmented features with {fg.doc_topic_matrix.shape[1]} topics.")
+            # Try to load pre-calculated enhanced features (with priors) from training
+            features_path = os.path.join(kg_dir, "node_features.pt")
+            if os.path.exists(features_path):
+                print(f"Loading enhanced node features from {features_path}...")
+                features_tensor = torch.load(features_path)
+                # Ensure it matches current dimensions (safety check)
+                if features_tensor.shape[0] != fg.features.shape[0]:
+                     print("Warning: Loaded features doc count mismatch. Falling back to reconstruction.")
+                     use_cached_features = False
+                else:
+                     use_cached_features = True
+            else:
+                 use_cached_features = False
 
-            # Log transform features to match training distribution
-            features_array = torch.log1p(features_tensor).numpy()
+            if not use_cached_features:
+                print("Enhanced features not found or invalid. Falling back to reconstruction (Missing Priors!).")
+                features_tensor = torch.from_numpy(fg.features.toarray()).float()
+                
+                vocab_list = fg.vectorizer.get_feature_names_out()
+                ngram_weights = [feature_weights.get_ngram_boost(w) for w in vocab_list] 
+                ngram_weights_tensor = torch.FloatTensor(ngram_weights)
+                
+                features_tensor = features_tensor * ngram_weights_tensor
+                
+                # Augment with Topic Features if available (must match train_model.py)
+                if hasattr(fg, 'doc_topic_matrix') and fg.doc_topic_matrix is not None:
+                    topic_features = torch.FloatTensor(fg.doc_topic_matrix)
+                    topic_features = topic_features * feature_weights.INFERENCE_WEIGHTS['topic_feature_scale'] # Match training scale
+                    features_tensor = torch.cat([features_tensor, topic_features], dim=1)
+                    print(f"Augmented features with {fg.doc_topic_matrix.shape[1]} topics.")
+
+                # Log transform features to match training distribution
+                features_tensor = torch.log1p(features_tensor)
+
+            features_array = features_tensor.cpu().numpy()
 
             self.data = {
                 'vocab': fg.vectorizer.get_feature_names_out(),
@@ -92,7 +114,35 @@ class KnowledgeGraphService:
             # Crucial: The model output dimension (num_keywords) covers {Vocab + Topics}
             # So we set it to the full feature dimension
             self.num_keywords = self.num_features 
+            
+            # Load Global IDF stats from Vectorizer if available
+            # This allows us to boost unique query terms (high IDF) during retrieval
+            if hasattr(fg.vectorizer, 'idf_'):
+                 self.idf = fg.vectorizer.idf_
+                 print(f"Loaded IDF stats for {len(self.idf)} terms.")
+            else:
+                 self.idf = None
+                 print("IDF stats not available in FeatureGenerator.")
+
             print(f"Loaded features from {fg_path}. Input dim: {self.num_features}")
+            
+            # Load Inverse Question Frequency (IQF) stats if available
+            iqf_path = os.path.join(kg_dir, "question_idf.pkl")
+            if os.path.exists(iqf_path):
+                try:
+                    import pickle
+                    with open(iqf_path, 'rb') as f:
+                        self.question_idf = pickle.load(f)
+                    print(f"Loaded IQF stats for {len(self.question_idf)} question tokens.")
+                except Exception as e:
+                    print(f"Error loading IQF stats: {e}")
+                    self.question_idf = {}
+            else:
+                self.question_idf = {}
+
+            # Load Keyword Expander
+            self.expander = KeywordExpander()
+            self.expander.load(self.expander_path)
 
         except Exception as e:
             print(f"Failed to load trained feature generator: {e}. Falling back to regeneration (Model mismatch risk!).")
@@ -135,13 +185,20 @@ class KnowledgeGraphService:
         query_tokens = clean_and_tokenize(user_query)
         print(f"Query tokens: {query_tokens}")
         
-        # Generate n-grams (1-5) to match sequence in vocabulary
-        query_ngrams = set(query_tokens) # Unigrams
-        for n in range(2, 6):
-            for i in range(len(query_tokens) - n + 1):
-                ngram = " ".join(query_tokens[i:i+n])
-                query_ngrams.add(ngram)
-        
+        # KEYWORD EXPANSION + N-GRAMS
+        # Generate n-grams including latents (e.g. "order sec" -> "order security")
+        # We pass None for token_base_weights to get pure expansion/structural weights.
+        # We will apply IQF weighting specifically in the matching loop to match Training logic.
+        if self.expander:
+             query_ngrams = self.expander.generate_expanded_ngrams(query_tokens, token_base_weights=None)
+        else:
+             # Fallback
+             query_ngrams = {t: 1.0 for t in query_tokens}
+             for n in range(2, 6):
+                for i in range(len(query_tokens) - n + 1):
+                    ngram = " ".join(query_tokens[i:i+n])
+                    query_ngrams[ngram] = 1.0
+
         # 2. Match with Vocab
         matched_indices = []
         matched_words = []
@@ -152,11 +209,31 @@ class KnowledgeGraphService:
             if word in query_ngrams:
                 matched_indices.append(i)
                 matched_words.append(word)
-                # Weight by word count squared to favor longer precise matches
-                # e.g. 'succeed at least once' (4) -> 64 (cubed) to ensure dominance
-                #      'should' (1) -> 1
-                word_count = len(word.split())
-                matched_weights.append(word_count ** 3)
+                
+                # Expansion/Structural Weight from Expander
+                mod_weight = query_ngrams[word]
+                
+                # Calculate IQF Component (Cubic Amplification)
+                # Matches logic in train_model.py
+                parts = word.split()
+                if parts and self.question_idf:
+                     iqfs = [self.question_idf.get(p, 1.0) for p in parts]
+                     iqf_val = sum(iqfs) / len(iqfs)
+                else:
+                     iqf_val = 1.0
+                
+                # Metric: Cubic IQF Boost
+                # Strongly favors unique terms (e.g. "US..." vs "sec")
+                iqf_boost = iqf_val ** 3.0
+                
+                # Sequence Length Boost (consistent with training)
+                ngram_len = len(parts)
+                seq_boost = feature_weights.get_qa_sequence_boost(ngram_len, 1.0)
+                
+                # Final Inference Weight
+                final_weight = mod_weight * iqf_boost * seq_boost
+                
+                matched_weights.append(final_weight)
         
         if not matched_indices:
             print("No matching selective keywords found in query.")
@@ -199,13 +276,14 @@ class KnowledgeGraphService:
         if len(matched_indices) > 1:
              shared_counts = (relevant_probs > 0.1).float().sum(dim=1)
              # Log scale boost to prevent explosion, but reward multiple hits
-             doc_scores = doc_scores * (1.0 + torch.log1p(shared_counts))
+             if feature_weights.INFERENCE_WEIGHTS['shared_match_boost_log']:
+                 doc_scores = doc_scores * (1.0 + torch.log1p(shared_counts))
         
-        # Normalize scores linearly instead of Softmax (Softmax creates a "winner-takes-all" distribution when raw scores are large (>10))
+        # Normalize scores so sum is 100
         if doc_scores.numel() > 0:
-            max_score = doc_scores.max()
-            if max_score > 1e-6:
-               doc_scores = (doc_scores / max_score) * config.SCORE_NORMALIZATION_FACTOR
+            total_sum = doc_scores.sum()
+            if total_sum > 1e-6:
+               doc_scores = (doc_scores / total_sum) * 100.0
             else:
                # Avoid division by zero if all scores are effectively zero
                doc_scores = torch.zeros_like(doc_scores)
@@ -226,7 +304,7 @@ class KnowledgeGraphService:
         
         # Dynamic threshold: Filter out docs with score lower than 10% of top score
         top_score = scored_docs[0][1] if scored_docs else 0
-        min_score = max(0.01, top_score * 0.1)
+        min_score = max(feature_weights.INFERENCE_WEIGHTS['result_min_score'], top_score * feature_weights.INFERENCE_WEIGHTS['result_ratio_threshold'])
 
         for idx, score in scored_docs:
             if score >= min_score:
