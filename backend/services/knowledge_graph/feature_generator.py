@@ -12,37 +12,10 @@ from services.knowledge_graph.tokenization import (
     extract_java_tokens, 
     extract_cpp_tokens, 
     extract_bash_tokens,
-    extract_html_segments
+    extract_html_tokens
 )
 from services.knowledge_graph import feature_weights
 
-def extract_html_tokens_with_weights(text):
-    # Weights managed in feature_weights.py
-    
-    segments = extract_html_segments(text)
-    weighted_tokens = []
-    
-    for tokens, tags in segments:
-        multiplier = 1.0
-        for tag_info in tags:
-            # tag_info is now a dict from updated StructuralHTMLParser
-            w = feature_weights.calculate_html_weight(tag_info, len(tokens))
-            multiplier = max(multiplier, w)
-        
-        multiplier = int(round(multiplier))
-        
-        for _ in range(multiplier):
-            weighted_tokens.extend(tokens)
-
-        # For high-weight sections, add n-gram phrases (bigrams/trigrams) to capture context
-        if multiplier >= 3 and len(tokens) > 1:
-            # Generate bigrams and trigrams using centralized util
-            ngrams = generate_ngrams(tokens, n_min=2, n_max=3)
-            # Repeat n-grams too
-            for _ in range(multiplier):
-                weighted_tokens.extend(ngrams)
-                
-    return weighted_tokens
 
 def whitespace_tokenizer(text):
     return text.split()
@@ -173,17 +146,54 @@ class FeatureGenerator:
                                 q = rec.get('query', {}) or {}
                                 ref_docs = q.get('ref_docs', []) or []
                                 conversations = q.get('conversations', []) or []
+                                main_question = (q.get('question') or "").strip()
+                                
+                                # Use explicit status from record if available, else default to accepted
+                                status = q.get('status') or 'accepted'
+                                base_mult = feature_weights.STATUS_WEIGHTS.get(status, 1.0)
+
+                                # 1. Add Main Question and Ref Doc Metadata (Comments/Keywords)
+                                for ref in ref_docs:
+                                    src = ref.get('source', '')
+                                    ref_fname = os.path.basename(src)
+                                    
+                                    # Add main question
+                                    if main_question:
+                                        qtokens = clean_and_tokenize(main_question)
+                                        qstr = " ".join(qtokens)
+                                        qa_augmentations.setdefault(ref_fname, []).append((qstr, base_mult, False))
+                                    
+                                    # Add comments (strong boost)
+                                    comment = ref.get('comment','')
+                                    if comment:
+                                        ctokens = clean_and_tokenize(comment)
+                                        cstr = " ".join(ctokens)
+                                        comment_w = base_mult * feature_weights.QA_COMPONENT_BOOSTS['comment']
+                                        qa_augmentations.setdefault(ref_fname, []).append((cstr, comment_w, True))
+                                        
+                                    # Add keywords (very strong boost)
+                                    kw_list = ref.get('keywords', []) or []
+                                    for kw in kw_list:
+                                        kw_tokens = clean_and_tokenize(kw)
+                                        kw_str = " ".join(kw_tokens)
+                                        kw_w = base_mult * feature_weights.QA_COMPONENT_BOOSTS['keywords']
+                                        qa_augmentations.setdefault(ref_fname, []).append((kw_str, kw_w, False))
+
+                                # 2. Add Conversation Turns
                                 for conv in conversations:
                                     human_text = (conv.get('human') or "").strip()
                                     ai_text = (conv.get('ai_assistant') or "").strip()
                                     for ref in ref_docs:
                                         src = ref.get('source', '')
                                         ref_fname = os.path.basename(src)
-                                        if human_text:
+                                        
+                                        # Avoid adding human text if it duplicates the main question exactly
+                                        if human_text and human_text != main_question:
                                             htokens = clean_and_tokenize(human_text)
                                             hstr = " ".join(htokens)
                                             # Human messages get a stronger base multiplier from feature_weights
                                             qa_augmentations.setdefault(ref_fname, []).append((hstr, feature_weights.STATUS_WEIGHTS['human_msg'], False))
+                                        
                                         if ai_text:
                                             atokens = clean_and_tokenize(ai_text)
                                             astr = " ".join(atokens)
@@ -222,7 +232,7 @@ class FeatureGenerator:
                         elif file.endswith('.sh'):
                             tokens = extract_bash_tokens(raw_content)
                         elif file.endswith('.html'):
-                            tokens = extract_html_tokens_with_weights(raw_content)
+                            tokens = extract_html_tokens(raw_content)
                         else:
                             tokens = clean_and_tokenize(raw_content)
                             

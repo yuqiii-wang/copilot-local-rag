@@ -609,13 +609,34 @@ document.getElementById('manualSubmit').onclick = async () => {
 
     const rows = Array.from(manualUrlList.children);
     const docs = [];
+    
+    // First pass: check if any scores were manually entered
+    let hasManualScores = false;
+    const entries = [];
     for (const r of rows) {
         const inputs = r.getElementsByTagName('input');
         const url = inputs[0].value.trim();
-        const score = parseFloat(inputs[1].value);
+        const scoreStr = inputs[1].value.trim();
         if (url) {
-            docs.push({ url, score: isNaN(score) ? 0 : score });
+            if (scoreStr !== '') hasManualScores = true;
+            entries.push({ url, scoreStr });
         }
+    }
+
+    // Second pass: build document list with logic
+    // If NO scores provided, distribute valid documents evenly (1.0 / count)
+    // If ANY scores provided, use parsed value (or 0 if missing/invalid)
+    const evenWeight = entries.length > 0 ? (1.0 / entries.length) : 0;
+
+    for (const e of entries) {
+        let finalScore;
+        if (!hasManualScores) {
+            finalScore = evenWeight;
+        } else {
+            const parsed = parseFloat(e.scoreStr);
+            finalScore = isNaN(parsed) ? 0 : parsed;
+        }
+        docs.push({ url: e.url, score: finalScore });
     }
     
     // Validate scores? No, backend normalizes.

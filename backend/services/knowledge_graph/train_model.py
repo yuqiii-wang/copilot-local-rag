@@ -252,7 +252,7 @@ def train():
 
 
     print("Injecting Priors from QA Dataset (and extracted literals)...")
-    prior_weight = 1.0 # Reduced from 100.0 to 1.0 to match TF-IDF scale
+    prior_weight = 10.0 # Increased from 1.0 to 10.0 to ensure QA priors dominate feature space
     
     vocab_map = fg.vectorizer.vocabulary_ # Word -> Index
     
@@ -307,10 +307,13 @@ def train():
                     status = entry.get('status','pending')
                     pos_mult = entry.get('pos_mult', 1.0)
                     
-                    # Score Normalization: 0..100 -> 1.0..2.0
                     raw_score = entry.get('score')
-                    if raw_score is None: raw_score = 0.0
-                    score_mult = 1.0 + (float(raw_score) / config.SCORE_NORMALIZATION_FACTOR)
+                    if raw_score is None: raw_score = 50.0
+                    
+                    if raw_score > 0:
+                        score_mult = raw_score
+                    else:
+                        score_mult = 1.0
                     
                     weight_multiplier = status_weights.get(status, 1.0) * pos_mult
                     if fname_key in basename_to_idx:
@@ -427,25 +430,37 @@ def train():
     print(f"Starting training (Reconstruction Task) for {EPOCHS} epochs...")
     model.train()
     
+    # Pre-calculate Loss Weights based on Target Importance (X)
+    # This ensures that stronger signals (high Inverse Frequency, N-Grams, Priors) 
+    # have higher probability of being learned and locating the document.
+    # Weight = 1.0 + (X * Multiplier). 
+    # Example: Weak signal (0.1) -> Weight ~3. Strong signal (4.0) -> Weight ~81.
+    loss_multiplier = feature_weights.TRAINING_WEIGHTS['non_zero_loss_multiplier']
+    base_loss_weights = 1.0 + (X * loss_multiplier)
+    
+    miss_penalty = feature_weights.TRAINING_WEIGHTS.get('missed_doc_penalty', 50.0)
+
+    loss_fn = nn.MSELoss(reduction='none')
+
     for epoch in range(EPOCHS):
         optimizer.zero_grad()
         
         # Forward
         outputs = model(X, hyperedge_index)
         
+        # Dynamic Loss Weighting:
+        # Check if we are totally missing a signal (Target > 0 but Output ~ 0)
+        # We define "totally missed" as output < 0.2 * Target (when Target > 0)
+        # This prevents the model from ignoring difficult documents.
+        with torch.no_grad():
+             # Create binary mask for missed signals (False Negatives)
+             missed_mask = (X > 0.0) & (outputs < (X * 0.2))
+             # Add penalty weight to the base weights for these specific elements
+             current_weights = base_loss_weights + (missed_mask.float() * miss_penalty)
+
         # Weighted Reconstruction Loss
-        # We want to penalize missing non-zero values (the signal) much more than getting 0s wrong.
-        # Since the matrix is highly sparse (~99% zeros), standard loss is dominated by 0->0 predictions.
-        
-        loss_fn = nn.MSELoss(reduction='none')
         element_loss = loss_fn(outputs, X)
-        
-        # Create a weight matrix: Boost importance of non-zero targets
-        # Non-zero entries get 20x weight
-        weights = torch.ones_like(X)
-        weights[X > 0] = feature_weights.TRAINING_WEIGHTS['non_zero_loss_multiplier'] 
-        
-        loss = (element_loss * weights).mean()
+        loss = (element_loss * current_weights).mean()
         
         loss.backward()
         optimizer.step()

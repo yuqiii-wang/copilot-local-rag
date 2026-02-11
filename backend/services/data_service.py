@@ -95,6 +95,19 @@ def process_initial_docs(raw_data: dict):
             for doc in raw_data['query']['ref_docs']:
                 if 'source' in doc:
                     doc['source'] = _convert_to_file_url(doc['source'])
+                
+                # Ensure title is the filename or last url segment
+                t = doc.get('title') or doc.get('source')
+                if t:
+                    # Handle windows paths and URLs
+                    clean_t = str(t).replace('\\', '/')
+                    # If it has path separators, take the last part
+                    if '/' in clean_t:
+                        doc['title'] = clean_t.split('/')[-1]
+                    else:
+                        # No separators, assume it's already a short name (or set it if title was None)
+                        if not doc.get('title'):
+                            doc['title'] = t
 
         # Validate and parse input
         data = FrontendDataSchema(**raw_data)

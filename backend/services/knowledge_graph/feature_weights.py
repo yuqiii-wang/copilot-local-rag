@@ -35,7 +35,7 @@ STATUS_WEIGHTS = {
     'added_confluence': 5.0, # Semi-trusted documentation update
     'pending': 1.0,          # Default / unknown state
     'rejected': 0.2,         # Explicitly down-weighted
-    'human_msg': 5.0,        # Human messages in conversation logs (stronger signal)
+    'human_msg': 10.0,       # Human messages in conversation logs (stronger signal)
     'ai_msg': 1.0            # AI responses in conversation logs (weaker signal)
 }
 
@@ -43,7 +43,7 @@ STATUS_WEIGHTS = {
 # Multipliers applied on top of status weights for specific field types in QA/Records.
 QA_COMPONENT_BOOSTS = {
     'comment': 3.0,      # Comments often explain *why* something is relevant
-    'keywords': 10.0,    # Explicit keywords tagged by users
+    'keywords': 20.0,    # Explicit keywords tagged by users - STRONG PRIORITY
     'question': 1.0      # The raw question text
 }
 
@@ -76,6 +76,7 @@ RECENCY_MAX_BOOST = 0.05  # 5% boost for newest files
 # Used in the GNN training loop in train_model.py.
 TRAINING_WEIGHTS = {
     'non_zero_loss_multiplier': 20.0, # Penalize missing real connections 20x more than 0s
+    'missed_doc_penalty': 100.0,      # Extra penalty weight if a known document link is predicted as ~0
     'inference_threshold': 0.5        # Minimum score to be considered a valid link in CSV output
 }
 

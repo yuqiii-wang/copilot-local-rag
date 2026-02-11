@@ -59,21 +59,32 @@ def visualize_knowledge_graph(dataset_path: str, output_file="knowledge_graph.pn
                         'score': score
                     })
 
-                # Sort by score descending and limit
+                # Sort by score descending
                 edges_list.sort(key=lambda x: x['score'], reverse=True)
-                edges_list = edges_list[:max_edges]
                 
-                print(f"Building graph with top {len(edges_list)} edges...")
+                print(f"Building graph with max {max_edges} edges...")
+
+                MAX_DEGREE_PER_ENTITY = 20
+                added_edges_count = 0
 
                 for item in edges_list:
+                    if added_edges_count >= max_edges:
+                        break
+                        
                     keyword = item['keyword']
                     doc_id = item['doc_id']
                     doc_type = item['doc_type']
 
                     # Document Node
-                    # Use doc_id as unique key. 
-                    # Note: Original code used doc_{i} index. Here we use path or ID string as key.
                     doc_node_key = f"doc_{doc_id}"
+                    # Keyword Node
+                    kw_node_key = f"kw_{keyword}"
+
+                    # Check max degree to prevent overfitting on specific nodes
+                    if G.has_node(doc_node_key) and G.degree[doc_node_key] >= MAX_DEGREE_PER_ENTITY:
+                        continue
+                    if G.has_node(kw_node_key) and G.degree[kw_node_key] >= MAX_DEGREE_PER_ENTITY:
+                        continue
                     
                     if not G.has_node(doc_node_key):
                         label = Path(doc_id).name
@@ -81,14 +92,13 @@ def visualize_knowledge_graph(dataset_path: str, output_file="knowledge_graph.pn
                             label = label[:12] + "..."
                         G.add_node(doc_node_key, label=label, type=doc_type, node_class='document')
                     
-                    # Keyword Node
-                    kw_node_key = f"kw_{keyword}"
                     if not G.has_node(kw_node_key):
                         G.add_node(kw_node_key, label=keyword, type='keyword', node_class='keyword')
                     
                     # Edge
                     if not G.has_edge(doc_node_key, kw_node_key):
                         G.add_edge(doc_node_key, kw_node_key)
+                        added_edges_count += 1
                         
         except Exception as e:
             print(f"Error reading CSV: {e}")
@@ -107,18 +117,16 @@ def visualize_knowledge_graph(dataset_path: str, output_file="knowledge_graph.pn
         # Extract data
         docs = data['docs']
         vocab = data['vocab']
-        added_edges = 0
-        if len(doc_indices.shape) > 0:
-            for d_idx, k_idx in zip(doc_indices, kw_indices):
-                if added_edges >= max_edges:
-                    break
-                    
-                word = vocab[k_idx]
-                if len(word.strip().split()) > 3:
-                    continue
+        hyperedge_index = data['hyperedge_index']
+        
+        # Convert to numpy if needed (handling torch tensor)
+        if hasattr(hyperedge_index, 'numpy'):
+            hyperedge_index = hyperedge_index.numpy()
 
-                G.add_edge(f"doc_{d_idx}", f"kw_{k_idx}")
-                added_edges += 1
+        doc_indices = hyperedge_index[0]
+        kw_indices = hyperedge_index[1]
+
+        # 1. Add Document Nodes
         for i, doc in enumerate(docs):
             node_id = f"doc_{i}"
             doc_type = doc.get('type', 'unknown')
@@ -138,14 +146,31 @@ def visualize_knowledge_graph(dataset_path: str, output_file="knowledge_graph.pn
 
         # 3. Add Edges (Document <-> Keyword)
         print("Adding edges...")
-        # hyperedge_index is numpy array
-        doc_indices = hyperedge_index[0]
-        kw_indices = hyperedge_index[1]
+        
+        added_edges = 0
+        MAX_DEGREE_PER_ENTITY = 20
         
         # Zip iterating over columns of the adjacency matrix essentially
-        if len(doc_indices.shape) > 0:
+        if len(doc_indices) > 0:
             for d_idx, k_idx in zip(doc_indices, kw_indices):
-                G.add_edge(f"doc_{d_idx}", f"kw_{k_idx}")
+                if added_edges >= max_edges:
+                    break
+
+                doc_node = f"doc_{d_idx}"
+                kw_node = f"kw_{k_idx}"
+                
+                # Maximum degree check to prevent overcrowding
+                if G.has_node(doc_node) and G.degree[doc_node] >= MAX_DEGREE_PER_ENTITY:
+                    continue
+                if G.has_node(kw_node) and G.degree[kw_node] >= MAX_DEGREE_PER_ENTITY:
+                    continue
+
+                word = vocab[k_idx]
+                if len(word.strip().split()) > 3:
+                    continue
+
+                G.add_edge(doc_node, kw_node)
+                added_edges += 1
             
     num_edges = G.number_of_edges()
     print(f"Graph created with {G.number_of_nodes()} nodes and {num_edges} edges.")

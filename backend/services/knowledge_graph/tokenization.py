@@ -4,9 +4,8 @@ import javalang
 from pathlib import Path
 from typing import List, Dict, Tuple
 from html.parser import HTMLParser
-import re
-import javalang
-from services.knowledge_graph.tokenization_utils import identify_pattern, extract_capital_sequences
+from services.knowledge_graph.tokenization_utils import identify_pattern, extract_capital_sequences, generate_ngrams
+from services.knowledge_graph import feature_weights
 
 # Java language keywords to exclude (Still useful for regex fallback or general cleaning)
 JAVA_KEYWORDS = {
@@ -124,6 +123,10 @@ class StructuralHTMLParser(HTMLParser):
                 break
 
     def handle_data(self, data):
+        # Ignore content within script and style tags to avoid CSS/JS noise
+        if any(tag['name'] in ('script', 'style', 'noscript', 'iframe', 'svg') for tag in self.current_tags):
+            return
+
         tokens = clean_and_tokenize(data)
         if tokens:
             self.segments.append((tokens, [t.copy() for t in self.current_tags]))
@@ -139,6 +142,71 @@ def extract_html_segments(text: str) -> List[Tuple[List[str], List[Dict]]]:
     except Exception:
         # Fallback
         return [(clean_and_tokenize(text), [])]
+
+def extract_html_tokens(text: str) -> List[str]:
+    """
+    Extracts tokens from HTML content with structural weighting.
+    
+    This function:
+    1. Parses HTML into segments (text content + context tags).
+    2. Calculates a weight for each segment based on tags (h1, strong, etc.) using feature_weights.
+    3. Repeats tokens based on weight to emphasize important sections.
+    4. Generates n-grams for high-weight sections to capture phrase context.
+    """
+    segments = extract_html_segments(text)
+    
+    # Dictionary to hold token layers. layer[i] will hold tokens for the i-th repetition.
+    # This prevents "Word Word" artifacts by preserving the sequence in each layer.
+    layers = {} 
+    explicit_ngrams = []
+    max_layer = 0
+
+    for tokens, tags in segments:
+        if not tokens:
+            continue
+            
+        multiplier = 1.0
+        
+        # Calculate maximum weight from the context stack
+        for tag_info in tags:
+            # Check for specific tag weights functionality
+            # tag_info contains {'name': 'tag', 'attrs': {...}}
+            w = feature_weights.calculate_html_weight(tag_info, len(tokens))
+            if w > multiplier:
+                multiplier = w
+                
+        # Round to integer for repetition
+        count = int(round(multiplier))
+        
+        if count > max_layer:
+            max_layer = count
+
+        # Populate layers
+        for c in range(1, count + 1):
+            if c not in layers:
+                layers[c] = []
+            layers[c].extend(tokens)
+            
+        # 2. Add structural N-grams for important sections
+        # If a headers/title/bold section, the phrase itself is a key feature (e.g., "Risk Policy")
+        # We add bigrams and trigrams.
+        if count >= 3 and len(tokens) > 1:
+            ngrams = generate_ngrams(tokens, n_min=2, n_max=3)
+            # Add ngrams with half the weight of individual tokens (heuristic) or full weight?
+            # We treat them as highly specific identifiers
+            for _ in range(count):
+                explicit_ngrams.extend(ngrams)
+                
+    # Flatten layers into a single sequence
+    weighted_tokens = []
+    
+    for c in range(1, max_layer + 1):
+        if c in layers:
+            weighted_tokens.extend(layers[c])
+            
+    weighted_tokens.extend(explicit_ngrams)
+    
+    return weighted_tokens
 
 def extract_java_tokens(source_code: str) -> List[str]:
     """

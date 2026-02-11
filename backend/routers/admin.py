@@ -83,10 +83,14 @@ async def add_manual_record(req: ManualRecordRequest):
         }
         
         doc_type = "code" if ext in code_exts else "confluence"
+        
+        # Determine title from URL (last segment)
+        clean_url = d.url.replace('\\', '/')
+        title_val = clean_url.split('/')[-1] if clean_url else "Untitled"
 
         norm_docs.append({
             "source": d.url,
-            "title": d.url, # Use URL as title
+            "title": title_val, 
             "type": doc_type,
             "score": norm_score,
             "comment": "",

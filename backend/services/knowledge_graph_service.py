@@ -188,7 +188,7 @@ class KnowledgeGraphService:
         # Apply weights to relevant probabilities
         weights_tensor = torch.FloatTensor(matched_weights)
         if relevant_probs.is_cuda:
-             weights_tensor = weights_tensor.to(relevant_probs.device)
+            weights_tensor = weights_tensor.to(relevant_probs.device)
         
         # Weighted sum of probabilities
         # Shape: [num_docs, num_matched] * [num_matched] -> [num_docs, num_matched] -> sum -> [num_docs]
@@ -201,10 +201,14 @@ class KnowledgeGraphService:
              # Log scale boost to prevent explosion, but reward multiple hits
              doc_scores = doc_scores * (1.0 + torch.log1p(shared_counts))
         
-        # Normalize scores using Softmax as requested
-        # We multiply by 100 to maintain percentage-like scaling consistent with UI expectations
+        # Normalize scores linearly instead of Softmax (Softmax creates a "winner-takes-all" distribution when raw scores are large (>10))
         if doc_scores.numel() > 0:
-            doc_scores = torch.softmax(doc_scores, dim=0) * config.SCORE_NORMALIZATION_FACTOR
+            max_score = doc_scores.max()
+            if max_score > 1e-6:
+               doc_scores = (doc_scores / max_score) * config.SCORE_NORMALIZATION_FACTOR
+            else:
+               # Avoid division by zero if all scores are effectively zero
+               doc_scores = torch.zeros_like(doc_scores)
 
         # Get top results
         results = []
