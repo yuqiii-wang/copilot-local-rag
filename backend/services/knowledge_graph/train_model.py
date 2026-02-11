@@ -369,15 +369,8 @@ def train():
                 status = entry.get('status','pending')
                 pos_mult = entry.get('pos_mult', 1.0)
                 
-                # BUG FIX: Score Normalization
-                raw_score = entry.get('score')
-                if raw_score is None: raw_score = 50.0
-                
-                # Normalize 0-100 to 0.2-2.0
-                if raw_score > 0:
-                   score_mult = max(0.2, raw_score / 50.0)
-                else:
-                   score_mult = 1.0 
+                # BUG FIX: Score Normalization using centralized weights
+                score_mult = feature_weights.get_user_score_weight(entry.get('score'))
                 
                 weight_multiplier = status_weights.get(status, 1.0) * pos_mult
                 

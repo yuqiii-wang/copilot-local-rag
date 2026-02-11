@@ -163,10 +163,8 @@ class FeatureGenerator:
                                     ref_fname = os.path.basename(src)
                                     
                                     # Incorporate Score from Feedback (0-100)
-                                    # We normalize to 0.2-2.0 range to modify the base status weight
-                                    raw_score = ref.get('score')
-                                    if raw_score is None: raw_score = 50.0
-                                    score_mult = max(0.2, raw_score / 50.0) # 100->2.0, 50->1.0, 20->0.4
+                                    # We use centralized logic now
+                                    score_mult = feature_weights.get_user_score_weight(ref.get('score'))
 
                                     # Add main question
                                     if main_question:

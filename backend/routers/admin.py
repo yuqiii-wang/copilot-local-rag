@@ -43,17 +43,30 @@ class ManualRecordRequest(BaseModel):
 
 @router.post('/manual_record')
 async def add_manual_record(req: ManualRecordRequest):
-    # Normalize scores: sum should be Config.SCORE_NORMALIZATION_FACTOR (100)
+    # Logic Consolidation:
+    # 1. Calculate stats: total sum, which docs have 0.
+    # 2. If total > 0:
+    #    a. If total > 100: Normalize all down to 100.
+    #    b. If total <= 100:
+    #       i. If there are docs with 0 score: Distribute (100 - total) among them.
+    #       ii. Otherwise: Keep scores as is.
+    # 3. If total == 0 (no manual scores):
+    #    a. Apply heuristic (60% rule).
+
+    NORM_MAX = float(config.SCORE_NORMALIZATION_FACTOR)
     total_score = sum(d.score for d in req.docs)
-    norm_docs = []
+    zero_indices = [i for i, d in enumerate(req.docs) if d.score == 0]
     
-    # If no scores provided (or all 0), apply heuristic: 60% rule
-    # 1 file: 100
-    # 2 files: 60, 40
-    # 3 files: 60, 24, 16 (recursive 60% of remainder)
+    # Pre-calculate fill value or normalization factor
+    fill_value = 0.0
+    normalize_factor = 1.0
+    use_heuristic = False
     heuristic_scores = []
-    if total_score == 0 and req.docs:
-        remaining = float(config.SCORE_NORMALIZATION_FACTOR)
+    norm_docs = []
+
+    if total_score == 0:
+        use_heuristic = True
+        remaining = NORM_MAX
         count = len(req.docs)
         for i in range(count):
             if i == count - 1:
@@ -62,14 +75,23 @@ async def add_manual_record(req: ManualRecordRequest):
                 val = remaining * 0.6
                 heuristic_scores.append(val)
                 remaining -= val
+    else:
+        # User provided some scores
+        if total_score > NORM_MAX:
+             normalize_factor = NORM_MAX / total_score
+        elif total_score < NORM_MAX and zero_indices:
+             remaining = NORM_MAX - total_score
+             fill_value = remaining / len(zero_indices)
 
     for i, d in enumerate(req.docs):
-        if total_score > 0:
-            norm_score = (d.score / total_score) * config.SCORE_NORMALIZATION_FACTOR
-        elif heuristic_scores:
+        if use_heuristic:
             norm_score = heuristic_scores[i]
+        elif total_score > NORM_MAX:
+            norm_score = d.score * normalize_factor
+        elif d.score == 0 and fill_value > 0:
+            norm_score = fill_value
         else:
-            norm_score = 0
+            norm_score = d.score
             
         # Determine type based on extension
         _, ext = os.path.splitext(d.url)

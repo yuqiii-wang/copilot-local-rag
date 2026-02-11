@@ -111,7 +111,15 @@ INFERENCE_WEIGHTS = {
 }
 
 # Config / Priors
-PRIOR_INJECTION_WEIGHT = 10.0   # Weight for injected QA priors in train_model.py
+PRIOR_INJECTION_WEIGHT = 1000.0   # Weight for injected QA priors in train_model.py
+
+# User Feedback Score Normalization
+# Used to convert 0-100 user scores into weight multipliers
+USER_SCORE_CONFIG = {
+    'default': 50.0,
+    'divisor': 20.0,      # score / 20.0 -> Multiplier (e.g. 100 -> 5.0)
+    'min_weight': 0.2
+}
 
 # Latent Edge Construction Weights
 # Used in keyword_expander.py
@@ -233,3 +241,16 @@ def calculate_qa_position_weight(index: int, base_multiplier: float) -> float:
         QA_POSITION_DECAY['start'] - index * QA_POSITION_DECAY['step']
     )
     return base_multiplier * pos_mult
+
+def get_user_score_weight(raw_score: Union[float, None]) -> float:
+    """
+    Normalizes user feedback score (0-100) to a weight multiplier.
+    Logic: max(min_weight, score / divisor)
+    """
+    if raw_score is None:
+        raw_score = USER_SCORE_CONFIG['default']
+    
+    if raw_score < 0: 
+        raw_score = 0.0
+
+    return max(USER_SCORE_CONFIG['min_weight'], raw_score / USER_SCORE_CONFIG['divisor'])

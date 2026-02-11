@@ -17,7 +17,6 @@ class KeywordReconstructionHGNN(nn.Module):
         # x: Node features
         x = self.conv1(x, hyperedge_index)
         x = F.relu(x)
-        x = F.dropout(x, p=0.5, training=self.training)
         
         x = self.conv2(x, hyperedge_index)
         x = F.relu(x) # Embedding

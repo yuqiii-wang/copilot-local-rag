@@ -624,17 +624,46 @@ document.getElementById('manualSubmit').onclick = async () => {
     }
 
     // Second pass: build document list with logic
-    // If NO scores provided, distribute valid documents evenly (1.0 / count)
-    // If ANY scores provided, use parsed value (or 0 if missing/invalid)
-    const evenWeight = entries.length > 0 ? (1.0 / entries.length) : 0;
+    // Logic: 
+    // 1. Calculate sum of manually provided scores
+    // 2. Identify docs without scores
+    // 3. Distribute (100 - currentSum) evenly among docs without scores
+    //    If currentSum > 100, remaining is 0 (or negative, effectively 0 for distribution)
+    
+    let currentSum = 0;
+    let missingCount = 0;
+    
+    // Calculate sums
+    for (const e of entries) {
+        if (e.scoreStr !== '') {
+            const val = parseFloat(e.scoreStr);
+            if (!isNaN(val)) currentSum += val;
+        } else {
+            missingCount++;
+        }
+    }
+    
+    // Logic: target total score of 100. 
+    // If sum of manual scores < 100, distribute remainder evenly among missing entries.
+    const targetTotal = 100.0;
+    let remaining = targetTotal - currentSum;
+    if (remaining < 0) remaining = 0;
+    
+    // Calculate what to fill empty slots with
+    let fillValue = 0;
+    if (missingCount > 0) {
+        fillValue = remaining / missingCount;
+    }
 
     for (const e of entries) {
         let finalScore;
-        if (!hasManualScores) {
-            finalScore = evenWeight;
+        // Check if user provided a specific score
+        if (e.scoreStr !== '') {
+             const parsed = parseFloat(e.scoreStr);
+             finalScore = isNaN(parsed) ? 0 : parsed;
         } else {
-            const parsed = parseFloat(e.scoreStr);
-            finalScore = isNaN(parsed) ? 0 : parsed;
+             // Use calculated fill value for entries without explicit score
+             finalScore = fillValue;
         }
         docs.push({ url: e.url, score: finalScore });
     }
