@@ -1,6 +1,8 @@
 import os
 import urllib.request
 from urllib.parse import unquote, urlparse
+from services.knowledge_graph import tokenization
+from services.utils.html_cleaner import HTMLContentCleaner
 
 class DownloadService:
     def _resolve_path(self, path: str):
@@ -56,6 +58,10 @@ class DownloadService:
                 start = max(0, i - 10)
                 end = min(len(lines), i + 11)
                 for j in range(start, end):
+                    # Filter boilerplate imports if they are not the target line itself
+                    # (Allow if the keyword actually matches the import line, e.g. searching for "java.util")
+                    if j != i and tokenization.is_boilerplate_line(lines[j]):
+                        continue
                     relevant_indices.add(j)
                 
                 # 2. Add Structure Context (Indentation Scan)
@@ -67,12 +73,14 @@ class DownloadService:
                 # Scan backwards for parents
                 for j in range(i - 1, -1, -1):
                     parent_line = lines[j]
-                    if not parent_line.strip(): continue 
+                    if not parent_line.strip(): continue
                     
                     parent_indent = len(parent_line.replace('\t', '    ')) - len(parent_line.replace('\t', '    ').lstrip())
                     if parent_indent < current_indent:
-                        relevant_indices.add(j)
-                        current_indent = parent_indent 
+                        # Avoid adding boilerplate parents (e.g. package pkg;)
+                        if not tokenization.is_boilerplate_line(parent_line):
+                            relevant_indices.add(j)
+                            current_indent = parent_indent
                         # Stop if we hit root or close to it
                         if current_indent <= 0: break
 
@@ -92,6 +100,15 @@ class DownloadService:
             last_idx = idx
             
         return "\n".join(result_lines)
+
+    def _is_html(self, url: str, content: str) -> bool:
+        if isinstance(url, str) and url.lower().endswith(('.html', '.htm', '.xhtml')):
+            return True
+        # Check first 1000 chars for doctype or html tag
+        header = content[:1000].lower() if content else ""
+        if "<!doctype html" in header or "<html" in header:
+            return True
+        return False
 
     def fetch_content(self, urls: list, query: str = None):
         """urls may be a list of strings or a list of objects { url: str, comment?: str }
@@ -129,6 +146,15 @@ class DownloadService:
             except Exception as e:
                 content = f"Error reading file {url}: {e}"
             
+            # HTML Cleaning
+            if found and self._is_html(url, content):
+                try:
+                    cleaner = HTMLContentCleaner()
+                    cleaner.feed(content)
+                    content = cleaner.get_text()
+                except Exception as e:
+                    print(f"HTML cleanup failed for {url}: {e}")
+
             # Smart filtering enabled if query is present and file was found
             if found and query:
                 content = self._extract_relevant_snippet(content, query)

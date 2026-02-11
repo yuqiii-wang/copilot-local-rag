@@ -3,6 +3,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Streamin
 from typing import Optional, List
 import os
 from services import data_service
+from services.knowledge_graph_service import kg_service
 from config import config
 from pydantic import BaseModel
 import queue
@@ -179,6 +180,8 @@ async def trigger_train(background_tasks: BackgroundTasks, init_lr: Optional[flo
             with contextlib.redirect_stdout(qw):
                 try:
                     train_model.train()
+                    training_log_queue.put("Reloading KG model...")
+                    kg_service.reload()
                 except Exception as exc:
                     # ensure exception gets into queue
                     training_log_queue.put(f"Train error: {exc}")

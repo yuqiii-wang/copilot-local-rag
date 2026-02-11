@@ -13,6 +13,16 @@ class KeywordExpander:
         self.keyword_edges: Dict[str, Dict[str, float]] = defaultdict(lambda: defaultdict(float))
         self.consonant_cache = {}
 
+        self.common_words = set()
+        try:
+            p = os.path.join(os.path.dirname(__file__), 'google_20k_eng_words.txt')
+            with open(p, 'r') as f:
+                for line in f:
+                    w = line.strip().lower()
+                    if w: self.common_words.add(w)
+        except Exception as e:
+            print(f"Warning: Could not load google_20k_eng_words.txt: {e}")
+
     def get_consonants(self, text: str) -> str:
         if text in self.consonant_cache:
             return self.consonant_cache[text]
@@ -33,8 +43,19 @@ class KeywordExpander:
         if t.endswith('ing'): return t[:-3]
         if t.endswith('tion'): return t[:-4]
         if t.endswith('ment'): return t[:-4]
-        if t.endswith('es') and len(t) > 4: return t[:-2]
-        if t.endswith('s') and not t.endswith('ss') and len(t) > 3: return t[:-1]
+        if t.endswith('es') and len(t) > 3: return t[:-2]
+        if t.endswith('s') and not t.endswith('ss') and len(t) > 4: return t[:-1]
+        
+        # Additional suffixes
+        if t.endswith('ly') and len(t) > 4: return t[:-2]
+        if t.endswith('ed') and len(t) > 4: return t[:-2]
+        if t.endswith('ful') and len(t) > 5: return t[:-3]
+        if t.endswith('al') and len(t) > 5: return t[:-2]
+        if t.endswith('ive') and len(t) > 5: return t[:-3]
+        if t.endswith('ous') and len(t) > 5: return t[:-3]
+        if t.endswith('ize') and len(t) > 5: return t[:-3]
+        if t.endswith('ise') and len(t) > 5: return t[:-3]
+        if t.endswith('able') and len(t) > 6: return t[:-4]
         
         return t
 
@@ -131,6 +152,8 @@ class KeywordExpander:
                 # We want to link qt to words in the document
                 
                 is_oov = qt not in vocab_set
+                # If qt is a common english word, assume it's not an abbreviation
+                is_common_word = qt.lower() in self.common_words
                 qt_cons = self.get_consonants(qt)
                 qt_len = len(qt)
                 
@@ -148,7 +171,7 @@ class KeywordExpander:
                     t_norm = self.normalize_variant(target_token)
 
                     # 1. Prefix Match (qt="sec", target="security")
-                    if qt_len >= 3 and target_token.startswith(qt):
+                    if qt_len >= 3 and target_token.startswith(qt) and not is_common_word:
                         score += feature_weights.LATENT_WEIGHTS['prefix_match']
                     
                     # 2. Reverse Prefix Match (qt="lending", target="lend")
@@ -163,7 +186,7 @@ class KeywordExpander:
                     # Only if lengths are somewhat comparable to avoid 's' matching 'supercalif...' falsely?
                     # Consonant skeletons of 'sec' -> 'sc'. 'security' -> 'scrty'. Match? No.
                     # 'lnd' -> 'lnd'. 'land' -> 'lnd'. Match!
-                    elif qt_len >= 3 and self.get_consonants(target_token) == qt_cons:
+                    elif qt_len >= 3 and self.get_consonants(target_token) == qt_cons and not is_common_word:
                         score += feature_weights.LATENT_WEIGHTS['consonant_match']
                         
                     if score > 0:
@@ -247,6 +270,53 @@ class KeywordExpander:
         
         return dict(expansion)
 
+    def _get_dictionary_variants(self, token: str) -> Set[str]:
+        if not self.common_words:
+            return set()
+        
+        variants = set()
+        base = token.lower()
+        
+        # Suffixes derived from normalize_variant + common morphology
+        suffixes = [
+            's', 'es', 'ing', 'ed', 'ly', 'ful', 'al', 'ive', 'ous',
+            'ize', 'ise', 'able', 'ment', 'tion', 'ion'
+        ]
+        
+        # 1. Simple append
+        for s in suffixes:
+            cand = base + s
+            if cand in self.common_words and cand != base:
+                variants.add(cand)
+
+        # 2. Drop 'e' + suffix
+        if base.endswith('e'):
+            base_no_e = base[:-1]
+            for s in ['ing', 'ed', 'able', 'ous', 'ive', 'al', 'tion']:
+                 cand = base_no_e + s
+                 if cand in self.common_words and cand != base:
+                     variants.add(cand)
+                     
+        # 3. y -> i + suffix
+        if base.endswith('y'):
+            base_no_y = base[:-1]
+            for s in ['ies', 'ied', 'ily']: # direct replacements for y
+                cand = base_no_y + s
+                if cand in self.common_words:
+                    variants.add(cand)
+        
+        # 4. Remove suffix
+        for s in suffixes:
+            if base.endswith(s):
+                stem = base[:-len(s)]
+                if len(stem) > 2 and stem in self.common_words:
+                    variants.add(stem)
+                # Restore 'e' (e.g. naming -> nam -> name)
+                if len(stem) > 2 and (stem + 'e') in self.common_words:
+                     variants.add(stem + 'e')
+
+        return variants
+
     def generate_expanded_ngrams(self, query_tokens: List[str], token_base_weights: Dict[str, float] = None) -> Dict[str, float]:
         """
         Generates n-grams (1-5) taking into account token expansions in sequence.
@@ -285,6 +355,13 @@ class KeywordExpander:
                     # Apply base scale to the EXPANSION too (so 'sec' IQF boosts 'security')
                     options.append((target, w * base_w))
             
+            # Dictionary Expansion
+            dict_vars = self._get_dictionary_variants(q)
+            for dv in dict_vars:
+                 if not any(opt[0] == dv for opt in options):
+                     # Use similar weight to structural variants (2.0)
+                     options.append((dv, 2.0 * base_w))
+
             lattice.append(options)
             
         result_ngrams = defaultdict(float)

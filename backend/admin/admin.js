@@ -286,8 +286,8 @@ async function fetchAndRenderGrid(range) {
     const res = await fetch(`/admin/stats?range=${encodeURIComponent(range)}`);
     if (!res.ok) { alert('Failed to fetch stats'); return; }
     const data = await res.json();
-    // Ensure recordsCache is loaded
-    if (!recordsCache || recordsCache.length === 0) await fetchRecords();
+    // Always refresh records so stats are in sync with any latest changes
+    await fetchRecords();
 
     // Build map of last timestamp per question from recordsCache
     const lastMap = {};

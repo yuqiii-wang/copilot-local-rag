@@ -307,7 +307,7 @@ def visualize_knowledge_graph(dataset_path: str, output_file="knowledge_graph.pn
 
     nx.draw_networkx_edges(G, pos, edgelist=structural_edges, alpha=0.2, edge_color='#666666')
     if latent_edges:
-        nx.draw_networkx_edges(G, pos, edgelist=latent_edges, alpha=0.6, edge_color='#888888', style='dashed', width=1.5)
+        nx.draw_networkx_edges(G, pos, edgelist=latent_edges, alpha=0.6, edge_color='#888888', style='dashed', width=1.0)
     
     # Draw Labels
     doc_labels = {n: G.nodes[n]['label'] for n in doc_nodes}
@@ -323,7 +323,7 @@ def visualize_knowledge_graph(dataset_path: str, output_file="knowledge_graph.pn
         Line2D([0], [0], marker='o', color='w', markerfacecolor=color_map['code'], label='Source Code', markersize=12, markeredgecolor='black'),
         Line2D([0], [0], marker='o', color='w', markerfacecolor=color_map['confluence'], label='Confluence Page', markersize=12, markeredgecolor='black'),
         Line2D([0], [0], marker='s', color='w', markerfacecolor='#FFCC00', label='Keyword', markersize=12, markeredgecolor='black'),
-        Line2D([0], [0], color='#888888', linestyle='--', label='Latent Connection', linewidth=2),
+        Line2D([0], [0], color='#888888', linestyle='--', label='Latent Connection', linewidth=1),
     ]
     plt.legend(handles=legend_elements, loc='upper right', fontsize=12)
     

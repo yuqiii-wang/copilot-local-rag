@@ -7,8 +7,8 @@ from data_manager import data_manager
 # Load history into memory on module import (or first use)
 MEMORY_CACHE = []
 try:
-    MEMORY_CACHE = data_manager.load_recent_records(7)
-    print(f"Initial load: {len(MEMORY_CACHE)} records from last 7 days.")
+    MEMORY_CACHE = data_manager.load_recent_records(365)
+    print(f"Initial load: {len(MEMORY_CACHE)} records from last 365 days.")
 except Exception as e:
     print(f"Failed to load history: {e}")
 

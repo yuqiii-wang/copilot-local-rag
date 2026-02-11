@@ -157,7 +157,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                 vscode.commands.executeCommand('workbench.action.chat.open', { query: finalQuery + `\n\nprocess-request ${requestId}` });
                 
                 // Record the docs immediately (Step 1)
-                await this._recordInitialDocs(backendUrl, data.manualText, data.ocrText, this._lastQuery, "", this._currentRecordId);
+                await this._recordInitialDocs(backendUrl, data.manualText, data.ocrText, this._lastQuery, "", this._currentRecordId, data.urls);
 
                 webviewView.webview.postMessage({ type: 'processingComplete' });
                 webviewView.webview.postMessage({ type: 'processingComplete' });
@@ -252,7 +252,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     });
   }
 
-  private async _recordInitialDocs(backendUrl: string, manualText: string, ocrText: string, userQuery: string, aiAnswer: string = "", sessionId: string | null = null) {
+  private async _recordInitialDocs(backendUrl: string, manualText: string, ocrText: string, userQuery: string, aiAnswer: string = "", sessionId: string | null = null, activeUrls: string[] | null = null) {
       try {
             // Helper to determine type
             const getDocType = (source: string) => {
@@ -262,23 +262,60 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                 return 'code';
             };
 
+            // Helper for title cleaning
+            const cleanTitle = (provided: string | undefined, src: string) => {
+                let t = provided;
+                // If title looks like a path (contains slashes), ignore it and use basename of source
+                if (t && (t.includes('/') || t.includes('\\'))) { t = undefined; }
+                if (t) { return t; }
+                
+                let s = src || "";
+                s = s.replace(/^file:\/\/\/?/, '').replace(/^https?:\/\//, '');
+                try { s = decodeURIComponent(s); } catch {}
+                s = s.replace(/\\/g, '/');
+                return s.split('/').pop() || "Document";
+            };
+
+            // Helper for score normalization
+            const normScore = (val: any) => {
+                let n = parseFloat(val);
+                if (isNaN(n)) return 0.0;
+                // Normalize 0-1 scale to 0-100
+                if (n > 0 && n <= 1.0) { n = n * 100.0; }
+                return parseFloat(n.toFixed(2));
+            };
+
             // Collect docs from state
+            let ragResults = this._lastRagResults;
+            if (activeUrls && Array.isArray(activeUrls)) {
+                const allowedSourceSet = new Set(activeUrls);
+                ragResults = ragResults.filter((r: any) => {
+                     const s = r.id || r.link || 'graph';
+                     // Check exact match or if the source is contained in the allowed set
+                     // (This handles potential discrepancies between link format and href)
+                     return allowedSourceSet.has(s); 
+                });
+            }
+
             const allDocs: any[] = [
-                ...this._lastRagResults.map((r: any) => {
+                ...ragResults.map((r: any) => {
                     const src = r.id || r.link || 'graph';
                     return { 
                         source: src, 
                         type: getDocType(src),
-                        title: r.title || r.metadata?.title || path.basename(src) || 'RAG Result',
-                        score: r.score
+                        title: cleanTitle(r.title || r.metadata?.title, src),
+                        score: normScore(r.score),
+                        keywords: Array.isArray(r.keywords) ? r.keywords : undefined,
+                        comment: r.comment || undefined
                     };
                 }),
                 ...this._lastDownloads.map(d => ({ 
                     source: d.url, 
                     type: getDocType(d.url),
-                    title: d.title || path.basename(d.url) || d.url,
+                    title: cleanTitle(d.title, d.url),
                     comment: d.comment || undefined,
-                    keywords: d.keywords || undefined
+                    keywords: Array.isArray(d.keywords) ? d.keywords : undefined,
+                    score: 100.0
                 }))
             ];
 

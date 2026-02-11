@@ -36,6 +36,11 @@ class KnowledgeGraphService:
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, self._initialize)
 
+    def reload(self):
+        """Reloads the model and data from disk. Useful after training."""
+        print("Reloading Knowledge Graph model from disk...")
+        self._initialize()
+
     def _initialize(self):
         print("Initializing Knowledge Graph Service...")
         

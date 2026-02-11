@@ -39,7 +39,6 @@ if config.DEBUG:
 else:
     DATASET_DIR = "services/knowledge_graph/real_dataset"
 
-QA_FILE = os.path.join(DATASET_DIR, "qa_dataset.json")
 MODEL_SAVE_PATH = "services/knowledge_graph/query_model.pth"
 FEATURE_GEN_PATH = "services/knowledge_graph/feature_gen.pkl"
 KEYWORD_EXPANDER_PATH = "services/knowledge_graph/keyword_expander.pkl"
@@ -154,41 +153,10 @@ def train():
     X = X * ngram_weights_tensor
 
     # Load QA Dataset first (QueryData schema)
-    print("Loading QA Dataset (QueryData schema)...")
-    qa_map = {}  # question -> list of dicts {fname, status, comment}
-    try:
-        with open(QA_FILE, 'r') as f:
-            qa_list = json.load(f)
-        for rec in qa_list:
-            q = rec.get('query', {}) or {}
-            question = (q.get('question') or "").strip()
-            status = (q.get('status') or "pending").lower()
-            ref_docs = q.get('ref_docs', [])
-            for idx, ref in enumerate(ref_docs):
-                # Position multiplier: first doc strongest, then step down; floor at 0.2
-                pos_mult = feature_weights.calculate_qa_position_weight(idx, 1.0)
-                src = ref.get('source', '')
-                fname = os.path.basename(src)
-                comment = ref.get('comment', '') or ''
-                keywords = ref.get('keywords', []) or []
-                score = ref.get('score')
-                if score is None:
-                    score = 0.0
-                if not question:
-                    continue
-                qa_map.setdefault(question, []).append({
-                    'fname': fname,
-                    'status': status,
-                    'comment': comment,
-                    'keywords': keywords,
-                    'pos_mult': pos_mult,
-                    'score': score
-                })
-        print(f"Loaded {len(qa_map)} QA queries from {QA_FILE}.")
-    except Exception as e:
-        print(f"Error loading QA dataset: {e}")
-        qa_map = {}
-
+    print("Loading QA (QueryData schema)")
+    # Note: Logic for loading from a single QA file has been removed. 
+    # We now strictly use the conversation records directory.
+    qa_map = {}  # question -> list of dicts {fname, status, comment
     # Also ingest conversation records (if present) to augment QA priors.
     # Human messages are treated as strong signals (status='accepted'),
     # while assistant responses are included with lower weight (status='pending').

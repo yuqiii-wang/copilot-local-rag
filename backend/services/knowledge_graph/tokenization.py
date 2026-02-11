@@ -39,6 +39,17 @@ BASH_KEYWORDS = {
     "read", "cd", "pwd", "pushd", "popd", "dirs", "eval", "exec", "source", "true", "false", "null"
 }
 
+# SQL Keywords
+SQL_KEYWORDS = {
+    "select", "from", "where", "insert", "update", "delete", "create", "alter", "drop", "table", "index",
+    "view", "trigger", "procedure", "function", "database", "grant", "revoke", "commit", "rollback", 
+    "join", "inner", "outer", "left", "right", "full", "on", "group", "by", "order", "having", "union",
+    "all", "distinct", "into", "values", "set", "as", "and", "or", "not", "null", "primary", "key",
+    "foreign", "default", "check", "constraint", "unique", "references", "auto_increment", "identity",
+    "exec", "exists", "cast", "convert", "case", "when", "then", "else", "end", "begin", "declare",
+    "top", "limit", "offset", "fetch", "next", "rows", "only", "with", "recursive"
+}
+
 def split_camel_snake(text: str) -> str:
     """
     Splits CamelCase and snake_case strings into space-separated words.
@@ -59,6 +70,10 @@ def clean_and_tokenize(text: str) -> List[str]:
     text = re.sub(r'(.)([A-Z][a-z]+)', r'\1 \2', text)
     text = re.sub(r'([a-z0-9])([A-Z])', r'\1 \2', text)
     
+    # Treat dot as delimiter unless adjacent to a digit or a common file extension
+    common_exts = r'(?:py|sh|java|c|cpp|cc|h|hpp|js|ts|jsx|tsx|html|css|scss|json|xml|yaml|yml|sql|md|txt|log|csv|bat|cmd|ps1|conf|ini|properties|gradle)'
+    text = re.sub(r'(?<!\d)\.(?!(?:\d|' + common_exts + r')\b)', ' ', text, flags=re.IGNORECASE)
+
     raw_tokens = text.split()
     final_tokens_list = []
     
@@ -413,6 +428,58 @@ def extract_bash_tokens(source_code: str) -> List[str]:
                     
     return expanded_tokens
 
+def extract_sql_tokens(source_code: str) -> List[str]:
+    """
+    Parses SQL code using regex to extract meaningful tokens:
+    - Table names
+    - Column names
+    - Procedures/Functions
+    """
+    identifiers = []
+    
+    # Remove strings to avoid tokenizing content
+    clean_code = re.sub(r"'[^']*'", '', source_code)
+    
+    # 1. Table/View definitions (CREATE TABLE name)
+    tables = re.findall(r'\b(?:create|alter|drop)\s+(?:table|view|index)\s+(\w+)', clean_code, re.IGNORECASE)
+    identifiers.extend(tables)
+    
+    # 2. Joins and Froms (FROM table, JOIN table)
+    refs = re.findall(r'\b(?:from|join|update|into)\s+(\w+)', clean_code, re.IGNORECASE)
+    identifiers.extend(refs)
+    
+    # 3. Column Definitions or Selects (harder with regex)
+    # We'll just tokenize words and filter keywords
+    
+    words = re.findall(r'\b[a-zA-Z0-9_]+\b', clean_code)
+    
+    expanded_tokens = []
+    for t in identifiers + words:
+        s_lower = t.lower()
+        if s_lower not in SQL_KEYWORDS and s_lower not in BASH_KEYWORDS and (len(s_lower) > 2 or any(c.isdigit() for c in s_lower)):
+             # Filter out numeric only unless it's specific ID like? No, clean_and_tokenize keeps numbers.
+             expanded_tokens.append(s_lower)
+
+    return list(set(expanded_tokens)) # Unique tokens for SQL usually
+
+def is_boilerplate_line(line: str) -> bool:
+    """
+    Checks if a line is likely an import, include, or non-business logic statement.
+    """
+    l = line.strip()
+    if not l: return False
+    
+    # C/C++
+    if l.startswith("#include") or l.startswith("#define") or l.startswith("using namespace"): return True
+    # Java
+    if l.startswith("package ") or l.startswith("import "): return True
+    # Python
+    if l.startswith("import ") or (l.startswith("from ") and " import " in l): return True
+    # JavaScript/TypeScript
+    if l.startswith("import ") or l.startswith("require("): return True
+    
+    return False
+
 def load_documents(dataset_path: str) -> List[Dict]:
     """
     Walks through the dataset directory and processes files (Confluence, Java, Jira).
@@ -449,7 +516,7 @@ def load_documents(dataset_path: str) -> List[Dict]:
                 tokenizer = extract_bash_tokens
             elif file_path.suffix == '.sql':
                 doc_type = "code"
-                # Use default clean_and_tokenize for now, or add extract_sql_tokens later
+                tokenizer = extract_sql_tokens
                 
             # Read content
             try:

@@ -58,6 +58,51 @@ class DataManager:
             
         return DummyConnection()
 
+
+    def _normalize_scores(self, record):
+        try:
+            if not isinstance(record, dict) or "query" not in record:
+                return
+            q_obj = record["query"]
+            if not isinstance(q_obj, dict) or "ref_docs" not in q_obj:
+                return
+            
+            docs = q_obj["ref_docs"]
+            if not isinstance(docs, list) or not docs:
+                return
+
+            current_sum = 0
+            null_docs = []
+            
+            # Identify docs with valid scores vs null/zero
+            for d in docs:
+                s = d.get("score")
+                if s is None or s == 0:
+                    null_docs.append(d)
+                else:
+                    try:
+                        val = float(s)
+                        current_sum += val
+                    except:
+                        null_docs.append(d)
+
+            # Distribute remaining
+            remaining = 100 - current_sum
+            if null_docs:
+                share = max(0, remaining) / len(null_docs)
+                for d in null_docs:
+                    d["score"] = share
+            
+            # Normalize total to 100 if needed (rescaling)
+            new_sum = sum(float(d.get("score", 0)) for d in docs)
+            if new_sum > 0 and abs(new_sum - 100) > 0.001:
+                factor = 100.0 / new_sum
+                for d in docs:
+                    d["score"] = float(d.get("score", 0)) * factor
+
+        except Exception as e:
+            logger.warning(f"Error normalizing scores: {e}")
+
     def _record_offline(self, query, params, fetch):
         """
         Record the query execution to a local JSON file.
@@ -95,6 +140,7 @@ class DataManager:
             # If this is a specialized store command, unwrap the payload for cleaner JSON
             if query == "STORE_FRONTEND_DATA" and isinstance(processed_params, list) and len(processed_params) > 0:
                  record = processed_params[0]
+                 self._normalize_scores(record)
                  # check if record is unwrapped
                  if isinstance(record, dict) and 'query' in record and 'id' in record['query']:
                      # It's already in the structure we want, so use it directly
