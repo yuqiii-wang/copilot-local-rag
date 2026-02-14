@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
-import { executeOCRRequest } from "./ocr/ocrHandler";
+import { executeVisionRequest } from "./vision/visionHandler";
 import { RequestManager } from "./requestManager";
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
@@ -9,7 +9,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   // State tracking for feedback
   private _lastDownloads: any[] = [];
   private _lastRagResults: any[] = [];
-  private _lastOcrText: string = "";
+    private _uploadedFiles: any[] = [];
   private _currentRecordId: string | null = null; // Track current session ID
   private _lastQuery: string = "";
 
@@ -61,20 +61,68 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             try {
                 // Reconstruct Buffer from the array data sent from webview
                 const fileBuffer = Buffer.from(data.data);
-                const result = await executeOCRRequest(fileBuffer, data.fileName);
-                
-                this._lastOcrText = result.ocr_text || "";
+                const result = await executeVisionRequest(fileBuffer, data.fileName);
+
+                const uploaded = {
+                    id: result.id ?? -1,
+                    filename: result.filename ?? data.fileName,
+                    image_url: result.image_url ?? undefined,
+                    created_at: result.created_at ?? new Date().toISOString()
+                };
+
+                this._uploadedFiles.push(uploaded);
 
                 webviewView.webview.postMessage({
-                    type: 'ocrResult',
-                    text: result.ocr_text || '_No text found_'
+                    type: 'uploadList',
+                    files: this._uploadedFiles
                 });
             } catch (error: any) {
-                vscode.window.showErrorMessage(`OCR Error: ${error.message}`);
+                vscode.window.showErrorMessage(`Vision Error: ${error.message}`);
                 webviewView.webview.postMessage({
                     type: 'error',
                     message: error.message
                 });
+            }
+            break;
+        }
+        case 'deleteImage': {
+            try {
+                // Prefer deriving the actual stored filename from the image_url if available
+                // fallback to data.filename (original name) only if image_url is missing
+                const actualFilename = (data.image_url ? data.image_url.split('/').pop() : undefined) || data.filename;
+                
+                if (!actualFilename) {
+                    vscode.window.showErrorMessage('No filename provided for deletion');
+                    break;
+                }
+
+                const resp = await fetch(`${backendUrl}/vision/delete`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filename: actualFilename })
+                });
+
+                if (!resp.ok) {
+                    vscode.window.showErrorMessage('Failed to delete uploaded image on server');
+                    break;
+                }
+
+                const json = await resp.json() as { deleted: boolean };
+                if (json.deleted) {
+                    // Remove from local state and notify webview
+                    // Filter out by either matching filename OR matching image_url filename
+                    this._uploadedFiles = this._uploadedFiles.filter((f: any) => {
+                        const storedName = (f.image_url || '').split('/').pop();
+                        return storedName !== actualFilename && f.filename !== actualFilename;
+                    });
+                    
+                    webviewView.webview.postMessage({ type: 'uploadList', files: this._uploadedFiles });
+                    vscode.window.showInformationMessage(`Deleted ${actualFilename}`);
+                } else {
+                    vscode.window.showWarningMessage(`File not found on server: ${actualFilename}`);
+                }
+            } catch (e: any) {
+                vscode.window.showErrorMessage(`Delete error: ${e.message}`);
             }
             break;
         }
@@ -136,9 +184,20 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                 const parts = [];
                 // parts.push('@repo-ask'); // Optional: enforce using the participant
                 if (data.manualText) parts.push(data.manualText);
-                if (data.ocrText) parts.push(`Found text from images\n${data.ocrText}`);
+                if (data.visionText) parts.push(`Found text from images\n${data.visionText}`);
                 if (contextContent) parts.push(`Retrieved Context:\n${contextContent}`);
                 
+                // If images were uploaded, append their public URLs so chat can access them
+                // We don't add them to the textual prompt anymore, but let the RequestManager carry them
+                // and the ChatParticipant will attach them as real Image parts to the LLM.
+                /* 
+                if (data.images && Array.isArray(data.images) && data.images.length > 0) {
+                    for (const imgUrl of data.images) {
+                        parts.push(`Image: ${imgUrl}`);
+                    }
+                }
+                */
+
                 const finalQuery = '@repo-ask ' + parts.join('\n\n');
                 
                 // Prepare request data for participant
@@ -149,15 +208,16 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                 
                 const requestId = reqManager.createRequest({
                     manualText: data.manualText,
-                    ocrText: data.ocrText,
+                    visionText: data.visionText,
                     urls: data.urls,
+                    images: data.images || [],
                     id: this._currentRecordId // Pass the backend record ID so ChatParticipant can reference it in buttons
                 });
                 
                 vscode.commands.executeCommand('workbench.action.chat.open', { query: finalQuery + `\n\nprocess-request ${requestId}` });
                 
                 // Record the docs immediately (Step 1)
-                await this._recordInitialDocs(backendUrl, data.manualText, data.ocrText, this._lastQuery, "", this._currentRecordId, data.urls);
+                await this._recordInitialDocs(backendUrl, data.manualText, data.visionText, this._lastQuery, "", this._currentRecordId, data.urls);
 
                 webviewView.webview.postMessage({ type: 'processingComplete' });
                 webviewView.webview.postMessage({ type: 'processingComplete' });
@@ -194,7 +254,12 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                     throw new Error(`Backend error: ${response.statusText}`);
                 }
                 const results = await response.json() as any[];
-                this._lastRagResults = results; // Log for feedback
+                
+                if (skip > 0) {
+                    this._lastRagResults = [...this._lastRagResults, ...results];
+                } else {
+                    this._lastRagResults = results;
+                }
                 
                 webviewView.webview.postMessage({
                     type: 'ragResult',
@@ -252,7 +317,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     });
   }
 
-  private async _recordInitialDocs(backendUrl: string, manualText: string, ocrText: string, userQuery: string, aiAnswer: string = "", sessionId: string | null = null, activeUrls: string[] | null = null) {
+  private async _recordInitialDocs(backendUrl: string, manualText: string, visionText: string, userQuery: string, aiAnswer: string = "", sessionId: string | null = null, activeUrls: string[] | null = null) {
       try {
             // Helper to determine type
             const getDocType = (source: string) => {
@@ -319,15 +384,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                 }))
             ];
 
-            if (this._lastOcrText) {
-                allDocs.push({ 
-                    source: 'user_upload',
-                    type: 'code', // Default to code for OCR snippets as they are likely code screenshots in this context
-                    content: this._lastOcrText.substring(0, 200) + '...',
-                    title: 'OCR Image Upload'
-                });
-            }
-
             // Deduplicate docs based on normalized source
             const seenSources = new Set<string>();
             const refDocs = [];
@@ -349,7 +405,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                 query: {
                     id: sessionId, // Use frontend generated UUID
                     timestamp: new Date().toISOString(),
-                    question: userQuery || manualText || (ocrText ? "OCR extraction" : ""),
+                    question: userQuery || manualText || (visionText ? "Vision extraction" : ""),
                     ref_docs: refDocs,
                     conversations: [
                          { ai_assistant: "", human: "" },

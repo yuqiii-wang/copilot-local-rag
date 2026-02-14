@@ -34,15 +34,18 @@ HIDDEN_DIM = 128
 LEARNING_RATE = 0.001 # Reduced to improve stability
 EPOCHS = 200 
 
-if config.DEBUG:
-    DATASET_DIR = "services/knowledge_graph/dummy_dataset"
-else:
-    DATASET_DIR = "services/knowledge_graph/real_dataset"
+# Use absolute paths based on this file's location
+current_dir = os.path.dirname(os.path.abspath(__file__))
 
-MODEL_SAVE_PATH = "services/knowledge_graph/query_model.pth"
-FEATURE_GEN_PATH = "services/knowledge_graph/feature_gen.pkl"
-KEYWORD_EXPANDER_PATH = "services/knowledge_graph/keyword_expander.pkl"
-RESULTS_CSV_PATH = "services/knowledge_graph/hypergraph_results.csv"
+if config.DEBUG:
+    DATASET_DIR = os.path.join(current_dir, "dummy_dataset")
+else:
+    DATASET_DIR = os.path.join(current_dir, "real_dataset")
+
+MODEL_SAVE_PATH = os.path.join(current_dir, "query_model.pth")
+FEATURE_GEN_PATH = os.path.join(current_dir, "feature_gen.pkl")
+KEYWORD_EXPANDER_PATH = os.path.join(current_dir, "keyword_expander.pkl")
+RESULTS_CSV_PATH = os.path.join(current_dir, "hypergraph_results.csv")
 
 def train():
     # 0. Run Indexers FIRST to extract literals

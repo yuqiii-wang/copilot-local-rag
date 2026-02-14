@@ -9,8 +9,8 @@
         button { width: 25%; margin-bottom: 10px; padding: 5px; display: block; }
         .image-upload { border: 1px dashed var(--vscode-descriptionForeground); padding: 20px; text-align: center; transition: all 0.2s; cursor: pointer; }
         .image-upload.drag-over { border-color: var(--vscode-focusBorder); background-color: var(--vscode-editor-selectionBackground); }
-        #ocr-result { margin-top: 20px; white-space: pre-wrap; background-color: var(--vscode-editor-background); padding: 10px; border: 1px solid var(--vscode-input-border); display: none; }
-        #ocr-result h4 { margin-top: 0; }
+        #vision-result { margin-top: 20px; white-space: pre-wrap; background-color: var(--vscode-editor-background); padding: 10px; border: 1px solid var(--vscode-input-border); display: none; }
+        #vision-result h4 { margin-top: 0; }
         .spinner {
             border: 4px solid var(--vscode-editor-background);
             border-top: 4px solid var(--vscode-progressBar-background);
@@ -29,6 +29,9 @@
         .link-item a { flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 10px; }
         .remove-link-btn { cursor: pointer; color: var(--vscode-errorForeground); font-weight: bold; padding: 0 5px; }
         .remove-link-btn:hover { background-color: var(--vscode-toolbar-hoverBackground); border-radius: 3px; }
+        #uploads-list { margin-top: 12px; }
+        #uploads-list ul { padding-left: 0; list-style-type: none; margin: 0; }
+        #uploads-list li { padding: 6px 8px; border: 1px solid var(--vscode-input-border); margin-bottom: 6px; border-radius: 4px; background: var(--vscode-editor-background); display:flex; justify-content:space-between; align-items:center; }
     </style>
 </head>
 <body>
@@ -40,6 +43,7 @@
         <input type="file" id="image-input" accept="image/*" multiple style="display: none;" />
         <div id="image-preview" style="display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; justify-content: center;"></div>
     </div>
+    <div id="uploads-list" aria-live="polite"></div>
 
     <div style="margin-top: 15px;">
         <textarea id="manual-text-input" placeholder="Type or paste text here..." style="width: 100%; min-height: 80px; box-sizing: border-box; background-color: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); padding: 5px; font-family: inherit; resize: vertical;"></textarea>
@@ -69,9 +73,9 @@
         </div>
     </div>
 
-    <div id="ocr-result">
+    <div id="vision-result">
         <h4>Found text from images</h4>
-        <div id="ocr-content"></div>
+        <div id="vision-content"></div>
         <div style="display: flex; gap: 5px; margin-top: 10px;">
             <button id="edit-btn">Edit</button>
             <button id="confirm-btn" style="display: none;">Confirm</button>
@@ -82,12 +86,14 @@
     <script>
         const vscode = acquireVsCodeApi();
         
-        const ocrContent = document.getElementById('ocr-content');
+        const visionContent = document.getElementById('vision-content');
         const editBtn = document.getElementById('edit-btn');
         const sendBtn = document.getElementById('send-btn');
         const confirmBtn = document.getElementById('confirm-btn');
         const queryBtn = document.getElementById('query-btn');
         const spinner = document.getElementById('loading-spinner');
+        const previewMap = new Map(); // filename -> objectURL for thumbnail reuse
+        let uploadedFiles = [];
 
         // ... existing code ...
         // Link management elements
@@ -178,9 +184,9 @@
             currentSkip = 0;
             if(loadMoreBtn) loadMoreBtn.style.display = 'none';
             spinner.style.display = 'block';
-            const ocrText = ocrContent.innerText;
+            const visionText = visionContent.innerText;
             const manualText = document.getElementById('manual-text-input').value;
-            const textToSend = [manualText, ocrText].filter(t => t && t.trim()).join('\n\n');
+            const textToSend = [manualText, visionText].filter(t => t && t.trim()).join('\n\n');
             vscode.postMessage({ type: 'queryRag', text: textToSend, skip: 0 });
         });
 
@@ -189,32 +195,32 @@
                  spinner.style.display = 'block';
                  currentSkip += RAG_LIMIT;
                  
-                 const ocrText = ocrContent.innerText;
+                 const visionText = visionContent.innerText;
                  const manualText = document.getElementById('manual-text-input').value;
-                 const textToSend = [manualText, ocrText].filter(t => t && t.trim()).join('\n\n');
+                 const textToSend = [manualText, visionText].filter(t => t && t.trim()).join('\n\n');
                  
                  vscode.postMessage({ type: 'queryRag', text: textToSend, skip: currentSkip });
             });
         }
 
         editBtn.addEventListener('click', () => {
-            ocrContent.contentEditable = 'true';
-            ocrContent.style.border = '1px solid var(--vscode-focusBorder)';
-            ocrContent.focus();
+            visionContent.contentEditable = 'true';
+            visionContent.style.border = '1px solid var(--vscode-focusBorder)';
+            visionContent.focus();
             editBtn.style.display = 'none';
             confirmBtn.style.display = 'block';
         });
 
         confirmBtn.addEventListener('click', () => {
-            ocrContent.contentEditable = 'false';
-            ocrContent.style.border = 'none';
+            visionContent.contentEditable = 'false';
+            visionContent.style.border = 'none';
             editBtn.style.display = 'block';
             confirmBtn.style.display = 'none';
         });
 
         sendBtn.addEventListener('click', () => {
             spinner.style.display = 'block';
-            const ocrText = ocrContent.innerText;
+            const visionText = visionContent.innerText;
             const manualText = document.getElementById('manual-text-input').value;
             
             // Gather all links
@@ -230,8 +236,9 @@
             vscode.postMessage({ 
                 type: 'processAndChat', 
                 manualText: manualText,
-                ocrText: ocrText,
-                urls: links
+                visionText: visionText,
+                urls: links,
+                images: uploadedFiles.map(f => f.image_url).filter(u => !!u)
             });
         });
 
@@ -249,13 +256,9 @@
                          // Create preview image
                          const blob = new Blob([arrayBuffer], { type: file.type });
                          const imageUrl = URL.createObjectURL(blob);
-                         const imgElement = document.createElement('img');
-                         imgElement.src = imageUrl;
-                         imgElement.style.width = '50px';
-                         imgElement.style.height = '50px';
-                         imgElement.style.objectFit = 'cover';
-                         imgElement.style.border = '1px solid var(--vscode-widget-border)';
-                         previewContainer.appendChild(imgElement);
+
+                         // Store preview URL so we can show a thumbnail in the uploads list
+                         previewMap.set(file.name, imageUrl);
 
                          // Convert ArrayBuffer to Array for serializing
                          const data = Array.from(new Uint8Array(arrayBuffer));
@@ -304,9 +307,9 @@
             const message = event.data;
             const spinner = document.getElementById('loading-spinner');
 
-            if (message.type === 'ocrResult' || message.type === 'error' || message.type === 'ragResult' || message.type === 'processingComplete') {
-                 if (spinner) spinner.style.display = 'none';
-            }
+                  if (message.type === 'visionResult' || message.type === 'error' || message.type === 'ragResult' || message.type === 'processingComplete' || message.type === 'uploadList') {
+                      if (spinner) spinner.style.display = 'none';
+                  }
 
             if (message.type === 'processingComplete') {
                 // Processing complete
@@ -343,22 +346,88 @@
                              // Only show "No documents" if it's a fresh search
                              // For load more, if no more results, just hide the button
                              ragList.innerHTML = '<li>No documents found.</li>';
+                             ragDiv.style.display = 'block'; // Make sure the container is visible
                         }
                         if (loadMoreBtn) loadMoreBtn.style.display = 'none';
                     }
                     break;
-                case 'ocrResult':
-                    const resultDiv = document.getElementById('ocr-result');
-                    const contentDiv = document.getElementById('ocr-content');
+                case 'visionResult':
+                    const resultDiv = document.getElementById('vision-result');
+                    const contentDiv = document.getElementById('vision-content');
                     const sendBtn = document.getElementById('send-btn');
                     resultDiv.style.display = 'block';
                     if (sendBtn) sendBtn.style.display = 'block';
                     const newText = (contentDiv.innerText ? '\n\n---\n\n' : '') + message.text;
                     contentDiv.innerText = newText;
                     break;
+                case 'uploadList':
+                    // Render uploaded files list and stop spinner
+                    const uploadsDiv = document.getElementById('uploads-list');
+                    uploadsDiv.innerHTML = '';
+                    uploadedFiles = Array.isArray(message.files) ? message.files : [];
+                    if (uploadedFiles && uploadedFiles.length > 0) {
+                        const ul = document.createElement('ul');
+                        uploadedFiles.forEach(f => {
+                            const li = document.createElement('li');
+                            // Thumbnail
+                            const thumb = document.createElement('img');
+                            const url = previewMap.get(f.filename) || f.image_url;
+                            if (url) {
+                                thumb.src = url;
+                            } else {
+                                thumb.src = '';
+                            }
+                            thumb.style.width = '40px';
+                            thumb.style.height = '40px';
+                            thumb.style.objectFit = 'cover';
+                            thumb.style.marginRight = '8px';
+                            thumb.style.borderRadius = '3px';
+
+                            const nameSpan = document.createElement('span');
+                            nameSpan.innerText = f.filename || 'uploaded-image';
+                            nameSpan.style.flexGrow = '1';
+                            nameSpan.style.overflow = 'hidden';
+                            nameSpan.style.textOverflow = 'ellipsis';
+                            nameSpan.style.whiteSpace = 'nowrap';
+
+                            const timeSpan = document.createElement('span');
+                            timeSpan.style.fontSize = '0.8em';
+                            timeSpan.style.color = 'var(--vscode-descriptionForeground)';
+                            timeSpan.innerText = f.created_at ? `Uploaded ${new Date(f.created_at).toLocaleString()}` : '';
+
+                            // Make thumbnail clickable to open full image if image_url provided
+                            if (f.image_url) {
+                                thumb.style.cursor = 'pointer';
+                                thumb.addEventListener('click', () => {
+                                    window.open(f.image_url, '_blank');
+                                });
+                            }
+
+                            // Delete button
+                            const delBtn = document.createElement('span');
+                            delBtn.className = 'remove-link-btn';
+                            delBtn.innerHTML = '&times;';
+                            delBtn.title = 'Delete Image';
+                            delBtn.style.marginLeft = '8px';
+                            delBtn.addEventListener('click', (e) => {
+                                e.stopPropagation(); 
+                                vscode.postMessage({ type: 'deleteImage', filename: f.filename, image_url: f.image_url });
+                            });
+
+                            li.appendChild(thumb);
+                            li.appendChild(nameSpan);
+                            li.appendChild(timeSpan);
+                            li.appendChild(delBtn);
+                            ul.appendChild(li);
+                        });
+                        uploadsDiv.appendChild(ul);
+                    } else {
+                        uploadsDiv.innerText = 'No uploaded files.';
+                    }
+                    break;
                 case 'error':
-                     const resultDivErr = document.getElementById('ocr-result');
-                     const contentDivErr = document.getElementById('ocr-content');
+                     const resultDivErr = document.getElementById('vision-result');
+                     const contentDivErr = document.getElementById('vision-content');
                      resultDivErr.style.display = 'block';
                      const errorText = (contentDivErr.innerText ? '\n\n---\n\n' : '') + 'Error: ' + message.message;
                      contentDivErr.innerText = errorText;

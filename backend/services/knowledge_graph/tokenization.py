@@ -61,6 +61,25 @@ def split_camel_snake(text: str) -> str:
     # Replace simple underscores and dashes
     return s2.replace('_', ' ').replace('-', ' ')
 
+def process_complex_token(token: str) -> List[str]:
+    """
+    Handles tokens with special delimiters (_, -, /, ?, etc.) or patterns (dates).
+    Returns a list of significant token variations.
+    """
+    variations = []
+    # Check for delimiters: _, -, /, ?, .
+    # Also handles dates like 2026-02-06 or paths like a/b/c
+    if re.search(r'[_\-/?.]', token):
+        # Clean but preserve valid structural characters
+        clean_whole = re.sub(r'[^a-zA-Z0-9._\-/?.]+', '', token).lower()
+        # Strip leading/trailing structural chars
+        clean_whole = clean_whole.strip('._-/?.')
+        
+        if len(clean_whole) > 2:
+            variations.append(clean_whole)
+            
+    return variations
+
 def clean_and_tokenize(text: str) -> List[str]:
     """
     Cleans text, removes Java keywords, handles Camel/Snake case, and tokenizes.
@@ -75,6 +94,7 @@ def clean_and_tokenize(text: str) -> List[str]:
     text = re.sub(r'(?<!\d)\.(?!(?:\d|' + common_exts + r')\b)', ' ', text, flags=re.IGNORECASE)
 
     raw_tokens = text.split()
+    # Standard list is used; Python handles dynamic resizing efficiently for thousands of tokens
     final_tokens_list = []
     
     for token in raw_tokens:
@@ -92,17 +112,30 @@ def clean_and_tokenize(text: str) -> List[str]:
                  matched = True
         
         if not matched:
-            if any(c.isdigit() for c in token):            
-                # Add cleaned number content
-                cleaned_num = re.sub(r'[^a-zA-Z0-9.,\-/]', '', token).lower()
-                if cleaned_num:
-                    final_tokens_list.append(cleaned_num)
+            # 1. Preserve structural tokens (delimited, dates, etc.)
+            complex_vars = process_complex_token(token)
+            if complex_vars:
+                 final_tokens_list.extend(complex_vars)
+
+            # 2. Text Splitting Logic (Universal)
+            # Independent of whether it was complex or numeric, we always try to extract sub-parts
+            # e.g. "123_456_trade" -> "123", "456", "trade"
+            t = token
+            for d in ['_', '-', '/', '?', '\\', '@']:
+                 t = t.replace(d, ' ')
+            
+            # Allow dots to remain in tokens (e.g. com.dummy)
+            t = re.sub(r'[^a-zA-Z0-9\s.]', '', t)
+            parts = t.lower().split()
+
+            if complex_vars:
+                # Add parts if they are not identical to the whole token we already added
+                for p in parts:
+                    if p not in complex_vars:
+                        final_tokens_list.append(p)
             else:
-                # Text Token Logic
-                t = token.replace('_', ' ').replace('-', ' ')
-                # Allow dots to remain in tokens (e.g. com.dummy)
-                t = re.sub(r'[^a-zA-Z0-9\s.]', '', t)
-                final_tokens_list.extend(t.lower().split())
+                # If it wasn't complex (no delimiters), just add the parts (likely just one word/number)
+                final_tokens_list.extend(parts)
             
     # 4. Filter stop words (Java keywords + common English stops if needed)
     # Also filtering very short tokens, but keeping metadata tokens and numbers
@@ -302,6 +335,12 @@ def extract_java_tokens(source_code: str) -> List[str]:
     
     # Process Identifiers (Split CamelCase/SnakeCase)
     for t in identifiers:
+        # If identifier contains _ or -, add the whole lowercase version
+        if '_' in t or '-' in t:
+             clean_whole = re.sub(r'[^a-zA-Z0-9._-]', '', t).lower()
+             if clean_whole not in JAVA_KEYWORDS and (len(clean_whole) > 2 or any(c.isdigit() for c in clean_whole)):
+                 expanded_tokens.append(clean_whole)
+        
         # Split camel/snake case
         cleaned_str = split_camel_snake(t)
         # Split by space and add
@@ -363,6 +402,12 @@ def extract_cpp_tokens(source_code: str) -> List[str]:
     
     # Process Identifiers
     for t in identifiers:
+        # If identifier contains _ or -, add the whole lowercase version
+        if '_' in t or '-' in t:
+             clean_whole = re.sub(r'[^a-zA-Z0-9._-]', '', t).lower()
+             if clean_whole not in CPP_KEYWORDS and (len(clean_whole) > 2 or any(c.isdigit() for c in clean_whole)):
+                 expanded_tokens.append(clean_whole)
+
         cleaned_str = split_camel_snake(t)
         sub = cleaned_str.split()
         for s in sub:
@@ -411,6 +456,12 @@ def extract_bash_tokens(source_code: str) -> List[str]:
     
     expanded_tokens = []
     for t in identifiers:
+        # If identifier contains _ or -, add the whole lowercase version
+        if '_' in t or '-' in t:
+             clean_whole = re.sub(r'[^a-zA-Z0-9._-]', '', t).lower()
+             clean_whole = clean_whole.strip('.-_')
+             if clean_whole not in BASH_KEYWORDS and (len(clean_whole) > 2 or any(c.isdigit() for c in clean_whole)):
+                 expanded_tokens.append(clean_whole)
         # Bash variables often use snake_case or CAPS
         cleaned_str = split_camel_snake(t)
         sub = cleaned_str.split()

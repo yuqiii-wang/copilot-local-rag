@@ -3,11 +3,11 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 
-export async function executeOCRRequest(fileBuffer: Buffer, filename: string): Promise<any> {
+export async function executeVisionRequest(fileBuffer: Buffer, filename: string): Promise<any> {
     const config = vscode.workspace.getConfiguration('repo-ask');
     const backendUrl = config.get<string>('backendUrl', 'http://localhost:14321');
     const sanitizedBackendUrl = backendUrl.endsWith('/') ? backendUrl.slice(0, -1) : backendUrl;
-    const ocrUrl = `${sanitizedBackendUrl}/ocr/`;
+    const visionUrl = `${sanitizedBackendUrl}/vision/`;
 
     // Use a dynamic import to avoid issues if Blob is not global or conflicts with DOM types
     let blob: Blob;
@@ -22,7 +22,7 @@ export async function executeOCRRequest(fileBuffer: Buffer, filename: string): P
     const formData = new FormData();
     formData.append('file', blob, filename);
 
-    const response = await fetch(ocrUrl, {
+    const response = await fetch(visionUrl, {
         method: 'POST',
         body: formData
     });

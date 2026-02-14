@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
-from routers import ocr, rag, download, data_router
+from routers import vision, rag, download, data_router
 from data_manager import data_manager
 
 
@@ -26,7 +26,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-app.include_router(ocr.router)
+app.include_router(vision.router)
 app.include_router(rag.router)
 app.include_router(download.router)
 app.include_router(data_router.router, prefix="/data", tags=["data"])
@@ -38,6 +38,8 @@ app.include_router(admin_router.router, prefix="/admin", tags=["admin"])
 # Serve admin static files (graph PNG) by mounting the folder
 from fastapi.staticfiles import StaticFiles
 app.mount('/admin/static', StaticFiles(directory='admin'), name='admin-static')
+# Serve uploaded files so frontend/chat can reference them
+app.mount('/uploads', StaticFiles(directory='uploads'), name='uploads')
 
 @app.get("/")
 def read_root():

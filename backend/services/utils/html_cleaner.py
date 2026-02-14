@@ -1,17 +1,40 @@
 from html.parser import HTMLParser
+from urllib.parse import urljoin
 
 class HTMLContentCleaner(HTMLParser):
-    def __init__(self):
+    def __init__(self, base_url=None):
         super().__init__()
         self.result = []
         self.skip_tags = {'script', 'style', 'noscript', 'iframe', 'svg', 'head', 'meta', 'link'}
         self.current_skip = 0
+        self.base_url = base_url
+        self.image_urls = []
 
     def handle_starttag(self, tag, attrs):
         if tag.lower() in self.skip_tags:
             self.current_skip += 1
         elif tag.lower() == 'br':
             self.result.append('\n')
+        elif tag.lower() == 'img':
+            if self.current_skip == 0:
+                self._handle_img(attrs)
+
+    def _handle_img(self, attrs):
+        attr_dict = dict((k.lower(), v) for k, v in attrs)
+        src = attr_dict.get('src')
+        alt = attr_dict.get('alt', 'image')
+        
+        if src:
+            # Resolve relative URL if base_url is present
+            if self.base_url:
+                try:
+                    src = urljoin(self.base_url, src)
+                except Exception:
+                    pass
+            
+            self.image_urls.append(src)
+            # Markdown format
+            self.result.append(f"\n![{alt}]({src})\n")
 
     def handle_endtag(self, tag):
         if tag.lower() in self.skip_tags:

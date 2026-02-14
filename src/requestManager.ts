@@ -1,7 +1,8 @@
 export interface RequestData {
     manualText: string;
-    ocrText?: string;
+    visionText?: string;
     urls?: string[];
+    images?: string[];
     sessionId?: string;
     id?: string; // The backend record ID
 }

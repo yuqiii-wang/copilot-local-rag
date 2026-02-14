@@ -19,7 +19,10 @@ class KnowledgeGraphService:
     def __init__(self):
         self.model = None
         self.data = None
-        self.dataset_path = os.path.join(kg_dir, "dummy_dataset")
+        if config.DEBUG:
+            self.dataset_path = os.path.join(kg_dir, "dummy_dataset")
+        else:
+            self.dataset_path = os.path.join(kg_dir, "real_dataset")
         # Use valid trained model path
         self.model_path = os.path.join(kg_dir, "query_model.pth")
         self.expander_path = os.path.join(kg_dir, "keyword_expander.pkl")

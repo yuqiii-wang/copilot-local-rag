@@ -1,12 +1,12 @@
 # RepoAsk - Copilot Local RAG Extension
 
-RepoAsk is a Visual Studio Code extension that supercharges your coding experience by integrating **Local Retrieval-Augmented Generation (RAG)** directly into GitHub Copilot. It allows you to chat with your repository's knowledge base, including external documentation (Confluence, Jira), code dependencies, and even text extracted from images via OCR.
+RepoAsk is a Visual Studio Code extension that supercharges your coding experience by integrating **Local Retrieval-Augmented Generation (RAG)** directly into GitHub Copilot. It allows you to chat with your repository's knowledge base, including external documentation (Confluence, Jira), code dependencies, and even text extracted from images via Vision services.
 
 ## Features
 
 *   **🤖 Custom Chat Participant**: Use `@repo-ask` in the Copilot Chat window to contextually interact with your retrieved data.
 *   **📚 Multi-Source Context**: Seamlessly pull information from specific URLs (e.g., Jira tickets, documentation pages) to answer your queries.
-*   **🖼️ OCR & Image Support**: Extract text from images and use it as context for your questions.
+*   **🖼️ Vision & Image Support**: Extract text from images and use it as context for your questions.
 *   **🕸️ Knowledge Graph Power**: (Backend) Utilizes a Hypergraph-based Knowledge Graph to find deep semantic links between your code and documentation.
 *   **📝 Feedback Loop**: Built-in commands to Accept or Reject answers, and even push valuable insights directly back to Confluence.
 *   **Sidebar Interface**: Dedicated "RepoAsk Chat" sidebar for managing your context, inputs, and uploads.
@@ -63,8 +63,7 @@ Open VS Code Settings (`Ctrl+,`) and search for `RepoAsk`. Configure the followi
 This extension acts as the frontend client for a sophisticated Knowledge Graph backend:
 *   **Frontend**: VS Code Extension (TypeScript) handling UI, Chat API integration, and user input.
 *   **Backend**: Python (FastAPI) handling:
-    *   **OCR**: Extracting text from uploaded images.
-    *   **Indexing**: Parsing Java code and Documentation into a Hypergraph.
+    *   **Vision**: Extracting text from uploaded images.    *   **Indexing**: Parsing Java code and Documentation into a Hypergraph.
     *   **GNN**: Running a Graph Neural Network to find semantically related files.
     *   **Retrieval**: Fetching relevant context for the LLM.
 

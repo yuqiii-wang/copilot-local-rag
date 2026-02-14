@@ -147,11 +147,14 @@ class DownloadService:
                 content = f"Error reading file {url}: {e}"
             
             # HTML Cleaning
+            extracted_images = []
             if found and self._is_html(url, content):
                 try:
-                    cleaner = HTMLContentCleaner()
+                    base_url = url if isinstance(url, str) and url.startswith(('http://', 'https://')) else None
+                    cleaner = HTMLContentCleaner(base_url=base_url)
                     cleaner.feed(content)
                     content = cleaner.get_text()
+                    extracted_images = cleaner.image_urls
                 except Exception as e:
                     print(f"HTML cleanup failed for {url}: {e}")
 
@@ -159,7 +162,7 @@ class DownloadService:
             if found and query:
                 content = self._extract_relevant_snippet(content, query)
 
-            result = {"url": url, "content": content, "found": found}
+            result = {"url": url, "content": content, "found": found, "images": extracted_images}
             if provided_comment:
                 result['comment'] = provided_comment
             results.append(result)

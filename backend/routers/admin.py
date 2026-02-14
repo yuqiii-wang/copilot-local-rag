@@ -206,7 +206,13 @@ async def trigger_visualize(background_tasks: BackgroundTasks):
         try:
             visualize_running = True
             from services.knowledge_graph.visualize_graph import visualize_knowledge_graph
-            dataset_dir = os.path.join(os.path.dirname(__file__), '..', 'services', 'knowledge_graph', 'dummy_dataset')
+            
+            base_kg_dir = os.path.join(os.path.dirname(__file__), '..', 'services', 'knowledge_graph')
+            if config.DEBUG:
+                dataset_dir = os.path.join(base_kg_dir, 'dummy_dataset')
+            else:
+                dataset_dir = os.path.join(base_kg_dir, 'real_dataset')
+                
             visualize_knowledge_graph(dataset_dir, output_file=os.path.basename(GRAPH_FILE), max_keywords=200, max_edges=400)
         except Exception as exc:
             print('Visualize error', exc)

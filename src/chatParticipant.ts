@@ -63,8 +63,10 @@ export function registerChatParticipant(context: vscode.ExtensionContext) {
             if (requestData) {
                 stream.progress('Retrieving context and thinking...');
                 
-                // Fetch download content
                 let loadedContext = "";
+                // Capture all downloaded images across all docs
+                const downloadedImages: string[] = [];
+
                 if (requestData.urls && requestData.urls.length > 0) {
                      try {
                         const config = vscode.workspace.getConfiguration('repo-ask');
@@ -93,6 +95,13 @@ export function registerChatParticipant(context: vscode.ExtensionContext) {
                                 const downloads = Array.isArray(data) ? data : (data.downloads || []);
 
                                 if (Array.isArray(downloads)) {
+                                    // Collect images
+                                    for (const d of downloads) {
+                                        if (d.images && Array.isArray(d.images)) {
+                                            downloadedImages.push(...d.images);
+                                        }
+                                    }
+
                                     // Summarize documents that lack comments using the selected language model
                                     for (const d of downloads) {
                                         // Ensure we preserve comment from backend if present
@@ -167,7 +176,7 @@ export function registerChatParticipant(context: vscode.ExtensionContext) {
 You are a helpful assistant. Use the following context to answer the user's question.
 
 Found text from images:
-${requestData.ocrText || "None"}
+${requestData.visionText || "None"}
 
 Downloaded Document Context:
 ${loadedContext || "None (Failed to download or no links provided)"}
@@ -186,8 +195,70 @@ ${requestData.manualText || "Please analyze the provided context."}
                     }
 
                     if (model) {
+                         const userParts: (vscode.LanguageModelTextPart | vscode.LanguageModelDataPart)[] = [];
+                         userParts.push(new vscode.LanguageModelTextPart(systemPrompt));
+
+                         if (requestData.images && requestData.images.length > 0) {
+                             const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+                             if (workspaceFolder) {
+                                 for (const imgPath of requestData.images) {
+                                     try {
+                                         const filename = imgPath.split('/').pop();
+                                         if (filename) {
+                                             // Try to locate in backend/uploads/images
+                                             const imageUri = vscode.Uri.joinPath(workspaceFolder.uri, 'backend', 'uploads', 'images', filename);
+                                             
+                                              // Verify file exists (readFile throws if not)
+                                             const fileData = await vscode.workspace.fs.readFile(imageUri);
+                                             
+                                             const ext = filename.split('.').pop()?.toLowerCase();
+                                             const mime = ext === 'png' ? 'image/png' : (ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : 'application/octet-stream');
+                                             
+                                             userParts.push(vscode.LanguageModelDataPart.image(fileData, mime));
+                                         }
+                                     } catch (e) {
+                                         console.error("Failed to attach image:", e);
+                                     }
+                                 }
+                             }
+                         }
+                         
+                         // ATTACH DOWNLOADED IMAGES
+                         // Check loadedContext for image references or use cached explicit image lists if we updated the protocol?
+                         // Ideally `loadedContext` is just text. We need access to the raw downloaded objects to get the 'images' array.
+                         // But we lost that scope.
+                         // However, if we look at the logic above: `loadedContext` is built from `downloads`.
+                         // But `downloads` variable is scoped inside the `if (requestData.urls)` block. 
+                         // We can't access `downloads` here easily without refactoring.
+                         // Refactoring to hoist `downloads` scope.
+                         
+                         /* This block is commented out because we need to refactor the scope of `downloads` first. */
+
+                         // Process downloaded images
+                         if (downloadedImages.length > 0) {
+                             // Limit to avoid overloading context
+                             const maxImages = 5;
+                             const uniqueImages = Array.from(new Set(downloadedImages)).slice(0, maxImages);
+                             
+                             for (const imgUrl of uniqueImages) {
+                                 try {
+                                     const imgResp = await fetch(imgUrl);
+                                     if (imgResp.ok) {
+                                         const buffer = await imgResp.arrayBuffer();
+                                         const uint8Array = new Uint8Array(buffer);
+                                         // Determine mime type roughly
+                                         const ext = imgUrl.split('.').pop()?.toLowerCase();
+                                         const mime = ext === 'png' ? 'image/png' : (ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : 'application/octet-stream');
+                                         userParts.push(vscode.LanguageModelDataPart.image(uint8Array, mime));
+                                     }
+                                 } catch (e) {
+                                     console.error(`Failed to fetch downloaded image ${imgUrl}`, e);
+                                 }
+                             }
+                         }
+
                          const messages = [
-                             vscode.LanguageModelChatMessage.User(systemPrompt)
+                             vscode.LanguageModelChatMessage.User(userParts)
                          ];
                          
                          let fullResponse = "";
@@ -298,7 +369,7 @@ ${requestData.manualText || "Please analyze the provided context."}
                 // This ensures the model sees the documents again.
                 if (initialRequestData && messages.length > 0) {
                      // We need to re-download the content? Or assume it's lost if we didn't cache the TEXT string?
-                     // RequestManager stores `ocrText`, `manualText`. `urls` implies we need to fetch.
+                     // RequestManager stores `visionText`, `manualText`. `urls` implies we need to fetch.
                      // But we can't do async fetch in the message construction easily if we want to be fast?
                      // Actually, we can.
                      
@@ -374,7 +445,7 @@ ${requestData.manualText || "Please analyze the provided context."}
 You are a helpful assistant. Use the following context to answer the user's question.
 
 Found text from images:
-${initialRequestData.ocrText || "None"}
+${initialRequestData.visionText || "None"}
 
 Downloaded Document Context:
 ${loadedContext || "None"}

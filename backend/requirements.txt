@@ -1,7 +1,5 @@
 fastapi
 uvicorn
-paddlepaddle
-paddleocr
 python-multipart
 torch
 torch-geometric
