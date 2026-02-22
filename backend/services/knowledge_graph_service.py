@@ -6,6 +6,7 @@ from typing import List, Dict
 from services.knowledge_graph.graph_model import KeywordReconstructionHGNN
 from services.knowledge_graph.feature_generator import generate_features
 from services.knowledge_graph.tokenization import clean_and_tokenize
+from services.knowledge_graph.tokenization_utils import generate_ngrams
 from services.knowledge_graph.keyword_expander import KeywordExpander
 from services.knowledge_graph import feature_weights
 from config import config
@@ -26,7 +27,9 @@ class KnowledgeGraphService:
         # Use valid trained model path
         self.model_path = os.path.join(kg_dir, "query_model.pth")
         self.expander_path = os.path.join(kg_dir, "keyword_expander.pkl")
+        self.unique_ngrams_bridge_path = os.path.join(kg_dir, "unique_ngrams_bridge.pkl")
         self.expander = None
+        self.unique_ngrams_bridge = []
         # Initialization is now async via load_async()
     
     async def load_async(self):
@@ -151,6 +154,18 @@ class KnowledgeGraphService:
             # Load Keyword Expander
             self.expander = KeywordExpander()
             self.expander.load(self.expander_path)
+            
+            # Load Unique Ngrams Bridge
+            if os.path.exists(self.unique_ngrams_bridge_path):
+                try:
+                    with open(self.unique_ngrams_bridge_path, 'rb') as f:
+                        self.unique_ngrams_bridge = pickle.load(f)
+                    print(f"Loaded unique ngrams bridge with {len(self.unique_ngrams_bridge)} entries")
+                except Exception as e:
+                    print(f"Error loading unique ngrams bridge: {e}")
+                    self.unique_ngrams_bridge = []
+            else:
+                self.unique_ngrams_bridge = []
 
         except Exception as e:
             print(f"Failed to load trained feature generator: {e}. Falling back to regeneration (Model mismatch risk!).")
@@ -279,6 +294,33 @@ class KnowledgeGraphService:
         # Shape: [num_docs, num_matched] * [num_matched] -> [num_docs, num_matched] -> sum -> [num_docs]
         weighted_probs = relevant_probs * weights_tensor
         doc_scores = weighted_probs.sum(dim=1)
+        
+        # Apply unique ngrams bridge boost
+        if self.unique_ngrams_bridge:
+            # Tokenize query and generate ngrams
+            query_token_list = clean_and_tokenize(user_query)
+            query_ngrams_list = generate_ngrams(query_token_list, n_min=1, n_max=5)
+            # Create a set for quick lookups
+            query_ngram_set = set(query_ngrams_list)
+            # Create a boost tensor
+            bridge_boost = torch.zeros_like(doc_scores)
+            # Check each unique ngram in the bridge
+            for entry in self.unique_ngrams_bridge:
+                token = entry['token']
+                if token in query_ngram_set:
+                    # Boost all documents that have this unique ngram
+                    for doc_idx in entry['doc_indices']:
+                        # Use predefined score if available (Bypass Bridge), else calculation
+                        if 'score' in entry:
+                             boost_amount = float(entry['score'])
+                        else:
+                             # Boost by ngram length (longer = more boost) - Legacy fallback
+                             boost_amount = 100.0 * (entry['length'] ** 2.0)
+                        
+                        bridge_boost[doc_idx] += boost_amount
+            # Add bridge boost to doc_scores
+            doc_scores += bridge_boost
+            print(f"Unique ngram bridge boost applied to {len(torch.nonzero(bridge_boost))} docs")
         
         # Additional boosting for overlap count
         if len(matched_indices) > 1:

@@ -46,6 +46,7 @@ MODEL_SAVE_PATH = os.path.join(current_dir, "query_model.pth")
 FEATURE_GEN_PATH = os.path.join(current_dir, "feature_gen.pkl")
 KEYWORD_EXPANDER_PATH = os.path.join(current_dir, "keyword_expander.pkl")
 RESULTS_CSV_PATH = os.path.join(current_dir, "hypergraph_results.csv")
+UNIQUE_NGRAMS_BRIDGE_PATH = os.path.join(current_dir, "unique_ngrams_bridge.pkl")
 
 def train():
     # 0. Run Indexers FIRST to extract literals
@@ -98,6 +99,11 @@ def train():
     
     fg.fit()
     fg.save(FEATURE_GEN_PATH)
+    
+    # Save unique ngrams bridge
+    print(f"Saving unique ngrams bridge with {len(fg.unique_ngrams_bridge)} entries...")
+    with open(UNIQUE_NGRAMS_BRIDGE_PATH, 'wb') as f:
+        pickle.dump(fg.unique_ngrams_bridge, f)
 
     num_docs = len(fg.doc_names)
     vocab_size = len(fg.vectorizer.get_feature_names_out())
@@ -590,8 +596,24 @@ def train():
 
         count = 0
         threshold = feature_weights.TRAINING_WEIGHTS['inference_threshold'] # Loosened threshold to allow more entities (TF-IDF often < 1.0)
-        
+
+        # 1. Add Unique Bridge Tokens (Bypass Model) to CSV
+        print(f"Adding {len(fg.unique_ngrams_bridge)} bypassed unique tokens to results...")
+        for entry in fg.unique_ngrams_bridge:
+            keyword = entry['token']
+            score = entry.get('score', 100.0) # Default to 100 if not present
+            
+            for d_idx in entry['doc_indices']:
+                doc_name = fg.reverse_file_map[d_idx]
+                d_type = doc_types.get(doc_name, 'unknown')
+                writer.writerow([keyword, doc_name, f"{score:.4f}", d_type])
+                count += 1
+
+        # 2. Add Model Predictions to CSV
         for k_idx, keyword in enumerate(vocab_list):
+            # Skip if this keyword was handled by bridge (it should have 0 score here anyway)
+            # But just in case, we can check or rely on the zeros
+            
             # Get docs for this keyword
             doc_scores = final_scores[:, k_idx]
             
@@ -601,7 +623,7 @@ def train():
             for d_idx in top_indices:
                 score = doc_scores[d_idx]
                 doc_name = fg.reverse_file_map[d_idx]
-                d_type = doc_types[doc_name]
+                d_type = doc_types.get(doc_name, 'unknown')
                 
                 writer.writerow([keyword, doc_name, f"{score:.4f}", d_type])
                 count += 1

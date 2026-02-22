@@ -82,6 +82,10 @@ class FeatureGenerator:
         self.doc_names = []
         self.doc_patterns = []
         self.doc_timestamps = []
+        # New: token to doc frequency map
+        self.token_doc_freq = {}
+        # New: longest unique ngrams (1-3 docs)
+        self.unique_ngrams_bridge = []
 
     def load_data(self, root_dir):
         """
@@ -312,12 +316,99 @@ class FeatureGenerator:
         self._apply_time_weights()
         print(f"Feature matrix shape: {self.features.shape}")
         
+        # Calculate token document frequencies
+        self._calculate_token_doc_freq()
+        # Find unique ngrams bridge
+        self._find_unique_ngrams_bridge()
+        
         # Fit NMF Topic Model
         print(f"Fitting NMF with {n_topics} topics...")
         self.nmf = NMF(n_components=n_topics, random_state=42, init='nndsvd')
         self.doc_topic_matrix = self.nmf.fit_transform(self.features)
         
         return self.features
+
+    def _calculate_token_doc_freq(self):
+        """Calculate how many documents each token appears in."""
+        # Convert features to binary (presence/absence)
+        binary_features = (self.features > 0).astype(int)
+        # Sum over docs to get frequency for each token
+        doc_freqs = np.array(binary_features.sum(axis=0)).flatten()
+        vocab = self.vectorizer.get_feature_names_out()
+        self.token_doc_freq = {vocab[i]: doc_freqs[i] for i in range(len(vocab))}
+    
+    def _find_unique_ngrams_bridge(self):
+        """Find tokens that appear in EXACTLY 1 document, and map to those docs.
+           These tokens are then REMOVED from the feature matrix so they don't participate in training.
+        """
+        vocab = self.vectorizer.get_feature_names_out()
+        # Sort tokens by ngram length descending (longest first)
+        sorted_tokens = sorted(vocab, key=lambda x: len(x.split()), reverse=True)
+        # Track which tokens we've already handled as part of longer ngrams
+        handled_subtokens = set()
+        
+        unique_bridge = []
+        
+        # Track indices to zero out
+        indices_to_zero = []
+
+        for token in sorted_tokens:
+            token_len = len(token.split())
+            # We do NOT skip handled subtokens anymore for unique bridge bypass
+            # This ensures that even if a token is part of a larger unique ngram,
+            # it is still added to the bridge if it is unique on its own.
+            # if token in handled_subtokens:
+            #    continue
+            
+            freq = self.token_doc_freq.get(token, 0)
+            
+            # STRICTLY 1 document (Unique Bridge Bypass)
+            if freq == 1:
+                # Find which docs contain this token
+                token_idx = self.vectorizer.vocabulary_[token]
+                # Check binary presence
+                doc_indices = self.features[:, token_idx].nonzero()[0]
+                
+                if len(doc_indices) == 1:
+                    doc_names = [self.reverse_file_map[idx] for idx in doc_indices]
+                    unique_bridge.append({
+                        'token': token,
+                        'length': token_len,
+                        'doc_indices': doc_indices.tolist(),
+                        'doc_names': doc_names,
+                        'score': 100.0 # Fixed high score as requested
+                    })
+                    
+                    # Mark for removal from training features
+                    indices_to_zero.append(token_idx)
+
+                    # Mark all subtokens as handled (for other logic if needed, but we disabled the check)
+                    if token_len > 1:
+                        subtokens = generate_ngrams(token.split(), n_min=1, n_max=token_len - 1)
+                        for st in subtokens:
+                            handled_subtokens.add(st)
+        
+        self.unique_ngrams_bridge = unique_bridge
+        print(f"Found {len(unique_bridge)} unique tokens/ngrams to bypass model training.")
+
+        # Zero out features for these tokens so they don't affect the model/graph
+        if indices_to_zero:
+            # Efficiently zero out columns in CSR/CSC matrix
+            # Lil matrix is slow, but we likely have CSR from TfidfVectorizer
+            # Convert to LIL for column editing or just multiply?
+            # Easiest: convert to lil, modify, convert back to csr? Or just manipulate data.
+            # Safe way:
+            print(f"removing {len(indices_to_zero)} unique tokens from training features...")
+            # Create a diagonal matrix with 0s at indices_to_zero and 1s elsewhere
+            n_features = self.features.shape[1]
+            diag_values = np.ones(n_features)
+            diag_values[indices_to_zero] = 0.0
+            from scipy.sparse import diags
+            D = diags(diag_values)
+            self.features = self.features @ D
+            
+            # Re-eliminate zeros to clean up the sparse matrix structure
+            self.features.eliminate_zeros()
 
     def transform(self, texts):
         # For query transformation, we should probably stick to standard tokenization 
@@ -357,7 +448,9 @@ class FeatureGenerator:
                 'doc_patterns': self.doc_patterns,
                 'doc_timestamps': self.doc_timestamps,
                 'nmf': getattr(self, 'nmf', None),
-                'doc_topic_matrix': getattr(self, 'doc_topic_matrix', None)
+                'doc_topic_matrix': getattr(self, 'doc_topic_matrix', None),
+                'token_doc_freq': getattr(self, 'token_doc_freq', {}),
+                'unique_ngrams_bridge': getattr(self, 'unique_ngrams_bridge', [])
             }, f)
         print(f"Feature generator saved to {output_path}")
 
@@ -372,6 +465,8 @@ class FeatureGenerator:
             self.doc_timestamps = data.get('doc_timestamps', [])
             self.nmf = data.get('nmf', None)
             self.doc_topic_matrix = data.get('doc_topic_matrix', None)
+            self.token_doc_freq = data.get('token_doc_freq', {})
+            self.unique_ngrams_bridge = data.get('unique_ngrams_bridge', [])
             
             # Try to load doc contents if saved, otherwise we can't regenerate features easily without reloading data
             if 'doc_contents' in data:
