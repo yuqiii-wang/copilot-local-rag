@@ -238,11 +238,20 @@ body {
     border-radius: 6px;
     background: var(--vscode-editor-background);
     color: var(--vscode-foreground);
-    white-space: pre-wrap;
+    white-space: normal;
     height: 100%;
     overflow: auto;
     font-family: var(--vscode-editor-font-family);
     font-size: 12px;
+    line-height: 1.45;
+}
+
+.doc-inline-image {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: 8px 0;
+    border-radius: 4px;
 }
 
 .metadata-list {

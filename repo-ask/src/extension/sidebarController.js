@@ -1,5 +1,12 @@
 const fs = require('fs');
 const path = require('path');
+const MarkdownIt = require('markdown-it');
+
+const markdownRenderer = new MarkdownIt({
+    html: false,
+    linkify: true,
+    breaks: true
+});
 
 function createSidebarController(deps) {
     const {
@@ -21,21 +28,29 @@ function createSidebarController(deps) {
                 docsWebviewView = webviewView;
                 docsWebviewView.webview.options = {
                     enableScripts: true,
-                    localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, 'src', 'sidebar')]
+                    localResourceRoots: [
+                        vscode.Uri.joinPath(context.extensionUri, 'src', 'sidebar'),
+                        vscode.Uri.file(storagePath)
+                    ]
                 };
 
                 docsWebviewView.webview.onDidReceiveMessage(async (message) => {
                     if (message?.command === 'openDoc' && message.docId) {
                         const metadata = readAllMetadata(storagePath).find(doc => String(doc.id) === String(message.docId));
-                        const content = metadata
+                        const rawContent = metadata
                             ? (readDocumentContent(storagePath, metadata.id) || 'No local markdown content found.')
                             : 'No local markdown content found.';
+                        const content = metadata
+                            ? rewriteMarkdownImageLinksForWebview(rawContent, metadata.id, docsWebviewView.webview)
+                            : rawContent;
+                        const contentHtml = renderMarkdownForWebview(content);
 
                         docsWebviewView.webview.postMessage({
                             command: 'docDetails',
                             payload: {
                                 id: message.docId,
                                 content,
+                                contentHtml,
                                 metadata: documentService.formatMetadataEntries(metadata)
                             }
                         });
@@ -111,17 +126,15 @@ function createSidebarController(deps) {
                             if (deletion.deletedCount > 0) {
                                 vscode.window.showInformationMessage(`Deleted local files (.md/.json) for: ${docId}`);
                             } else {
-                                const markdownPath = path.join(storagePath, `${docId}.md`);
-                                const jsonPath = path.join(storagePath, `${docId}.json`);
+                                const docFolderPath = path.join(storagePath, String(docId));
                                 vscode.window.showWarningMessage(
-                                    `Delete may have failed for ${docId}. Manually delete these files if they still exist:\n- ${markdownPath}\n- ${jsonPath}`
+                                    `Delete may have failed for ${docId}. Manually delete this folder if it still exists:\n- ${docFolderPath}`
                                 );
                             }
                         } catch (error) {
-                            const markdownPath = path.join(storagePath, `${docId}.md`);
-                            const jsonPath = path.join(storagePath, `${docId}.json`);
+                            const docFolderPath = path.join(storagePath, String(docId));
                             vscode.window.showErrorMessage(
-                                `Failed to delete ${docId}: ${error.message}. Please manually delete:\n- ${markdownPath}\n- ${jsonPath}`
+                                `Failed to delete ${docId}: ${error.message}. Please manually delete:\n- ${docFolderPath}`
                             );
                         }
                     }
@@ -170,6 +183,21 @@ function createSidebarController(deps) {
         }
     }
 
+    function upsertSidebarDocument(metadata) {
+        if (!docsWebviewView || !metadata || !metadata.id) {
+            return;
+        }
+
+        docsWebviewView.webview.postMessage({
+            command: 'docUpserted',
+            payload: {
+                id: metadata.id,
+                title: metadata.title || 'Untitled',
+                last_updated: metadata.last_updated || ''
+            }
+        });
+    }
+
     function getSidebarHtml(webview) {
         const htmlPath = vscode.Uri.joinPath(context.extensionUri, 'src', 'sidebar', 'index.html');
         const cssPath = vscode.Uri.joinPath(context.extensionUri, 'src', 'sidebar', 'styles.css');
@@ -182,6 +210,46 @@ function createSidebarController(deps) {
             .replace('__CSS_URI__', cssUri)
             .replace('__DOCS_DATA__', JSON.stringify(docs))
             .replace('__SYNC_STATUS__', JSON.stringify(sidebarSyncStatus));
+    }
+
+    function rewriteMarkdownImageLinksForWebview(markdownContent, docId, webview) {
+        const markdown = String(markdownContent || '');
+        const imagePattern = /!\[([^\]]*)\]\(([^)]+)\)/g;
+
+        return markdown.replace(imagePattern, (fullMatch, alt, srcRaw) => {
+            const source = normalizeMarkdownLinkTarget(srcRaw);
+            if (!source || /^https?:\/\//i.test(source) || /^data:image\//i.test(source)) {
+                return fullMatch;
+            }
+
+            const filePath = path.isAbsolute(source)
+                ? source
+                : path.join(storagePath, String(docId), source.replace(/\//g, path.sep));
+
+            if (!fs.existsSync(filePath)) {
+                return fullMatch;
+            }
+
+            const webviewUri = webview.asWebviewUri(vscode.Uri.file(filePath)).toString();
+            return `![${String(alt || '').trim()}](${webviewUri})`;
+        });
+    }
+
+    function normalizeMarkdownLinkTarget(rawValue) {
+        const value = String(rawValue || '').trim();
+        if (!value) {
+            return '';
+        }
+
+        if (value.startsWith('<') && value.endsWith('>')) {
+            return value.slice(1, -1).trim();
+        }
+
+        return value;
+    }
+
+    function renderMarkdownForWebview(markdownContent) {
+        return markdownRenderer.render(String(markdownContent || ''));
     }
 
     function getSidebarErrorHtml(message) {
@@ -204,7 +272,8 @@ function createSidebarController(deps) {
     return {
         sidebarProvider,
         refreshSidebarView,
-        setSidebarSyncStatus
+        setSidebarSyncStatus,
+        upsertSidebarDocument
     };
 }
 

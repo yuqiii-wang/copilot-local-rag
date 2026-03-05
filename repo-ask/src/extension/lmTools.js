@@ -7,6 +7,7 @@ function createLanguageModelTools(deps) {
         fetchConfluencePage,
         setSidebarSyncStatus,
         refreshSidebarView,
+        upsertSidebarDocument,
         readAllMetadata,
         readDocumentContent,
         findRelevantDocuments,
@@ -22,6 +23,14 @@ function createLanguageModelTools(deps) {
             parts.push(vscode.LanguageModelDataPart.json(data));
         }
         return new vscode.LanguageModelToolResult(parts);
+    }
+
+    function formatRefreshStatus(sourceLabel, progress = {}) {
+        const index = Number(progress?.index);
+        const total = Number(progress?.total);
+        const hasFraction = Number.isFinite(index) && Number.isFinite(total) && total > 0;
+        const progressSuffix = hasFraction ? ` (${index}/${total})` : '';
+        return `downloading from ${sourceLabel} ...${progressSuffix}`;
     }
 
     function registerRepoAskLanguageModelTools() {
@@ -46,10 +55,19 @@ function createLanguageModelTools(deps) {
             },
             async invoke(options) {
                 const arg = String(options?.input?.arg || '').trim();
+                const createRefreshOptions = (sourceLabel) => ({
+                    onDocumentProcessed: ({ metadata, index, total }) => {
+                        if (typeof upsertSidebarDocument === 'function') {
+                            upsertSidebarDocument(metadata);
+                        }
+                        setSidebarSyncStatus(formatRefreshStatus(sourceLabel, { index, total }));
+                    }
+                });
+
                 try {
                     if (!arg) {
                         setSidebarSyncStatus('downloading from confluence cloud ...');
-                        await documentService.refreshAllDocuments();
+                        await documentService.refreshAllDocuments(createRefreshOptions('confluence cloud'));
                         setSidebarSyncStatus('');
                         refreshSidebarView();
                         return toToolResult('Refreshed all Confluence documents into local-store.', { refreshed: 'all' });
@@ -58,7 +76,7 @@ function createLanguageModelTools(deps) {
                     const parsed = await parseRefreshArg(vscode, arg);
                     if (parsed.found && parsed.source === 'regex-jira') {
                         setSidebarSyncStatus('downloading from jira ...');
-                        await documentService.refreshJiraIssue(parsed.arg);
+                        await documentService.refreshJiraIssue(parsed.arg, createRefreshOptions('jira'));
                         setSidebarSyncStatus('');
                         refreshSidebarView();
                         return toToolResult(`Refreshed Jira issue for: ${parsed.arg}`, { refreshed: parsed.arg, source: 'jira' });
@@ -67,7 +85,7 @@ function createLanguageModelTools(deps) {
                     if (parsed.found && parsed.arg) {
                         await fetchConfluencePage(parsed.arg);
                         setSidebarSyncStatus('downloading from confluence cloud ...');
-                        await documentService.refreshDocument(parsed.arg);
+                        await documentService.refreshDocument(parsed.arg, createRefreshOptions('confluence cloud'));
                         setSidebarSyncStatus('');
                         refreshSidebarView();
                         return toToolResult(`Refreshed Confluence page for: ${parsed.arg}`, { refreshed: parsed.arg, source: 'confluence' });
@@ -181,12 +199,20 @@ function createLanguageModelTools(deps) {
 
     async function handleRefreshFromSource(sourceInput, response, options = {}) {
         const parsed = await parseRefreshArg(vscode, sourceInput, options);
+        const createRefreshOptions = (sourceLabel) => ({
+            onDocumentProcessed: ({ metadata, index, total }) => {
+                if (typeof upsertSidebarDocument === 'function') {
+                    upsertSidebarDocument(metadata);
+                }
+                setSidebarSyncStatus(formatRefreshStatus(sourceLabel, { index, total }));
+            }
+        });
 
         if (parsed.found && parsed.source === 'regex-jira') {
             response.markdown(`Refreshing Jira issue for: ${parsed.arg}...`);
             try {
                 setSidebarSyncStatus('downloading from jira ...');
-                await documentService.refreshJiraIssue(parsed.arg);
+                await documentService.refreshJiraIssue(parsed.arg, createRefreshOptions('jira'));
                 response.markdown('Refresh completed for the Jira issue.');
                 setSidebarSyncStatus('');
                 refreshSidebarView();
@@ -213,7 +239,7 @@ function createLanguageModelTools(deps) {
             response.markdown(`Refreshing document for: ${parsed.arg}...`);
             try {
                 setSidebarSyncStatus('downloading from confluence cloud ...');
-                await documentService.refreshDocument(parsed.arg);
+                await documentService.refreshDocument(parsed.arg, createRefreshOptions('confluence cloud'));
                 response.markdown('Refresh completed for the resolved page.');
                 setSidebarSyncStatus('');
                 refreshSidebarView();

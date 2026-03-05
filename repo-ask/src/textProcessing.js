@@ -1,9 +1,17 @@
-const cheerio = require('cheerio');
+const TurndownService = require('turndown');
 const {
     generate_ngrams,
     identify_pattern,
     extract_capital_sequences
 } = require('./tokenization');
+
+const turndownService = new TurndownService({
+    headingStyle: 'atx',
+    codeBlockStyle: 'fenced',
+    bulletListMarker: '-',
+    emDelimiter: '_',
+    strongDelimiter: '**'
+});
 
 function truncate(value, maxLen) {
     if (!value || value.length <= maxLen) {
@@ -28,26 +36,8 @@ function tokenize(text) {
     return normalized.split(' ').filter(token => token.length > 2);
 }
 
-function htmlToPlainText(html) {
-    const $ = cheerio.load(html || '');
-    return $.text().replace(/\s+/g, ' ').trim();
-}
-
 function htmlToMarkdown(html) {
-    const source = String(html || '');
-
-    const withMarkdownHints = source
-        .replace(/\r\n/g, '\n')
-        .replace(/<\s*br\s*\/?\s*>/gi, '\n')
-        .replace(/<\s*\/\s*(p|div|section|article|h[1-6]|ul|ol|table|tr)\s*>/gi, '\n\n')
-        .replace(/<\s*li[^>]*>/gi, '\n- ')
-        .replace(/<\s*pre[^>]*>/gi, '\n```\n')
-        .replace(/<\s*\/\s*pre\s*>/gi, '\n```\n')
-        .replace(/<\s*code[^>]*>/gi, '`')
-        .replace(/<\s*\/\s*code\s*>/gi, '`');
-
-    const $ = cheerio.load(withMarkdownHints);
-    return $.text().replace(/\n{3,}/g, '\n\n').trim();
+    return turndownService.turndown(String(html || '')).trim();
 }
 
 function generateKeywords(text) {
@@ -88,7 +78,6 @@ function generateSummary(text, maxLength = 220) {
 module.exports = {
     truncate,
     tokenize,
-    htmlToPlainText,
     htmlToMarkdown,
     generateKeywords,
     generateSummary

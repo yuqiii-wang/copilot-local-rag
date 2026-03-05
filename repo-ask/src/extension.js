@@ -141,6 +141,7 @@ function setupExtension(context) {
         fetchConfluencePage,
         setSidebarSyncStatus: sidebar.setSidebarSyncStatus,
         refreshSidebarView: sidebar.refreshSidebarView,
+        upsertSidebarDocument: sidebar.upsertSidebarDocument,
         readAllMetadata: () => readAllMetadata(storagePath),
         readDocumentContent: (docId) => readDocumentContent(storagePath, docId),
         findRelevantDocuments,
@@ -221,22 +222,37 @@ function setupExtension(context) {
 
         try {
             sidebar.setSidebarSyncStatus('');
+            const formatRefreshStatus = (sourceLabel, progress = {}) => {
+                const index = Number(progress?.index);
+                const total = Number(progress?.total);
+                const hasFraction = Number.isFinite(index) && Number.isFinite(total) && total > 0;
+                const progressSuffix = hasFraction ? ` (${index}/${total})` : '';
+                return `downloading from ${sourceLabel} ...${progressSuffix}`;
+            };
+
+            const createRefreshOptions = (sourceLabel) => ({
+                onDocumentProcessed: ({ metadata, index, total }) => {
+                    sidebar.upsertSidebarDocument(metadata);
+                    sidebar.setSidebarSyncStatus(formatRefreshStatus(sourceLabel, { index, total }));
+                }
+            });
+
             if (arg && arg.trim().length > 0) {
                 const parsed = await parseRefreshArg(vscode, arg.trim());
                 sidebar.setSidebarSyncStatus('downloading from confluence/jira cloud ...');
                 if (parsed.found && parsed.source === 'regex-jira') {
-                    await documentService.refreshJiraIssue(parsed.arg);
+                    await documentService.refreshJiraIssue(parsed.arg, createRefreshOptions('jira'));
                     vscode.window.showInformationMessage(`Refreshed Jira issue for: ${parsed.arg}`);
                 } else {
                     const resolvedArg = parsed.found && parsed.arg ? parsed.arg : arg.trim();
-                    await documentService.refreshDocument(resolvedArg);
+                    await documentService.refreshDocument(resolvedArg, createRefreshOptions('confluence cloud'));
                     vscode.window.showInformationMessage(`Refreshed document for: ${resolvedArg}`);
                 }
             } else {
                 const downloadingMessage = 'downloading from confluence/jira cloud ...';
                 vscode.window.showInformationMessage(downloadingMessage);
                 sidebar.setSidebarSyncStatus(downloadingMessage);
-                await documentService.refreshAllDocuments();
+                await documentService.refreshAllDocuments(createRefreshOptions('confluence cloud'));
                 vscode.window.showInformationMessage('Refreshed all documents');
             }
 

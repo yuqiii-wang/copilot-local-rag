@@ -22,7 +22,7 @@
                     <h2 class="viewer-title">Content</h2>
                     <button id="add-to-prompts-btn" class="action-btn" type="button" disabled>Add to Prompts</button>
                 </div>
-                <pre id="doc-content" class="doc-content">Select a document to view local content.</pre>
+                <div id="doc-content" class="doc-content">Select a document to view local content.</div>
             </section>
             <div id="viewer-splitter" class="viewer-splitter" role="separator" aria-orientation="horizontal" aria-label="Resize content and metadata"></div>
             <section class="metadata-pane">
@@ -49,7 +49,9 @@
         const viewerEl = document.querySelector('.viewer');
         const viewerSplitterEl = document.getElementById('viewer-splitter');
         const initialSyncStatus = __SYNC_STATUS__;
-        let displayedDocs = Array.isArray(docs) ? docs.map(doc => ({ id: doc.id, title: doc.title })) : [];
+        let displayedDocs = Array.isArray(docs)
+            ? docs.map(doc => ({ id: doc.id, title: doc.title, last_updated: doc.last_updated || '' }))
+            : [];
         let selectedDocId = null;
         let isViewerResizing = false;
         let isMainResizing = false;
@@ -185,6 +187,10 @@
             `).join('');
         }
 
+        function sortDisplayedDocs() {
+            displayedDocs = displayedDocs.sort((a, b) => String(b.last_updated || '').localeCompare(String(a.last_updated || '')));
+        }
+
         function render() {
             if (!Array.isArray(displayedDocs) || displayedDocs.length === 0) {
                 docListEl.innerHTML = '<p class="empty">No local documents yet. Run @repoask refresh to sync to Confluence Cloud.</p>';
@@ -250,9 +256,34 @@
                 render();
             }
 
+            if (message?.command === 'docUpserted') {
+                const incoming = message.payload || {};
+                const docId = String(incoming.id || '').trim();
+                if (docId.length > 0) {
+                    const existingIndex = displayedDocs.findIndex(doc => String(doc.id) === docId);
+                    const nextDoc = {
+                        id: incoming.id,
+                        title: incoming.title || 'Untitled',
+                        last_updated: incoming.last_updated || ''
+                    };
+
+                    if (existingIndex >= 0) {
+                        displayedDocs[existingIndex] = {
+                            ...displayedDocs[existingIndex],
+                            ...nextDoc
+                        };
+                    } else {
+                        displayedDocs.push(nextDoc);
+                    }
+
+                    sortDisplayedDocs();
+                    render();
+                }
+            }
+
             if (message?.command === 'docDetails') {
                 const payload = message.payload || {};
-                docContentEl.textContent = payload.content || 'No local markdown content found.';
+                docContentEl.innerHTML = payload.contentHtml || escapeHtml(payload.content || 'No local markdown content found.');
                 renderMetadata(payload.metadata || []);
             }
 
@@ -276,6 +307,7 @@
         });
 
         renderSyncStatus(initialSyncStatus || '');
+        sortDisplayedDocs();
         addToPromptsBtnEl.disabled = !selectedDocId;
         applyMainTopHeight((containerEl.clientHeight || 0) * mainTopPaneRatio);
         applyViewerTopHeight((viewerEl.clientHeight || 0) * topPaneRatio);
