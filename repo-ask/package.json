@@ -43,7 +43,7 @@
         "toolReferenceName": "repoaskRefresh",
         "displayName": "RepoAsk Refresh",
         "modelDescription": "Refresh one Confluence page (id/title/link), one Jira issue (key/id/link), or all Confluence pages when arg is empty.",
-        "userDescription": "Sync Confluence/Jira data into local-store.",
+        "userDescription": "Sync and download Confluence/Jira data into local-store.",
         "canBeReferencedInPrompt": true,
         "icon": "$(sync)",
         "inputSchema": {
@@ -286,7 +286,7 @@
     "@types/glob": "^8.0.3",
     "@types/mocha": "^10.0.1",
     "@types/node": "16.x",
-    "@types/vscode": "1.106.3",
+    "@types/vscode": "^1.106.0",
     "@vscode/test-electron": "^2.3.2",
     "@vscode/vsce": "^3.7.1",
     "eslint": "^8.40.0",

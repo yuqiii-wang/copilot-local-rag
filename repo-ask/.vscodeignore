@@ -1,4 +1,5 @@
-node_modules/
 out/
 .vscode/
 *.log
+dummy-servers/
+google_20k_eng_words.txt
