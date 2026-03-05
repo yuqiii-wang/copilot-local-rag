@@ -16,3 +16,6 @@ uploads
 offline_records
 data
 .pytest_cache
+.venv
+local-store
+nohup.out

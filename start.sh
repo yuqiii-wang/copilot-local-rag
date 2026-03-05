@@ -1,9 +1,11 @@
 #!/bin/bash
+cd repo-ask
 npm install
 npm run compile
 npx vsce package
 
-cd backend
+cd dummy-servers
 pip install -r requirements.txt
-python app.py
+nohup python confluence_server.py &
+nohup python jira_server.py &
 

@@ -1,0 +1,301 @@
+{
+  "name": "repo-ask",
+  "displayName": "@RepoAsk",
+  "description": "A VS Code plugin for searching and managing Confluence documentation",
+  "version": "0.1.0",
+  "publisher": "repo-ask",
+  "engines": {
+    "vscode": ">=1.106.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onView:repo-ask-documents",
+    "onCommand:repo-ask.refresh",
+    "onCommand:repo-ask.annotate",
+    "onCommand:repo-ask.rank",
+    "onCommand:repo-ask.check",
+    "onChatParticipant:repoask",
+    "onLanguageModelTool:repoask_refresh",
+    "onLanguageModelTool:repoask_annotate",
+    "onLanguageModelTool:repoask_rank",
+    "onLanguageModelTool:repoask_check"
+  ],
+  "main": "index.js",
+  "contributes": {
+    "chatParticipants": [
+      {
+        "id": "repoask",
+        "name": "repoask",
+        "description": "RepoAsk chat for checking, ranking, annotating, and refreshing (sync/download) Confluence pages and Jira issues"
+      }
+    ],
+    "languageModelTools": [
+      {
+        "name": "repoask_refresh",
+        "tags": [
+          "repoask",
+          "confluence",
+          "jira",
+          "sync"
+        ],
+        "toolReferenceName": "repoaskRefresh",
+        "displayName": "RepoAsk Refresh",
+        "modelDescription": "Refresh one Confluence page (id/title/link), one Jira issue (key/id/link), or all Confluence pages when arg is empty.",
+        "userDescription": "Sync Confluence/Jira data into local-store.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(sync)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "arg": {
+              "type": "string",
+              "description": "Optional Confluence page id/title/link or Jira issue key/id/link. Leave empty to refresh all Confluence pages."
+            }
+          }
+        }
+      },
+      {
+        "name": "repoask_annotate",
+        "tags": [
+          "repoask",
+          "metadata",
+          "annotation"
+        ],
+        "toolReferenceName": "repoaskAnnotate",
+        "displayName": "RepoAsk Annotate",
+        "modelDescription": "Annotate local metadata with summary and keywords for one document or all local documents.",
+        "userDescription": "Enrich local metadata.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(symbol-keyword)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "arg": {
+              "type": "string",
+              "description": "Optional page id/title/link to annotate one document. Leave empty to annotate all local documents."
+            }
+          }
+        }
+      },
+      {
+        "name": "repoask_rank",
+        "tags": [
+          "repoask",
+          "search",
+          "rank"
+        ],
+        "toolReferenceName": "repoaskRank",
+        "displayName": "RepoAsk Rank",
+        "modelDescription": "Rank local documents using IDF scoring over local metadata and markdown content.",
+        "userDescription": "Find top matching local documents.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(list-ordered)",
+        "inputSchema": {
+          "type": "object",
+          "required": [
+            "query"
+          ],
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Query terms used to rank local documents."
+            },
+            "limit": {
+              "type": "number",
+              "description": "Optional max number of results to return.",
+              "default": 5
+            }
+          }
+        }
+      },
+      {
+        "name": "repoask_check",
+        "tags": [
+          "repoask",
+          "relevance",
+          "qa"
+        ],
+        "toolReferenceName": "repoaskCheck",
+        "displayName": "RepoAsk Check",
+        "modelDescription": "Find relevant local documents for a question using metadata relevance and include local content references.",
+        "userDescription": "Check local docs for relevant references.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(search)",
+        "inputSchema": {
+          "type": "object",
+          "required": [
+            "query"
+          ],
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "User question to evaluate against local metadata and content."
+            },
+            "limit": {
+              "type": "number",
+              "description": "Optional max number of references to return.",
+              "default": 5
+            }
+          }
+        }
+      }
+    ],
+    "commands": [
+      {
+        "command": "repo-ask.check",
+        "title": "RepoAsk: Check"
+      },
+      {
+        "command": "repo-ask.rank",
+        "title": "RepoAsk: Rank"
+      },
+      {
+        "command": "repo-ask.refresh",
+        "title": "RepoAsk: Refresh"
+      },
+      {
+        "command": "repo-ask.annotate",
+        "title": "RepoAsk: Annotate"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "repo-ask-explorer",
+          "title": "RepoAsk",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "repo-ask-explorer": [
+        {
+          "id": "repo-ask-documents",
+          "name": "Documents",
+          "type": "webview",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "RepoAsk",
+      "properties": {
+        "repoAsk.confluence": {
+          "type": "object",
+          "default": {
+            "key": "ALM",
+            "isDefault": true,
+            "url": "http://localhost:8001",
+            "spaceKey": "",
+            "ancestorsPageId": "",
+            "token": ""
+          },
+          "description": "Confluence connection profile used by RepoAsk.",
+          "additionalProperties": false,
+          "properties": {
+            "key": {
+              "type": "string",
+              "description": "Profile key for the Confluence connection."
+            },
+            "isDefault": {
+              "type": "boolean",
+              "description": "Whether this connection is the default profile."
+            },
+            "url": {
+              "type": "string",
+              "description": "Base URL for the Confluence API endpoint."
+            },
+            "spaceKey": {
+              "type": "string",
+              "description": "Optional default Confluence space key."
+            },
+            "ancestorsPageId": {
+              "type": "string",
+              "description": "Optional default ancestors page id."
+            },
+            "token": {
+              "type": "string",
+              "description": "Optional Confluence access token."
+            }
+          }
+        },
+        "repoAsk.jira": {
+          "type": "object",
+          "default": {
+            "key": "ALM",
+            "isDefault": true,
+            "url": "http://localhost:8002",
+            "token": "",
+            "regex": [
+              "PROJECT-\\d+"
+            ]
+          },
+          "description": "Jira connection profile used by RepoAsk.",
+          "additionalProperties": false,
+          "properties": {
+            "key": {
+              "type": "string",
+              "description": "Profile key for the Jira connection."
+            },
+            "isDefault": {
+              "type": "boolean",
+              "description": "Whether this connection is the default profile."
+            },
+            "url": {
+              "type": "string",
+              "description": "Base URL for the Jira API endpoint."
+            },
+            "token": {
+              "type": "string",
+              "description": "Optional Jira access token."
+            },
+            "regex": {
+              "type": "array",
+              "description": "List of regex patterns used to extract Jira issue keys from parse arg input.",
+              "items": {
+                "type": "string"
+              },
+              "default": [
+                "PROJECT-\\d+"
+              ]
+            }
+          }
+        },
+        "repoAsk.confluenceBaseUrl": {
+          "type": "string",
+          "default": "http://localhost:8001",
+          "description": "Base URL for the Confluence API used by repoaskrefresh operations."
+        },
+        "repoAsk.jiraBaseUrl": {
+          "type": "string",
+          "default": "http://localhost:8002",
+          "description": "Base URL for the Jira API used by repoask Jira operations."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "pretest": "npm run lint",
+    "test": "node ./test/runTest.js",
+    "compile": "echo Compile completed"
+  },
+  "devDependencies": {
+    "@types/glob": "^8.0.3",
+    "@types/mocha": "^10.0.1",
+    "@types/node": "16.x",
+    "@types/vscode": "1.106.3",
+    "@vscode/test-electron": "^2.3.2",
+    "@vscode/vsce": "^3.7.1",
+    "eslint": "^8.40.0",
+    "glob": "^8.1.0",
+    "mocha": "^10.2.0",
+    "typescript": "^5.0.4"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "cheerio": "^1.0.0-rc.12"
+  }
+}

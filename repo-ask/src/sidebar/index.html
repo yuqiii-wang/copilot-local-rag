@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="__CSS_URI__">
+    <title>repoaskDocuments</title>
+</head>
+<body>
+    <main class="container">
+        <header class="header">
+            <h1 class="title">Doc Store</h1>
+            <p class="subtitle">Local Confluence documents</p>
+            <p id="sync-status" class="sync-status" aria-live="polite"></p>
+            <input id="search-input" class="search-input" type="text" placeholder="Search local-store (IDF rank)">
+        </header>
+        <section id="doc-list" class="doc-list"></section>
+        <div id="main-splitter" class="main-splitter" role="separator" aria-orientation="horizontal" aria-label="Resize list and detail"></div>
+        <section class="viewer">
+            <section class="content-pane">
+                <div class="viewer-header">
+                    <h2 class="viewer-title">Content</h2>
+                    <button id="add-to-prompts-btn" class="action-btn" type="button" disabled>Add to Prompts</button>
+                </div>
+                <pre id="doc-content" class="doc-content">Select a document to view local content.</pre>
+            </section>
+            <div id="viewer-splitter" class="viewer-splitter" role="separator" aria-orientation="horizontal" aria-label="Resize content and metadata"></div>
+            <section class="metadata-pane">
+                <h2 class="viewer-title">Metadata</h2>
+                <ul id="metadata-list" class="metadata-list">
+                    <li class="metadata-item">title: -</li>
+                </ul>
+            </section>
+        </section>
+    </main>
+
+    <script>
+        const vscode = acquireVsCodeApi();
+        const docs = __DOCS_DATA__;
+        const docListEl = document.getElementById('doc-list');
+        const searchInputEl = document.getElementById('search-input');
+        const docContentEl = document.getElementById('doc-content');
+        const metadataListEl = document.getElementById('metadata-list');
+        const syncStatusEl = document.getElementById('sync-status');
+        const addToPromptsBtnEl = document.getElementById('add-to-prompts-btn');
+        const containerEl = document.querySelector('.container');
+        const headerEl = document.querySelector('.header');
+        const mainSplitterEl = document.getElementById('main-splitter');
+        const viewerEl = document.querySelector('.viewer');
+        const viewerSplitterEl = document.getElementById('viewer-splitter');
+        const initialSyncStatus = __SYNC_STATUS__;
+        let displayedDocs = Array.isArray(docs) ? docs.map(doc => ({ id: doc.id, title: doc.title })) : [];
+        let selectedDocId = null;
+        let isViewerResizing = false;
+        let isMainResizing = false;
+        let mainTopPaneRatio = 0.4;
+        let topPaneRatio = 0.6;
+        const layoutGap = 10;
+        const layoutSplitterHeight = 6;
+
+        function clamp(value, min, max) {
+            return Math.max(min, Math.min(max, value));
+        }
+
+        function applyMainTopHeight(topHeightPx) {
+            if (!containerEl || !headerEl) {
+                return;
+            }
+
+            const containerHeight = containerEl.clientHeight || 0;
+            const headerHeight = headerEl.offsetHeight || 0;
+            const totalResizableHeight = Math.max(0, containerHeight - headerHeight - (layoutGap * 3) - layoutSplitterHeight);
+
+            const minTop = Math.floor(totalResizableHeight * 0.3);
+            const maxTop = Math.ceil(totalResizableHeight * 0.7);
+            const safeTop = clamp(topHeightPx, minTop, maxTop);
+            const bottomHeight = Math.max(0, totalResizableHeight - safeTop);
+            mainTopPaneRatio = totalResizableHeight > 0 ? (safeTop / totalResizableHeight) : 0.4;
+
+            containerEl.style.gridTemplateRows = `auto ${safeTop}px ${layoutSplitterHeight}px ${bottomHeight}px`;
+        }
+
+        function onMainSplitterPointerMove(event) {
+            if (!isMainResizing || !headerEl) {
+                return;
+            }
+
+            const headerRect = headerEl.getBoundingClientRect();
+            const topHeight = event.clientY - headerRect.bottom - layoutGap;
+            applyMainTopHeight(topHeight);
+        }
+
+        function stopMainSplitterResize() {
+            if (!isMainResizing) {
+                return;
+            }
+
+            isMainResizing = false;
+            document.body.classList.remove('is-resizing');
+            window.removeEventListener('pointermove', onMainSplitterPointerMove);
+            window.removeEventListener('pointerup', stopMainSplitterResize);
+        }
+
+        function applyViewerTopHeight(topHeightPx) {
+            if (!viewerEl) {
+                return;
+            }
+
+            const viewerHeight = viewerEl.clientHeight || 0;
+            const splitterHeight = 6;
+            const totalResizableHeight = Math.max(0, viewerHeight - splitterHeight);
+
+            const minTop = Math.floor(totalResizableHeight * 0.3);
+            const maxTop = Math.ceil(totalResizableHeight * 0.7);
+            const safeTop = clamp(topHeightPx, minTop, maxTop);
+            const bottomHeight = Math.max(0, totalResizableHeight - safeTop);
+            topPaneRatio = totalResizableHeight > 0 ? (safeTop / totalResizableHeight) : 0.6;
+
+            viewerEl.style.gridTemplateRows = `${safeTop}px ${splitterHeight}px ${bottomHeight}px`;
+        }
+
+        function onSplitterPointerMove(event) {
+            if (!isViewerResizing || !viewerEl) {
+                return;
+            }
+
+            const rect = viewerEl.getBoundingClientRect();
+            const topHeight = event.clientY - rect.top;
+            applyViewerTopHeight(topHeight);
+        }
+
+        function stopSplitterResize() {
+            if (!isViewerResizing) {
+                return;
+            }
+
+            isViewerResizing = false;
+            document.body.classList.remove('is-resizing');
+            window.removeEventListener('pointermove', onSplitterPointerMove);
+            window.removeEventListener('pointerup', stopSplitterResize);
+        }
+
+        mainSplitterEl.addEventListener('pointerdown', (event) => {
+            isMainResizing = true;
+            document.body.classList.add('is-resizing');
+            mainSplitterEl.setPointerCapture(event.pointerId);
+            window.addEventListener('pointermove', onMainSplitterPointerMove);
+            window.addEventListener('pointerup', stopMainSplitterResize);
+        });
+
+        viewerSplitterEl.addEventListener('pointerdown', (event) => {
+            isViewerResizing = true;
+            document.body.classList.add('is-resizing');
+            viewerSplitterEl.setPointerCapture(event.pointerId);
+            window.addEventListener('pointermove', onSplitterPointerMove);
+            window.addEventListener('pointerup', stopSplitterResize);
+        });
+
+        function renderSyncStatus(message) {
+            const text = String(message || '').trim();
+            syncStatusEl.textContent = text;
+            syncStatusEl.classList.toggle('visible', text.length > 0);
+        }
+
+        function escapeHtml(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function renderMetadata(metadataItems) {
+            const items = Array.isArray(metadataItems) ? metadataItems : [];
+            if (items.length === 0) {
+                metadataListEl.innerHTML = '<li class="metadata-item">title: -</li>';
+                return;
+            }
+
+            metadataListEl.innerHTML = items.map(item => `
+                <li class="metadata-item">${escapeHtml(item.key)}: ${escapeHtml(item.value)}</li>
+            `).join('');
+        }
+
+        function render() {
+            if (!Array.isArray(displayedDocs) || displayedDocs.length === 0) {
+                docListEl.innerHTML = '<p class="empty">No local documents yet. Run @repoask refresh to sync to Confluence Cloud.</p>';
+                return;
+            }
+
+            docListEl.innerHTML = displayedDocs.map(doc => {
+                const title = escapeHtml(doc.title || 'Untitled');
+                const isActive = String(doc.id) === String(selectedDocId) ? ' active' : '';
+
+                return `
+                    <div class="doc-item${isActive}" data-doc-id="${escapeHtml(doc.id)}">
+                        <button class="doc-open-btn" data-doc-id="${escapeHtml(doc.id)}" title="Open ${title}">
+                            <span class="doc-title">${title}</span>
+                        </button>
+                        <button class="doc-delete-btn" data-doc-id="${escapeHtml(doc.id)}" title="Delete ${title}" aria-label="Delete ${title}">×</button>
+                    </div>
+                `;
+            }).join('');
+
+            document.querySelectorAll('.doc-open-btn').forEach((buttonEl) => {
+                buttonEl.addEventListener('click', () => {
+                    const docId = buttonEl.getAttribute('data-doc-id');
+                    selectedDocId = docId;
+                    addToPromptsBtnEl.disabled = !selectedDocId;
+                    render();
+                    vscode.postMessage({ command: 'openDoc', docId });
+                });
+            });
+
+            document.querySelectorAll('.doc-delete-btn').forEach((buttonEl) => {
+                buttonEl.addEventListener('click', () => {
+                    const docId = buttonEl.getAttribute('data-doc-id');
+                    const title = (displayedDocs.find(doc => String(doc.id) === String(docId))?.title || 'this document');
+                    vscode.postMessage({ command: 'deleteDoc', docId, title });
+                });
+            });
+        }
+
+        addToPromptsBtnEl.addEventListener('click', () => {
+            if (!selectedDocId) {
+                return;
+            }
+
+            vscode.postMessage({
+                command: 'addToPrompts',
+                docId: selectedDocId
+            });
+        });
+
+        searchInputEl.addEventListener('input', () => {
+            vscode.postMessage({
+                command: 'searchDocs',
+                query: searchInputEl.value || ''
+            });
+        });
+
+        window.addEventListener('message', event => {
+            const message = event.data;
+
+            if (message?.command === 'searchResults') {
+                displayedDocs = Array.isArray(message.payload) ? message.payload : [];
+                render();
+            }
+
+            if (message?.command === 'docDetails') {
+                const payload = message.payload || {};
+                docContentEl.textContent = payload.content || 'No local markdown content found.';
+                renderMetadata(payload.metadata || []);
+            }
+
+            if (message?.command === 'syncStatus') {
+                renderSyncStatus(message.payload || '');
+            }
+
+            if (message?.command === 'docDeleted') {
+                const deletedId = String(message.payload?.id || '').trim();
+                if (deletedId) {
+                    displayedDocs = displayedDocs.filter(doc => String(doc.id) !== deletedId);
+                    if (String(selectedDocId) === deletedId) {
+                        selectedDocId = null;
+                        addToPromptsBtnEl.disabled = true;
+                        docContentEl.textContent = 'Select a document to view local content.';
+                        renderMetadata([]);
+                    }
+                    render();
+                }
+            }
+        });
+
+        renderSyncStatus(initialSyncStatus || '');
+        addToPromptsBtnEl.disabled = !selectedDocId;
+        applyMainTopHeight((containerEl.clientHeight || 0) * mainTopPaneRatio);
+        applyViewerTopHeight((viewerEl.clientHeight || 0) * topPaneRatio);
+        window.addEventListener('resize', () => {
+            applyMainTopHeight((containerEl.clientHeight || 0) * mainTopPaneRatio);
+            applyViewerTopHeight((viewerEl.clientHeight || 0) * topPaneRatio);
+        });
+        render();
+    </script>
+</body>
+</html>
