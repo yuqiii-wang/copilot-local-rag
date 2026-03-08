@@ -1,0 +1,113 @@
+module.exports = function(context) {
+  const { vscode, storagePath, indexStoragePath, fetchConfluencePage, fetchAllConfluencePages, fetchJiraIssue, truncate, tokenize, htmlToMarkdown, generateKeywords, generateExtendedKeywords, generateSummary, readAllMetadata, writeDocumentFiles, readDocumentContent, rankDocumentsByIdf, bm25Index, keywordsIndex, rankLocalDocuments, checkLocalDocumentsAgentic, refreshDocument, refreshAllDocuments, refreshJiraIssue, notifyDocumentProcessed, processDocument, processJiraIssue, finalizeBm25KeywordsForDocuments,     localizeMarkdownImageLinks, normalizeMarkdownLinkTarget, downloadImageAsset, downloadDataUriAsset, resolveAbsoluteImageUrl, isDataUri, determineImageExtension, mimeTypeToExtension, getKeywordConfig, buildKeywordOnlyIndexText, rebuildKeywordsIndexFromMetadata, normalizeKeywordsInput, cleanKeywords, normalizeMetadataKeywordFields, mergeKeywordsPreservingSignals, appendKeywordsToExisting, writeDocumentPromptFile, formatMetadataEntries, getStoredMetadataById, generateStoredMetadataById, updateStoredMetadataById, removeDocumentFromIndicesById, sanitizeFileSegment, getWorkspaceRootPath, getPageHtml, isLikelyHtml, extractHtmlTagData, resolveSourceUrl, extractJsonObject } = context;
+
+async function annotateDocumentByArg(pageArg) {
+  const allMetadata = readAllMetadata(storagePath);
+  let metadata = allMetadata.find(item => String(item.id) === pageArg || String(item.title) === pageArg);
+  if (!metadata) {
+    const page = await fetchConfluencePage(pageArg);
+    metadata = allMetadata.find(item => String(item.id) === String(page?.id));
+  }
+  if (!metadata) {
+    return {
+      message: `Document ${pageArg} is not in local store. Run refresh first.`
+    };
+  }
+  const updated = await annotateStoredDocument(metadata);
+  if (!updated) {
+    return {
+      message: `No local plain text content for ${metadata.title}. Run refresh first.`
+    };
+  }
+  return {
+    message: `Annotated document: ${metadata.title}`
+  };
+}
+
+async function annotateAllDocuments() {
+  const allMetadata = readAllMetadata(storagePath);
+  let updatedCount = 0;
+  for (const metadata of allMetadata) {
+    const updated = await annotateStoredDocument(metadata);
+    if (updated) {
+      updatedCount += 1;
+    }
+  }
+  return {
+    message: updatedCount > 0 ? `Annotated ${updatedCount} document(s)` : 'No local documents available to annotate. Run refresh first.'
+  };
+}
+
+async function generateAnnotationWithLlm(metadata, content) {
+  const originalKeywords = cleanKeywords(metadata?.keywords);
+  const fallbackKeywords = generateKeywords(content);
+  const fallbackSummary = generateSummary(content);
+  function appendSynonymKeywords(baseKeywords, maxSynonyms = 6) {
+    const orderedBase = cleanKeywords(baseKeywords);
+    if (orderedBase.length === 0) {
+      return [];
+    }
+    const synonymCandidates = cleanKeywords(generateExtendedKeywords(orderedBase), 80).filter(keyword => !orderedBase.includes(keyword)).slice(0, maxSynonyms);
+    return cleanKeywords([...orderedBase, ...synonymCandidates]);
+  }
+  if (!vscode.lm || !vscode.LanguageModelChatMessage) {
+    return {
+      keywords: appendSynonymKeywords([...originalKeywords, ...fallbackKeywords]),
+      summary: fallbackSummary
+    };
+  }
+  try {
+    const models = await vscode.lm.selectChatModels({});
+    const model = models?.[0];
+    if (!model) {
+      return {
+        keywords: appendSynonymKeywords([...originalKeywords, ...fallbackKeywords]),
+        summary: fallbackSummary
+      };
+    }
+    const prompt = ['You are annotating a local Confluence document metadata record.', 'Return valid JSON only with shape: {"summary":"...","keywords":"keyword-a, keyword-b"}.', 'Summary must be just a one or two sentence description.', 'Keywords must be specific technical terms in one comma-separated string.', 'Include a few close synonyms or related alternate terms that help retrieval.', `Title: ${metadata.title || ''}`, `Topic: ${metadata.parent_confluence_topic || ''}`, `Author: ${metadata.author || ''}`, 'Document markdown content:', truncate(content, 100000)].join('\n');
+    const response = await model.sendRequest([vscode.LanguageModelChatMessage.User(prompt)]);
+    let responseText = '';
+    for await (const fragment of response.text) {
+      responseText += fragment;
+    }
+    const parsed = extractJsonObject(responseText) || {};
+    const llmKeywords = cleanKeywords(parsed.keywords);
+    const llmSummary = String(parsed.summary || '').trim();
+    const appendedWithLlm = appendKeywordsToExisting(originalKeywords, [...llmKeywords, ...fallbackKeywords], getKeywordConfig().DEFAULT_KEYWORD_LIMIT);
+    const fallbackMergedKeywords = appendKeywordsToExisting(originalKeywords, fallbackKeywords, getKeywordConfig().DEFAULT_KEYWORD_LIMIT);
+    return {
+      keywords: appendedWithLlm.length > 0 ? appendSynonymKeywords(appendedWithLlm) : appendSynonymKeywords(fallbackMergedKeywords),
+      summary: llmSummary || fallbackSummary
+    };
+  } catch {
+    return {
+      keywords: appendSynonymKeywords([...originalKeywords, ...fallbackKeywords]),
+      summary: fallbackSummary
+    };
+  }
+}
+
+async function annotateStoredDocument(metadata) {
+  const content = readDocumentContent(storagePath, metadata.id);
+  if (!content) {
+    return false;
+  }
+  const annotation = await generateAnnotationWithLlm(metadata, content);
+  const updatedMetadata = normalizeMetadataKeywordFields({
+    ...metadata,
+    keywords: cleanKeywords(annotation.keywords, getKeywordConfig().DEFAULT_KEYWORD_LIMIT),
+    summary: annotation.summary
+  });
+  writeDocumentFiles(storagePath, metadata.id, content, updatedMetadata);
+  keywordsIndex.upsertDocument(updatedMetadata.id, buildKeywordOnlyIndexText(updatedMetadata));
+  return true;
+}
+
+  return {
+    annotateDocumentByArg,
+    annotateAllDocuments,
+    annotateStoredDocument,
+    generateAnnotationWithLlm
+  };
+};

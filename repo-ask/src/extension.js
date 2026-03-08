@@ -12,7 +12,7 @@ const {
 } = require('./textProcessing');
 const {
     ensureStoragePath,
-    ensureBm25StoragePath,
+    ensureIndexStoragePath,
     readAllMetadata,
     readDocumentContent,
     deleteDocumentFiles,
@@ -26,25 +26,22 @@ const { createSidebarController } = require('./extension/sidebarController');
 const { createLanguageModelTools } = require('./extension/lmTools');
 const { loadWorkspacePromptContext } = require('./extension/promptContext');
 const { answerGeneralPromptQuestion } = require('./extension/chat/generalAnswer');
-const { isRefreshPrompt } = require('./extension/chat/refreshPrompt');
 const { registerCoreCommands } = require('./extension/commands');
 
-const EMPTY_STORE_HINT = 'No local documents found. Run `@repoask refresh` to sync to Confluence Cloud.';
+const EMPTY_STORE_HINT = 'No local documents found. Use the sidebar popup to sync to Confluence Cloud.';
 const TOOL_NAMES = {
-    refresh: 'repoask_refresh',
-    annotate: 'repoask_annotate',
     rank: 'repoask_rank',
     check: 'repoask_check'
 };
 
 function setupExtension(context) {
     const storagePath = ensureStoragePath(context);
-    const bm25StoragePath = ensureBm25StoragePath(context);
+    const indexStoragePath = ensureIndexStoragePath(context);
 
     const documentService = createDocumentService({
         vscode,
         storagePath,
-        bm25StoragePath,
+        indexStoragePath,
         fetchConfluencePage,
         fetchAllConfluencePages,
         fetchJiraIssue,
@@ -109,25 +106,9 @@ function setupExtension(context) {
         repoAskParticipant = vscode.chat.createChatParticipant('repoask', async (request, chatContext, response) => {
             const prompt = request.prompt?.trim() || '';
             const workspacePromptContext = loadWorkspacePromptContext(vscode);
-            const llmOptions = {
-                workspacePromptContext: workspacePromptContext.text
-            };
 
             if (!prompt) {
-                response.markdown('Ask a question, or use `refresh` to sync content.');
-                return;
-            }
-
-            if (isRefreshPrompt(prompt)) {
-                await lmTools.handleRefreshFromSource(prompt, response, llmOptions);
-                return;
-            }
-
-            if (prompt.toLowerCase().startsWith('annotate')) {
-                const annotateArg = prompt.replace(/^annotate\s*/i, '').trim();
-                response.markdown(`Annotating documents${annotateArg ? ` for ${annotateArg}` : ' (all local docs)'}...`);
-                await vscode.commands.executeCommand('repo-ask.annotate', annotateArg);
-                response.markdown('Annotation completed.');
+                response.markdown('Ask a question.');
                 return;
             }
 

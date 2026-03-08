@@ -13,15 +13,17 @@
   "activationEvents": [
     "onView:repo-ask-documents",
     "onCommand:repo-ask.refresh",
-    "onCommand:repo-ask.annotate",
+
     "onCommand:repo-ask.rank",
     "onCommand:repo-ask.check",
     "onCommand:repo-ask.checkAllDocs",
     "onChatParticipant:repoask",
-    "onLanguageModelTool:repoask_refresh",
-    "onLanguageModelTool:repoask_annotate",
     "onLanguageModelTool:repoask_rank",
-    "onLanguageModelTool:repoask_check"
+    "onLanguageModelTool:repoask_check",
+    "onLanguageModelTool:repoask_read_metadata",
+    "onLanguageModelTool:repoask_read_content",
+    "onLanguageModelTool:repoask_new_code_check",
+    "onLanguageModelTool:repoask_read_repo_prompts"
   ],
   "main": "index.js",
   "contributes": {
@@ -33,53 +35,6 @@
       }
     ],
     "languageModelTools": [
-      {
-        "name": "repoask_refresh",
-        "tags": [
-          "repoask",
-          "confluence",
-          "jira",
-          "sync"
-        ],
-        "toolReferenceName": "repoaskRefresh",
-        "displayName": "RepoAsk Refresh",
-        "modelDescription": "Refresh one Confluence page (id/title/link), one Jira issue (key/id/link), or all Confluence pages when arg is empty.",
-        "userDescription": "Sync and download Confluence/Jira data into local-store.",
-        "canBeReferencedInPrompt": true,
-        "icon": "$(sync)",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "arg": {
-              "type": "string",
-              "description": "Optional Confluence page id/title/link or Jira issue key/id/link. Leave empty to refresh all Confluence pages."
-            }
-          }
-        }
-      },
-      {
-        "name": "repoask_annotate",
-        "tags": [
-          "repoask",
-          "metadata",
-          "annotation"
-        ],
-        "toolReferenceName": "repoaskAnnotate",
-        "displayName": "RepoAsk Annotate",
-        "modelDescription": "Annotate local metadata with summary and keywords for one document or all local documents.",
-        "userDescription": "Enrich local metadata.",
-        "canBeReferencedInPrompt": true,
-        "icon": "$(symbol-keyword)",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "arg": {
-              "type": "string",
-              "description": "Optional page id/title/link to annotate one document. Leave empty to annotate all local documents."
-            }
-          }
-        }
-      },
       {
         "name": "repoask_rank",
         "tags": [
@@ -193,6 +148,44 @@
             }
           }
         }
+      },
+      {
+        "name": "repoask_new_code_check",
+        "tags": [
+          "repoask",
+          "code",
+          "diff",
+          "review",
+          "test"
+        ],
+        "toolReferenceName": "repoaskNewCodeCheck",
+        "displayName": "RepoAsk New Code Check",
+        "modelDescription": "Get git diff of the current branch compared to main/master to do code review, generate tests, and verify against guides.",
+        "userDescription": "Compare current branch with main/master via git diff.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(git-compare)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "repoask_read_repo_prompts",
+        "tags": [
+          "repoask",
+          "prompts",
+          "code"
+        ],
+        "toolReferenceName": "repoaskReadRepoPrompts",
+        "displayName": "RepoAsk Read Repo Prompts",
+        "modelDescription": "Read the .github/prompts/*.prompt.md files and return their content to be used as instructions/guides.",
+        "userDescription": "Read repository code guidelines prompts.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(file)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
       }
     ],
     "commands": [
@@ -211,10 +204,6 @@
       {
         "command": "repo-ask.refresh",
         "title": "RepoAsk: Refresh"
-      },
-      {
-        "command": "repo-ask.annotate",
-        "title": "RepoAsk: Annotate"
       }
     ],
     "viewsContainers": {
@@ -235,10 +224,11 @@
           "icon": "media/icon.svg"
         }
       ]
-    },
-    "configuration": {
-      "title": "RepoAsk",
-      "properties": {
+    }
+  },
+  "configuration": {
+    "title": "RepoAsk",
+    "properties": {
         "repoAsk.initKeywordNum": {
           "type": "number",
           "default": 50,
@@ -335,7 +325,6 @@
           "default": "http://localhost:8002",
           "description": "Base URL for the Jira API used by repoask Jira operations."
         }
-      }
     }
   },
   "scripts": {
@@ -357,6 +346,10 @@
     "typescript": "^5.0.4"
   },
   "dependencies": {
+    "@babel/core": "^7.29.0",
+    "@babel/generator": "^7.29.1",
+    "@babel/parser": "^7.29.0",
+    "@babel/traverse": "^7.29.0",
     "axios": "^1.6.0",
     "cheerio": "^1.0.0-rc.12",
     "markdown-it": "^14.1.1",

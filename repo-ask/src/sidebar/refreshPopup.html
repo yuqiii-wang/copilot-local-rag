@@ -1,0 +1,27 @@
+<div id="refresh-popup" class="refresh-popup" style="display: none;">
+    <div class="refresh-popup-header">
+        <h3 style="margin:0;font-size:13px;">Refresh Documents</h3>
+        <button id="close-refresh-popup-btn" class="icon-btn" aria-label="Close" title="Close">&times;</button>
+    </div>
+    <div class="refresh-popup-body" style="padding: 10px 0;">
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                <input type="radio" name="syncType" value="single" checked> Single URL/ID
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                <input type="radio" name="syncType" value="all"> All Documents
+            </label>
+        </div>
+        
+        <div id="sync-single-container">
+            <input type="text" id="sync-single-input" class="search-input" placeholder="Confluence URL or Jira ID" style="width:100%;">
+        </div>
+        <div id="sync-all-container" style="display:none; color: var(--vscode-descriptionForeground); font-size: 12px;">
+            <p style="margin:0;">Sync all documents from Confluence?</p>
+            <p style="margin-top:8px; font-weight:bold;">All doc sync could take a long time...</p>
+        </div>
+    </div>
+    <div class="refresh-popup-footer" style="text-align:right;">
+        <button id="submit-refresh-btn" class="action-btn">Sync</button>
+    </div>
+</div>

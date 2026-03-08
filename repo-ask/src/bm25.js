@@ -1,14 +1,14 @@
 const fs = require('fs');
 const path = require('path');
 
-const INDEX_FILE_NAME = 'bm25-index.json';
 const DEFAULT_K1 = 1.5;
 const DEFAULT_B = 0.75;
 
 function createBm25Index(deps) {
     const {
         storePath,
-        tokenize
+        tokenize,
+        indexFileName = 'bm25-index.json'
     } = deps;
 
     function ensureStorePath() {
@@ -17,7 +17,7 @@ function createBm25Index(deps) {
 
     function getIndexPath() {
         ensureStorePath();
-        return path.join(storePath, INDEX_FILE_NAME);
+        return path.join(storePath, indexFileName);
     }
 
     function loadIndex() {

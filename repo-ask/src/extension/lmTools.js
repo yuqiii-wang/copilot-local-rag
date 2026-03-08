@@ -46,99 +46,6 @@ function createLanguageModelTools(deps) {
             return [];
         }
 
-        const refreshTool = vscode.lm.registerTool(toolNames.refresh, {
-            prepareInvocation(options) {
-                const arg = String(options?.input?.arg || '').trim();
-                return {
-                    invocationMessage: arg.length > 0
-                        ? `Refreshing RepoAsk document source for: ${arg}`
-                        : 'Refreshing all RepoAsk Confluence documents',
-                    confirmationMessages: {
-                        title: arg.length > 0 ? 'Refresh RepoAsk document source?' : 'Refresh all RepoAsk Confluence docs?',
-                        message: arg.length > 0
-                            ? `This will sync local-store from: ${arg}`
-                            : 'This will sync all Confluence pages into local-store.'
-                    }
-                };
-            },
-            async invoke(options) {
-                const arg = String(options?.input?.arg || '').trim();
-                const createRefreshOptions = (sourceLabel) => ({
-                    onDocumentProcessed: ({ metadata, index, total }) => {
-                        if (typeof upsertSidebarDocument === 'function') {
-                            upsertSidebarDocument(metadata);
-                        }
-                        setSidebarSyncStatus(formatRefreshStatus(sourceLabel, { index, total }));
-                    }
-                });
-
-                try {
-                    if (!arg) {
-                        setSidebarSyncStatus('downloading from confluence cloud ...');
-                        await documentService.refreshAllDocuments(createRefreshOptions('confluence cloud'));
-                        setSidebarSyncStatus('');
-                        refreshSidebarView();
-                        return toToolResult('Refreshed all Confluence documents into local-store.', { refreshed: 'all' });
-                    }
-
-                    const parsed = await parseRefreshArg(vscode, arg);
-                    if (parsed.found && parsed.source === 'regex-jira') {
-                        setSidebarSyncStatus('downloading from jira ...');
-                        await documentService.refreshJiraIssue(parsed.arg, createRefreshOptions('jira'));
-                        setSidebarSyncStatus('');
-                        refreshSidebarView();
-                        return toToolResult(`Refreshed Jira issue for: ${parsed.arg}`, { refreshed: parsed.arg, source: 'jira' });
-                    }
-
-                    if (parsed.found && parsed.arg) {
-                        await fetchConfluencePage(parsed.arg);
-                        setSidebarSyncStatus('downloading from confluence cloud ...');
-                        await documentService.refreshDocument(parsed.arg, createRefreshOptions('confluence cloud'));
-                        setSidebarSyncStatus('');
-                        refreshSidebarView();
-                        return toToolResult(`Refreshed Confluence page for: ${parsed.arg}`, { refreshed: parsed.arg, source: 'confluence' });
-                    }
-
-                    return toToolResult(
-                        'Could not resolve a Confluence page id/title/link or Jira issue key/id/link. Provide an explicit arg, or call this tool with empty arg to refresh all Confluence docs.',
-                        { refreshed: false, reason: 'unresolved-arg' }
-                    );
-                } catch (error) {
-                    setSidebarSyncStatus('');
-                    return toToolResult(`Refresh failed: ${error.message}`, { refreshed: false, error: error.message });
-                }
-            }
-        });
-
-        const annotateTool = vscode.lm.registerTool(toolNames.annotate, {
-            prepareInvocation(options) {
-                const arg = String(options?.input?.arg || '').trim();
-                return {
-                    invocationMessage: arg.length > 0
-                        ? `Annotating RepoAsk document: ${arg}`
-                        : 'Annotating all RepoAsk local documents',
-                    confirmationMessages: {
-                        title: arg.length > 0 ? 'Annotate selected RepoAsk document?' : 'Annotate all RepoAsk local documents?',
-                        message: arg.length > 0
-                            ? `This will recompute summary and keywords for: ${arg}`
-                            : 'This will recompute summary and keywords for all local documents.'
-                    }
-                };
-            },
-            async invoke(options) {
-                const arg = String(options?.input?.arg || '').trim();
-                try {
-                    const result = arg.length > 0
-                        ? await documentService.annotateDocumentByArg(arg)
-                        : await documentService.annotateAllDocuments();
-                    refreshSidebarView();
-                    return toToolResult(result.message, { annotated: true, arg: arg || '' });
-                } catch (error) {
-                    return toToolResult(`Annotate failed: ${error.message}`, { annotated: false, error: error.message });
-                }
-            }
-        });
-
         const rankTool = vscode.lm.registerTool(toolNames.rank, {
             async invoke(options) {
                 const query = String(options?.input?.query || '').trim();
@@ -154,12 +61,33 @@ function createLanguageModelTools(deps) {
                     return toToolResult('No matching local documents found for the query.', { results: [] });
                 }
 
-                const results = ranked.map(item => ({
-                    id: item.id,
-                    title: item.title || 'Untitled',
-                    score: Number(item.score?.toFixed ? item.score.toFixed(4) : item.score),
-                    summary: item.summary || ''
-                }));
+                const repAskConfig = vscode.workspace.getConfiguration('repoAsk');
+                const confProfile = repAskConfig.get('confluence');
+                const confUrl = String((confProfile && typeof confProfile === 'object' ? confProfile.url : '') || repAskConfig.get('confluenceBaseUrl') || 'http://127.0.0.1:8001').replace(/\/$/, '');
+                
+                const jiraProfile = repAskConfig.get('jira');
+                const jiraUrl = String((jiraProfile && typeof jiraProfile === 'object' ? jiraProfile.url : '') || repAskConfig.get('jiraBaseUrl') || 'http://127.0.0.1:8002').replace(/\/$/, '');
+
+                const results = ranked.map(item => {
+                    let fullUrl = item.url || '';
+                    if (fullUrl && !fullUrl.startsWith('http')) {
+                        const isJira = item.parent_confluence_topic && String(item.parent_confluence_topic).startsWith('Jira');
+                        const baseUrl = isJira ? jiraUrl : confUrl;
+                        fullUrl = `${baseUrl}${fullUrl.startsWith('/') ? '' : '/'}${fullUrl}`;
+                    }
+                    return {
+                        ...item,
+                        id: item.id,
+                        title: item.title || 'Untitled',
+                        url: fullUrl || 'None',
+                        score: Number(item.score?.toFixed ? item.score.toFixed(4) : item.score),
+                        summary: item.summary || '',
+                        author: item.author || 'Unknown',
+                        last_updated: item.last_updated || 'Unknown',
+                        parent_confluence_topic: item.parent_confluence_topic || 'None',
+                        keywords: item.keywords || []
+                    };
+                });
                 const lines = results.map((item, index) => `${index + 1}. ${item.title} (score ${item.score})`);
                 return toToolResult(`Top ranked RepoAsk documents:\n${lines.join('\n')}`, { results });
             }
@@ -298,80 +226,104 @@ function createLanguageModelTools(deps) {
             }
         });
 
-        return [refreshTool, annotateTool, rankTool, checkTool, readMetadataTool, readContentTool];
-    }
-
-    async function handleRefreshFromSource(sourceInput, response, options = {}) {
-        const parsed = await parseRefreshArg(vscode, sourceInput, options);
-        const createRefreshOptions = (sourceLabel) => ({
-            onDocumentProcessed: ({ metadata, index, total }) => {
-                if (typeof upsertSidebarDocument === 'function') {
-                    upsertSidebarDocument(metadata);
+        const newCodeCheckTool = vscode.lm.registerTool('repoask_new_code_check', {
+            prepareInvocation() {
+                return {
+                    invocationMessage: 'Generating new code check vs main/master branch...',
+                    confirmationMessages: {
+                        title: 'Generate new code check?',
+                        message: 'This will run git diff against main/master and return the changes for review.'
+                    }
+                };
+            },
+            async invoke() {
+                const { execSync } = require('child_process');
+                const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+                if (!workspaceFolder) {
+                    return toToolResult('No workspace folder open', { diff: null });
                 }
-                setSidebarSyncStatus(formatRefreshStatus(sourceLabel, { index, total }));
+                
+                try {
+                    execSync('git rev-parse --is-inside-work-tree', { cwd: workspaceFolder, stdio: 'ignore' });
+                } catch (e) {
+                    return toToolResult('This workspace is not a valid git repository or git is not installed/permitted.', { diff: null, error: 'Not a git repository or git lacks permission' });
+                }
+
+                try {
+                    let diff = '';
+                    try {
+                        diff = execSync('git diff origin/main...HEAD', { cwd: workspaceFolder, encoding: 'utf8' });
+                    } catch (e1) {
+                        try {
+                            diff = execSync('git diff origin/master...HEAD', { cwd: workspaceFolder, encoding: 'utf8' });
+                        } catch (e2) {
+                            try {
+                                diff = execSync('git diff main...HEAD', { cwd: workspaceFolder, encoding: 'utf8' });
+                            } catch (e3) {
+                                try {
+                                    diff = execSync('git diff master...HEAD', { cwd: workspaceFolder, encoding: 'utf8' });
+                                } catch (e4) {
+                                    diff = execSync('git diff HEAD', { cwd: workspaceFolder, encoding: 'utf8' });
+                                }
+                            }
+                        }
+                    }
+                    if (!diff || !diff.trim()) {
+                        return toToolResult('No code changes found compared to main/master.', { diff: '' });
+                    }
+                    return toToolResult(`Git diff:\n\n\`\`\`diff\n${diff}\n\`\`\``, { diff });
+                } catch (error) {
+                    return toToolResult(`Code check failed: ${error.message}`, { diff: null, error: error.message });
+                }
             }
         });
 
-        if (parsed.found && parsed.source === 'regex-jira') {
-            response.markdown(`Refreshing Jira issue for: ${parsed.arg}...`);
-            try {
-                setSidebarSyncStatus('downloading from jira ...');
-                await documentService.refreshJiraIssue(parsed.arg, createRefreshOptions('jira'));
-                response.markdown('Refresh completed for the Jira issue.');
-                setSidebarSyncStatus('');
-                refreshSidebarView();
-            } catch (error) {
-                setSidebarSyncStatus('');
-                const status = error?.response?.status;
-                const detail = status ? `backend returned ${status}` : (error?.message || 'backend request failed');
-                response.markdown(`Refresh failed for Jira issue ${parsed.arg} (${detail}).`);
+        const readRepoPromptsTool = vscode.lm.registerTool('repoask_read_repo_prompts', {
+            prepareInvocation() {
+                return {
+                    invocationMessage: 'Reading repository code guidelines prompts...',
+                    confirmationMessages: {
+                        title: 'Read repo prompts?',
+                        message: 'This will read guidelines from .github/prompts/*.prompt.md'
+                    }
+                };
+            },
+            async invoke() {
+                const fs = require('fs');
+                const path = require('path');
+                const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+                if (!workspaceFolder) {
+                    return toToolResult('No workspace folder open', { contents: null });
+                }
+
+                const promptsDir = path.join(workspaceFolder, '.github', 'prompts');
+                if (!fs.existsSync(promptsDir)) {
+                    return toToolResult('No .github/prompts/ directory found.', { contents: [] });
+                }
+
+                try {
+                    const files = fs.readdirSync(promptsDir).filter(f => f.endsWith('.prompt.md'));
+                    if (files.length === 0) {
+                        return toToolResult('No .prompt.md files found in .github/prompts/.', { contents: [] });
+                    }
+
+                    const contents = files.map(f => {
+                        const content = fs.readFileSync(path.join(promptsDir, f), 'utf8');
+                        return `--- File: ${f} ---\n${content}`;
+                    });
+
+                    return toToolResult(`Found ${files.length} prompt file(s):\n\n${contents.join('\n\n')}`, { contents });
+                } catch (error) {
+                    return toToolResult(`Failed to read prompts: ${error.message}`, { contents: null, error: error.message });
+                }
             }
-            return;
-        }
-
-        if (parsed.found && parsed.arg) {
-            try {
-                await fetchConfluencePage(parsed.arg);
-            } catch (error) {
-                const status = error?.response?.status;
-                const detail = status ? `backend returned ${status}` : 'backend request failed';
-                response.markdown(`Could not resolve the requested document (${detail}). Do you want to download all docs instead?`);
-                appendRefreshAllDocsButton(response);
-                return;
-            }
-
-            response.markdown(`Refreshing document for: ${parsed.arg}...`);
-            try {
-                setSidebarSyncStatus('downloading from confluence cloud ...');
-                await documentService.refreshDocument(parsed.arg, createRefreshOptions('confluence cloud'));
-                response.markdown('Refresh completed for the resolved page.');
-                setSidebarSyncStatus('');
-                refreshSidebarView();
-            } catch (error) {
-                setSidebarSyncStatus('');
-                const status = error?.response?.status;
-                const detail = status ? `backend returned ${status}` : (error?.message || 'backend request failed');
-                response.markdown(`Refresh failed for the requested page (${detail}). Do you want to download all docs instead?`);
-                appendRefreshAllDocsButton(response);
-            }
-            return;
-        }
-
-        response.markdown(`I couldn't find a Confluence link, page id, or exact page title in your request. Do you want to download all docs instead?`);
-        appendRefreshAllDocsButton(response);
-    }
-
-    function appendRefreshAllDocsButton(response) {
-        response.button({
-            command: 'repo-ask.refresh',
-            title: 'Refresh All Docs',
-            arguments: ['']
         });
+
+        return [rankTool, checkTool, readMetadataTool, readContentTool, newCodeCheckTool, readRepoPromptsTool];
     }
 
     return {
-        registerRepoAskLanguageModelTools,
-        handleRefreshFromSource
+        registerRepoAskLanguageModelTools
     };
 }
 

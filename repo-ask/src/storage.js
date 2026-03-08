@@ -9,8 +9,8 @@ function getLocalStorePath(context) {
     return path.join(context.globalStorageUri.fsPath, 'local-store');
 }
 
-function getLocalBm25StorePath(context) {
-    return path.join(context.globalStorageUri.fsPath, 'local-store-bm25');
+function getLocalIndexStorePath(context) {
+    return path.join(context.globalStorageUri.fsPath, 'local-store-index');
 }
 
 function ensureStoragePath(context) {
@@ -19,10 +19,10 @@ function ensureStoragePath(context) {
     return storagePath;
 }
 
-function ensureBm25StoragePath(context) {
-    const bm25Path = getLocalBm25StorePath(context);
-    fs.mkdirSync(bm25Path, { recursive: true });
-    return bm25Path;
+function ensureIndexStoragePath(context) {
+    const indexPath = getLocalIndexStorePath(context);
+    fs.mkdirSync(indexPath, { recursive: true });
+    return indexPath;
 }
 
 function getDocumentDirectory(storagePath, docId) {
@@ -184,7 +184,7 @@ function formatDocumentDetails(metadata, content) {
 
 module.exports = {
     ensureStoragePath,
-    ensureBm25StoragePath,
+    ensureIndexStoragePath,
     getDocumentDirectory,
     getDocumentImagesDirectory,
     readAllMetadata,

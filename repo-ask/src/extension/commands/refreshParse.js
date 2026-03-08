@@ -13,7 +13,14 @@ function registerRefreshAndParseCommands(deps) {
         });
 
         try {
-            sidebar.setSidebarSyncStatus('');
+            // Do not clear status here to preserve "downloading..." state from UI
+            // sidebar.setSidebarSyncStatus('');
+            if (typeof sidebar.setSidebarSyncError === 'function') {
+                sidebar.setSidebarSyncError('');
+            }
+            if (typeof sidebar.setSidebarSyncSuccess === 'function') {
+                sidebar.setSidebarSyncSuccess('');
+            }
             const formatRefreshStatus = (sourceLabel, progress = {}) => {
                 const index = Number(progress?.index);
                 const total = Number(progress?.total);
@@ -34,23 +41,41 @@ function registerRefreshAndParseCommands(deps) {
                 sidebar.setSidebarSyncStatus('downloading from confluence/jira cloud ...');
                 if (parsed.found && parsed.source === 'regex-jira') {
                     await documentService.refreshJiraIssue(parsed.arg, createRefreshOptions('jira'));
-                    vscode.window.showInformationMessage(`Refreshed Jira issue for: ${parsed.arg}`);
+                    const successMsg = `Refreshed Jira issue for: ${parsed.arg}`;
+                    vscode.window.showInformationMessage(successMsg);
+                    if (typeof sidebar.setSidebarSyncSuccess === 'function') {
+                        sidebar.setSidebarSyncSuccess(successMsg);
+                    }
                 } else {
                     const resolvedArg = parsed.found && parsed.arg ? parsed.arg : arg.trim();
                     await documentService.refreshDocument(resolvedArg, createRefreshOptions('confluence cloud'));
-                    vscode.window.showInformationMessage(`Refreshed document for: ${resolvedArg}`);
+                    const successMsg = `Refreshed document for: ${resolvedArg}`;
+                    vscode.window.showInformationMessage(successMsg);
+                    if (typeof sidebar.setSidebarSyncSuccess === 'function') {
+                        sidebar.setSidebarSyncSuccess(successMsg);
+                    }
                 }
             } else {
                 const downloadingMessage = 'downloading from confluence/jira cloud ...';
                 vscode.window.showInformationMessage(downloadingMessage);
                 sidebar.setSidebarSyncStatus(downloadingMessage);
                 await documentService.refreshAllDocuments(createRefreshOptions('confluence cloud'));
-                vscode.window.showInformationMessage('Refreshed all documents');
+                const successMsg = 'Refreshed all documents';
+                vscode.window.showInformationMessage(successMsg);
+                if (typeof sidebar.setSidebarSyncSuccess === 'function') {
+                    sidebar.setSidebarSyncSuccess(successMsg);
+                }
             }
 
             sidebar.refreshSidebarView();
         } catch (error) {
-            vscode.window.showErrorMessage(`Error refreshing documents: ${error.message}`);
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            vscode.window.showErrorMessage(`Error refreshing documents: ${errorMsg}`);
+
+            if (typeof sidebar.setSidebarSyncError === 'function') {
+                const target = (arg && arg.trim().length > 0) ? `"${arg.trim()}"` : 'all documents';
+                sidebar.setSidebarSyncError(`Failed to sync ${target}: ${errorMsg}`);
+            }
         } finally {
             sidebar.setSidebarSyncStatus('');
             sidebar.refreshSidebarView();

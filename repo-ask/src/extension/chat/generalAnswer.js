@@ -1,3 +1,6 @@
+const fs = require('fs');
+const path = require('path');
+
 const LLM_RESPONSE_TIMEOUT_MS = 30000;
 const CHAT_METADATA_RANK_LIMIT = 5;
 const CHAT_THINKING_DOC_LIST_LIMIT = 25;
@@ -282,15 +285,18 @@ async function answerGeneralPromptQuestion(vscodeApi, prompt, workspacePromptCon
 
     const contextText = String(workspacePromptContext || '').trim();
 
+    const promptTemplatePath = path.join(__dirname, 'agentPrompt.txt');
+    let baseInstruction = '';
+    try {
+        baseInstruction = fs.readFileSync(promptTemplatePath, 'utf8');
+    } catch (e) {
+        baseInstruction = 'You are RepoAsk Agent. Rely on the local-store tools to find answers or read repo prompts.';
+    }
+
     const instruction = [
-        'You are RepoAsk Agent. Your goal is to answer the user question using your registered tools.',
-        'Wait for tool results before explaining the final answer.',
-        'For a general query:',
-        '1. Use `repoask_rank` tool with limit 10 to select the top 10 docs.',
-        '2. If the results are not related to the question, use `repoask_read_metadata` to load ALL metadata. Read them carefully and select up to 10 file ids that are most relevant.',
-        '3. After selecting the top docs (either from rank or metadata fallback), use `repoask_read_content` tool to read the full contents of those top files.',
-        '4. Finally, send the detailed answer to explain the question by combining the retrieved document contents and any workspace prompt context.',
-        contextText ? `Workspace markdown prompt context:\n${contextText}` : 'Workspace markdown prompt context: (none)',
+        baseInstruction.trim(),
+        '',
+        contextText ? `Workspace guidelines (ONLY FOR SCENARIO 2):\n${contextText}` : 'Workspace guidelines: (none)',
         `User question: ${prompt}`
     ].join('\n\n');
 

@@ -25,13 +25,13 @@ Keep code clean and write to new files if one file is too large.
 - Keep local store contract aligned with `repo-ask/src/storage.js`:
 	- Current primary format: one directory per doc (`local-store/<id>/content.md`, `local-store/<id>/metadata.json`, optional `local-store/<id>/images/*`).
 	- Backward compatibility: legacy flat files (`<id>.md`, `<id>.json`, `<id>.txt`) are still read/deleted when present.
-	- BM25 indices: stored in `local-store-bm25/` for fast local retrieval.
+	- Indices: stored in `local-store-index/` with two index dimensions: keywords and bm25 for fast local retrieval.
 
 ## Capability expectations
 - Understand and modify FastAPI routes and dummy data models in `dummy-servers/confluence_server.py` and `dummy-servers/jira_server.py`.
 - Understand and modify VS Code extension runtime in `repo-ask/src/extension.js` (with `repo-ask/index.js` as entrypoint).
 - Reuse tokenization helpers from `repo-ask/src/tokenization/*` and text-processing helpers from `repo-ask/src/textProcessing.js`.
-- Understand document lifecycle in `repo-ask/src/extension/documentService.js`, LLM parsing helpers in `repo-ask/src/extension/llm.js`, and LM tool/chat routing in `repo-ask/src/extension/lmTools.js`.
+- Understand document lifecycle in `repo-ask/src/extension/documentService/*`, LLM parsing helpers in `repo-ask/src/extension/llm.js`, and LM tool/chat routing in `repo-ask/src/extension/lmTools.js` and `repo-ask/src/extension/promptContext.js`.
 - Understand command modules under `repo-ask/src/extension/commands/*` and chat handlers under `repo-ask/src/extension/chat/*`.
 - Keep ranking behavior consistent with `documentService.rankLocalDocuments`: BM25-first ranking with IDF fallback.
 - Run project commands for verification (`npm run compile`, `npx vsce package`, and relevant Python syntax checks).
@@ -75,18 +75,18 @@ Quick validation checklist before merging any agent-driven change:
 
 Current code map (verified):
 - Extension runtime and commands: `repo-ask/src/extension.js`
-- Document orchestration (refresh/annotate/rank): `repo-ask/src/extension/documentService.js`
+- Document orchestration (refresh/annotate/rank): `repo-ask/src/extension/documentService/*`
 - LLM tool/arg parsing helpers: `repo-ask/src/extension/llm.js`
 - LM tool registration + chat refresh fallback UI: `repo-ask/src/extension/lmTools.js`
-- Command registrations: `repo-ask/src/extension/commands.js`, `repo-ask/src/extension/commands/*`
-- Chat handlers: `repo-ask/src/extension/chat/generalAnswer.js`, `repo-ask/src/extension/chat/refreshPrompt.js`
+- Command registrations / definitions: `repo-ask/src/extension/commands.js`, `repo-ask/src/extension/commands/*` (e.g. `refreshParse.js`)
+- Chat handlers & Prompt Context: `repo-ask/src/extension/chat/generalAnswer.js`, `repo-ask/src/extension/chat/agentPrompt.txt`, `repo-ask/src/extension/promptContext.js`
 - Confluence/Jira API adapters: `repo-ask/src/confluenceApi.js`, `repo-ask/src/jiraApi.js`
-- Local storage contract (doc directory with `content.md` + `metadata.json`, BM25 in `local-store-bm25/`, plus legacy fallback): `repo-ask/src/storage.js`
+- Local storage contract (doc directory with `content.md` + `metadata.json`, Indices in `local-store-index/`, plus legacy fallback): `repo-ask/src/storage.js`
 - Ranking engines: `repo-ask/src/bm25.js`, `repo-ask/src/relevance.js`
 - Text conversion + keyword/summary fallback: `repo-ask/src/textProcessing.js`
 - Tokenization helpers: `repo-ask/src/tokenization/*` (extractors, ngrams, structural, patterns)
-- Sidebar controller + UI: `repo-ask/src/extension/sidebarController.js`, `repo-ask/src/sidebar/index.html`, `repo-ask/src/sidebar/styles.css`
-- Dummy servers: `dummy-servers/confluence_server.py`, `dummy-servers/jira_server.py`
+- Sidebar controller + UI: `repo-ask/src/extension/sidebarController.js`, `repo-ask/src/sidebar/index.html`, `repo-ask/src/sidebar/styles.css`, `repo-ask/src/sidebar/refreshPopup.html`
+- Dummy servers: `dummy-servers/confluence_server.py`, `dummy-servers/jira_server.py`, `dummy-servers/generate_dummy_data.py`
 
 Current behavior snapshot:
 - Chat participant supports direct `refresh` and `annotate`; refresh-like prompts are auto-detected, and other prompts go through general prompt-context Q&A.

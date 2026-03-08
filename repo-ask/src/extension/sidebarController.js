@@ -21,6 +21,8 @@ function createSidebarController(deps) {
 
     let docsWebviewView;
     let sidebarSyncStatus = '';
+    let sidebarSyncError = '';
+    let sidebarSyncSuccess = '';
 
     const sidebarProvider = {
         resolveWebviewView: async (webviewView) => {
@@ -35,6 +37,23 @@ function createSidebarController(deps) {
                 };
 
                 docsWebviewView.webview.onDidReceiveMessage(async (message) => {
+                    if (message?.command === 'clearSyncError') {
+                        sidebarSyncError = '';
+                    }
+
+                    if (message?.command === 'clearSyncSuccess') {
+                        sidebarSyncSuccess = '';
+                    }
+
+                    if (message?.command === 'refreshDocs') {
+                        const { isAll, arg } = message;
+                        if (isAll) {
+                            vscode.commands.executeCommand('repo-ask.refresh', '');
+                        } else if (arg) {
+                            vscode.commands.executeCommand('repo-ask.refresh', String(arg).trim());
+                        }
+                    }
+
                     if (message?.command === 'openDoc' && message.docId) {
                         const metadata = readAllMetadata(storagePath).find(doc => String(doc.id) === String(message.docId));
                         const rawContent = metadata
@@ -146,9 +165,9 @@ function createSidebarController(deps) {
 
                         try {
                             const createdPath = documentService.writeDocumentPromptFile(metadata, content);
-                            vscode.window.showInformationMessage(`Added prompt: ${path.basename(createdPath)}`);
+                            docsWebviewView.webview.postMessage({ command: 'addToPromptsSuccess', payload: createdPath });
                         } catch (error) {
-                            vscode.window.showErrorMessage(`Failed to add prompt: ${error.message}`);
+                            docsWebviewView.webview.postMessage({ command: 'addToPromptsError', payload: error.message });
                         }
                     }
 
@@ -171,8 +190,8 @@ function createSidebarController(deps) {
                             }
 
                             const deletion = deleteDocumentFiles(storagePath, docId);
-                            if (typeof documentService.removeBm25DocumentById === 'function') {
-                                documentService.removeBm25DocumentById(docId);
+                            if (typeof documentService.removeDocumentFromIndicesById === 'function') {
+                                documentService.removeDocumentFromIndicesById(docId);
                             }
                             docsWebviewView.webview.postMessage({
                                 command: 'docDeleted',
@@ -223,6 +242,30 @@ function createSidebarController(deps) {
         docsWebviewView.webview.postMessage({
             command: 'syncStatus',
             payload: sidebarSyncStatus
+        });
+    }
+
+    function setSidebarSyncError(message) {
+        sidebarSyncError = String(message || '');
+        if (!docsWebviewView) {
+            return;
+        }
+
+        docsWebviewView.webview.postMessage({
+            command: 'syncError',
+            payload: sidebarSyncError
+        });
+    }
+
+    function setSidebarSyncSuccess(message) {
+        sidebarSyncSuccess = String(message || '');
+        if (!docsWebviewView) {
+            return;
+        }
+
+        docsWebviewView.webview.postMessage({
+            command: 'syncSuccess',
+            payload: sidebarSyncSuccess
         });
     }
 
@@ -289,15 +332,20 @@ function createSidebarController(deps) {
     function getSidebarHtml(webview) {
         const htmlPath = vscode.Uri.joinPath(context.extensionUri, 'src', 'sidebar', 'index.html');
         const cssPath = vscode.Uri.joinPath(context.extensionUri, 'src', 'sidebar', 'styles.css');
+        const popupPath = vscode.Uri.joinPath(context.extensionUri, 'src', 'sidebar', 'refreshPopup.html');
 
         const htmlTemplate = fs.readFileSync(htmlPath.fsPath, 'utf8');
+        const popupHtml = fs.existsSync(popupPath.fsPath) ? fs.readFileSync(popupPath.fsPath, 'utf8') : '';
         const cssUri = webview.asWebviewUri(cssPath).toString();
         const docs = readAllMetadata(storagePath).sort((a, b) => String(b.last_updated).localeCompare(String(a.last_updated)));
 
         return htmlTemplate
             .replace('__CSS_URI__', cssUri)
             .replace('__DOCS_DATA__', JSON.stringify(docs))
-            .replace('__SYNC_STATUS__', JSON.stringify(sidebarSyncStatus));
+            .replace('__SYNC_STATUS__', JSON.stringify(sidebarSyncStatus))
+            .replace('__SYNC_ERROR__', JSON.stringify(sidebarSyncError))
+            .replace('__SYNC_SUCCESS__', JSON.stringify(sidebarSyncSuccess))
+            .replace('__REFRESH_POPUP__', popupHtml);
     }
 
     function rewriteMarkdownImageLinksForWebview(markdownContent, docId, webview) {
@@ -361,6 +409,8 @@ function createSidebarController(deps) {
         sidebarProvider,
         refreshSidebarView,
         setSidebarSyncStatus,
+        setSidebarSyncError,
+        setSidebarSyncSuccess,
         upsertSidebarDocument,
         revealDocumentInSidebar
     };

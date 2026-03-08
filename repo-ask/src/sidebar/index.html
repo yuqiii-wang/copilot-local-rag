@@ -8,11 +8,27 @@
 </head>
 <body>
     <main class="container">
-        <header class="header">
-            <h1 class="title">Doc Store</h1>
+        <header class="header" style="position: relative;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h1 class="title">Doc Store</h1>
+                <button id="open-refresh-popup-btn" class="icon-btn" aria-label="Refresh Documents" title="Refresh Documents" style="background:none;border:none;cursor:pointer;color:inherit;padding:4px;display:flex;align-items:center;">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                        <path fill-rule="evenodd" clip-rule="evenodd" d="M4.681 3H2V2h3.5l.5.5V6H5V4a5 5 0 1 0 4.53 8.36l.334.943A6 6 0 1 1 4.681 3z"/>
+                    </svg>
+                </button>
+            </div>
+            __REFRESH_POPUP__
             <p class="subtitle">Local Confluence documents</p>
             <p id="sync-status" class="sync-status" aria-live="polite"></p>
-            <input id="search-input" class="search-input" type="text" placeholder="Search local-store (IDF rank)">
+            <div id="error-banner" class="error-banner" style="display: none; background: var(--vscode-editorError-background, rgba(255,0,0,0.1)); color: var(--vscode-editorError-foreground, #ff0000); padding: 8px; margin-top: 8px; border-radius: 4px; border: 1px solid var(--vscode-editorError-border, transparent); align-items: center; justify-content: space-between; font-size: 12px; word-break: break-all;">
+                <span id="error-banner-text"></span>
+                <button id="close-error-banner-btn" class="icon-btn" style="background: none; border: none; cursor: pointer; color: inherit; margin-left: 8px; font-size: 14px;" aria-label="Dismiss error" title="Dismiss error">&times;</button>
+            </div>
+            <div id="success-banner" class="success-banner" style="display: none; background: var(--vscode-editorInfo-background, rgba(0,255,0,0.1)); color: var(--vscode-editorInfo-foreground, #00ff00); padding: 8px; margin-top: 8px; border-radius: 4px; border: 1px solid var(--vscode-editorInfo-border, transparent); align-items: center; justify-content: space-between; font-size: 12px; word-break: break-all;">
+                <span id="success-banner-text"></span>
+                <button id="close-success-banner-btn" class="icon-btn" style="background: none; border: none; cursor: pointer; color: inherit; margin-left: 8px; font-size: 14px;" aria-label="Dismiss success" title="Dismiss success">&times;</button>
+            </div>
+            <input id="search-input" class="search-input" type="text" placeholder="Search local-store">
         </header>
         <section id="doc-list" class="doc-list"></section>
         <div id="main-splitter" class="main-splitter" role="separator" aria-orientation="horizontal" aria-label="Resize list and detail"></div>
@@ -29,14 +45,14 @@
                 <div class="viewer-header">
                     <h2 class="viewer-title">Metadata</h2>
                     <div class="metadata-actions">
-                        <button id="generate-metadata-btn" class="action-btn action-btn-secondary" type="button" disabled>AI Gen</button>
-                        <button id="metadata-edit-toggle-btn" class="action-btn action-btn-secondary" type="button" disabled>Edit</button>
+                        <button id="generate-metadata-btn" class="action-btn" type="button" disabled>AI Gen</button>
+                        <button id="metadata-edit-toggle-btn" class="action-btn" type="button" disabled>Edit</button>
                     </div>
                 </div>
                 <label class="metadata-label" for="summary-input">Summary</label>
-                <textarea id="summary-input" class="metadata-textarea" rows="5" placeholder="Summary is empty. Generate or edit it."></textarea>
+                <textarea id="summary-input" class="metadata-textarea" rows="3" placeholder="Summary is empty. Generate or edit it."></textarea>
                 <label class="metadata-label" for="keywords-input">Keywords (comma separated)</label>
-                <textarea id="keywords-input" class="metadata-textarea metadata-textarea-keywords" rows="3" placeholder="keyword-a, keyword-b"></textarea>
+                <textarea id="keywords-input" class="metadata-textarea metadata-textarea-keywords" rows="2" placeholder="keyword-a, keyword-b"></textarea>
                 <ul id="metadata-list" class="metadata-list">
                     <li class="metadata-item">title: -</li>
                 </ul>
@@ -64,6 +80,8 @@
         const viewerEl = document.querySelector('.viewer');
         const viewerSplitterEl = document.getElementById('viewer-splitter');
         const initialSyncStatus = __SYNC_STATUS__;
+        const initialSyncError = __SYNC_ERROR__;
+        const initialSyncSuccess = __SYNC_SUCCESS__;
         let displayedDocs = Array.isArray(docs)
             ? docs.map(doc => ({ id: doc.id, title: doc.title, last_updated: doc.last_updated || '' }))
             : [];
@@ -182,7 +200,52 @@
             syncStatusEl.textContent = text;
             syncStatusEl.classList.toggle('visible', text.length > 0);
             syncStatusEl.classList.toggle('loading', isDownloadingFromSource);
+            
+            const refreshIconBtn = document.getElementById('open-refresh-popup-btn');
+            if (refreshIconBtn) {
+                if (isDownloadingFromSource) {
+                    refreshIconBtn.classList.add('is-spinning');
+                } else {
+                    refreshIconBtn.classList.remove('is-spinning');
+                }
+            }
         }
+
+        function renderSyncError(message) {
+            const errorBanner = document.getElementById('error-banner');
+            const errorBannerText = document.getElementById('error-banner-text');
+            const text = String(message || '').trim();
+            if (text.length > 0) {
+                errorBannerText.textContent = `Error: ${text}`;
+                errorBanner.style.display = 'flex';
+                document.getElementById('success-banner').style.display = 'none';
+            } else {
+                errorBanner.style.display = 'none';
+            }
+        }
+
+        function renderSuccessMessage(message) {
+            const successBanner = document.getElementById('success-banner');
+            const successBannerText = document.getElementById('success-banner-text');
+            const text = String(message || '').trim();
+            if (text.length > 0) {
+                successBannerText.textContent = `${text}`;
+                successBanner.style.display = 'flex';
+                document.getElementById('error-banner').style.display = 'none';
+            } else {
+                successBanner.style.display = 'none';
+            }
+        }
+
+        document.getElementById('close-error-banner-btn')?.addEventListener('click', () => {
+            renderSyncError('');
+            vscode.postMessage({ command: 'clearSyncError' });
+        });
+
+        document.getElementById('close-success-banner-btn')?.addEventListener('click', () => {
+            renderSuccessMessage('');
+            vscode.postMessage({ command: 'clearSyncSuccess' });
+        });
 
         function escapeHtml(value) {
             return String(value || '')
@@ -261,7 +324,7 @@
 
         function render() {
             if (!Array.isArray(displayedDocs) || displayedDocs.length === 0) {
-                docListEl.innerHTML = '<p class="empty">No local documents yet. Run @repoask refresh to sync to Confluence Cloud.</p>';
+                docListEl.innerHTML = '<p class="empty">No local documents yet. Use the sync button to download from Confluence Cloud.</p>';
                 return;
             }
 
@@ -373,6 +436,22 @@
                 renderSyncStatus(message.payload || '');
             }
 
+            if (message?.command === 'syncError') {
+                renderSyncError(message.payload || '');
+            }
+
+            if (message?.command === 'syncSuccess') {
+                renderSuccessMessage(message.payload || '');
+            }
+
+            if (message?.command === 'addToPromptsSuccess') {
+                renderSuccessMessage(`Added to prompts: ${message.payload}`);
+            }
+
+            if (message?.command === 'addToPromptsError') {
+                renderSyncError(`${message.payload}`);
+            }
+
             if (message?.command === 'docDeleted') {
                 const deletedId = String(message.payload?.id || '').trim();
                 if (deletedId) {
@@ -450,7 +529,67 @@
             setMetadataEditMode(false);
         });
 
+        // Refresh Popup Logic
+        const openRefreshPopupBtn = document.getElementById('open-refresh-popup-btn');
+        const refreshPopup = document.getElementById('refresh-popup');
+        const closeRefreshPopupBtn = document.getElementById('close-refresh-popup-btn');
+        const submitRefreshBtn = document.getElementById('submit-refresh-btn');
+        const syncSingleInput = document.getElementById('sync-single-input');
+        const syncSingleContainer = document.getElementById('sync-single-container');
+        const syncAllContainer = document.getElementById('sync-all-container');
+        const syncRadios = document.querySelectorAll('input[name="syncType"]');
+
+        if (openRefreshPopupBtn && refreshPopup) {
+            openRefreshPopupBtn.addEventListener('click', () => {
+                refreshPopup.style.display = 'block';
+                if (syncSingleInput && syncSingleInput.offsetParent !== null) {
+                    syncSingleInput.focus();
+                }
+            });
+            closeRefreshPopupBtn.addEventListener('click', () => {
+                refreshPopup.style.display = 'none';
+            });
+            
+            syncRadios.forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    if (e.target.value === 'all') {
+                        if (syncSingleContainer) syncSingleContainer.style.display = 'none';
+                        if (syncAllContainer) syncAllContainer.style.display = 'block';
+                    } else {
+                        if (syncSingleContainer) syncSingleContainer.style.display = 'block';
+                        if (syncAllContainer) syncAllContainer.style.display = 'none';
+                        if (syncSingleInput) syncSingleInput.focus();
+                    }
+                });
+            });
+
+            submitRefreshBtn.addEventListener('click', () => {
+                let isAll = false;
+                const allRadio = document.querySelector('input[name="syncType"][value="all"]');
+                if (allRadio && allRadio.checked) {
+                    isAll = true;
+                }
+
+                if (isAll) {
+                    renderSyncError('');
+                    renderSuccessMessage('');
+                    renderSyncStatus('downloading from confluence/jira cloud ...');
+                    vscode.postMessage({ command: 'refreshDocs', isAll: true });
+                } else {
+                    const arg = syncSingleInput ? syncSingleInput.value.trim() : '';
+                    if (!arg) return;
+                    renderSyncError('');
+                    renderSuccessMessage('');
+                    renderSyncStatus('downloading from confluence/jira cloud ...');
+                    vscode.postMessage({ command: 'refreshDocs', isAll: false, arg });
+                }
+                refreshPopup.style.display = 'none';
+            });
+        }
+
         renderSyncStatus(initialSyncStatus || '');
+        renderSuccessMessage(initialSyncSuccess || '');
+        renderSyncError(initialSyncError || '');
         sortDisplayedDocs();
         addToPromptsBtnEl.disabled = !selectedDocId;
         generateMetadataBtnEl.disabled = !selectedDocId;

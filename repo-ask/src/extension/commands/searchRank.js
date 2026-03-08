@@ -23,7 +23,7 @@ function registerCheckAndRankCommands(deps) {
         try {
             const metadataList = readAllMetadata(storagePath);
             if (metadataList.length === 0) {
-                vscode.window.showInformationMessage('No local documents found. Run @repoask refresh to sync to Confluence Cloud.');
+                vscode.window.showInformationMessage('No local documents found. Use the sidebar to sync to Confluence Cloud.');
                 return;
             }
 
@@ -106,7 +106,7 @@ function registerCheckAndRankCommands(deps) {
         try {
             const metadataList = readAllMetadata(storagePath);
             if (metadataList.length === 0) {
-                vscode.window.showInformationMessage('No local documents found. Run @repoask refresh to sync content first.');
+                vscode.window.showInformationMessage('No local documents found. Use the sync button in the sidebar first.');
                 return;
             }
 

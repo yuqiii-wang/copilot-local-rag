@@ -3,6 +3,7 @@ node_modules
 .vscode
 .vscode-test
 *.vsix
+repo-ask/.github/prompts
 .DS_Store
 Thumbs.db
 package-lock.json

@@ -30,9 +30,16 @@ function loadWorkspacePromptContext(vscode, maxChars = 0) {
         }
 
         const workspaceRoot = workspaceFolder.uri.fsPath;
-        const promptsDir = path.join(workspaceRoot, '.github', 'prompts');
-        const markdownFiles = collectMarkdownFilesRecursive(promptsDir)
-            .sort((a, b) => a.localeCompare(b));
+        const promptsDirList = [
+            path.join(workspaceRoot, '.github', '.prompts'),
+        ];
+
+        let markdownFiles = [];
+        for (const dir of promptsDirList) {
+            markdownFiles.push(...collectMarkdownFilesRecursive(dir));
+        }
+        
+        markdownFiles = markdownFiles.sort((a, b) => a.localeCompare(b));
 
         if (markdownFiles.length === 0) {
             return { text: '', fileCount: 0 };
