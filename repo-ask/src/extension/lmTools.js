@@ -63,10 +63,10 @@ function createLanguageModelTools(deps) {
 
                 const repAskConfig = vscode.workspace.getConfiguration('repoAsk');
                 const confProfile = repAskConfig.get('confluence');
-                const confUrl = String((confProfile && typeof confProfile === 'object' ? confProfile.url : '') || repAskConfig.get('confluenceBaseUrl') || 'http://127.0.0.1:8001').replace(/\/$/, '');
+                const confUrl = String((confProfile && typeof confProfile === 'object' ? confProfile.url : '') || 'http://127.0.0.1:8001').replace(/\/$/, '');
                 
                 const jiraProfile = repAskConfig.get('jira');
-                const jiraUrl = String((jiraProfile && typeof jiraProfile === 'object' ? jiraProfile.url : '') || repAskConfig.get('jiraBaseUrl') || 'http://127.0.0.1:8002').replace(/\/$/, '');
+                const jiraUrl = String((jiraProfile && typeof jiraProfile === 'object' ? jiraProfile.url : '') || 'http://127.0.0.1:8002').replace(/\/$/, '');
 
                 const results = ranked.map(item => {
                     let fullUrl = item.url || '';
@@ -166,15 +166,20 @@ function createLanguageModelTools(deps) {
                 const allMetadata = readAllMetadata();
                 let filtered = allMetadata;
                 if (ids.length > 0) {
-                    filtered = allMetadata.filter(m => ids.includes(String(m.id)) || ids.includes(m.id));
+                    filtered = allMetadata.filter(m => 
+                        ids.includes(String(m.id)) || 
+                        ids.includes(m.id) ||
+                        ids.includes(m.title) ||
+                        ids.some(id => String(m.title).includes(String(id)))
+                    );
                 }
-                
+
                 const repAskConfig = vscode.workspace.getConfiguration('repoAsk');
                 const confProfile = repAskConfig.get('confluence');
-                const confUrl = String((confProfile && typeof confProfile === 'object' ? confProfile.url : '') || repAskConfig.get('confluenceBaseUrl') || 'http://127.0.0.1:8001').replace(/\/$/, '');
+                const confUrl = String((confProfile && typeof confProfile === 'object' ? confProfile.url : '') || 'http://127.0.0.1:8001').replace(/\/$/, '');
                 
                 const jiraProfile = repAskConfig.get('jira');
-                const jiraUrl = String((jiraProfile && typeof jiraProfile === 'object' ? jiraProfile.url : '') || repAskConfig.get('jiraBaseUrl') || 'http://127.0.0.1:8002').replace(/\/$/, '');
+                const jiraUrl = String((jiraProfile && typeof jiraProfile === 'object' ? jiraProfile.url : '') || 'http://127.0.0.1:8002').replace(/\/$/, '');
 
                 const summaryLines = filtered.map(m => {
                     let fullUrl = m.url || '';
@@ -212,7 +217,12 @@ function createLanguageModelTools(deps) {
                 const allMetadata = readAllMetadata();
                 let filtered = allMetadata;
                 if (ids.length > 0) {
-                    filtered = allMetadata.filter(m => ids.includes(String(m.id)) || ids.includes(m.id));
+                    filtered = allMetadata.filter(m => 
+                        ids.includes(String(m.id)) || 
+                        ids.includes(m.id) ||
+                        ids.includes(m.title) ||
+                        ids.some(id => String(m.title).includes(String(id)))
+                    );
                 }
                 const results = [];
                 for (const m of filtered) {

@@ -17,17 +17,8 @@ function toSentenceCase(text) {
     return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
-function toThinkingMarkdown(message) {
-    const sentence = toSentenceCase(message);
-    const quoted = sentence
-        .split(/\r?\n/)
-        .map((line) => `> ${line}`)
-        .join('\n');
-    return `> **Thinking**\n${quoted}`;
-}
-
 function emitThinking(response, message) {
-    response.markdown(toThinkingMarkdown(message));
+    response.progress(toSentenceCase(message));
 }
 
 function splitIntoChunks(text, maxChars = CHAT_TEXT_CHUNK_SIZE) {

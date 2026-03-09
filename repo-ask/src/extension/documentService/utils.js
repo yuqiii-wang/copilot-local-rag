@@ -97,13 +97,11 @@ function resolveSourceUrl(source) {
     if (isJira) {
       const jiraProfile = configuration.get('jira');
       const jiraObjectUrl = jiraProfile && typeof jiraProfile === 'object' ? jiraProfile.url : undefined;
-      const jiraLegacyUrl = configuration.get('jiraBaseUrl');
-      base = String(jiraObjectUrl || jiraLegacyUrl || 'http://127.0.0.1:8002').replace(/\/$/, '');
+      base = String(jiraObjectUrl || 'http://127.0.0.1:8002').replace(/\/$/, '');
     } else {
       const confProfile = configuration.get('confluence');
       const confObjectUrl = confProfile && typeof confProfile === 'object' ? confProfile.url : undefined;
-      const confLegacyUrl = configuration.get('confluenceBaseUrl');
-      base = String(confObjectUrl || confLegacyUrl || 'http://127.0.0.1:8001').replace(/\/$/, '');
+      base = String(confObjectUrl || 'http://127.0.0.1:8001').replace(/\/$/, '');
     }
 
     if (!candidate.startsWith('/')) {

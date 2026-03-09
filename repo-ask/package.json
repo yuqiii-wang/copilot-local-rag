@@ -13,7 +13,6 @@
   "activationEvents": [
     "onView:repo-ask-documents",
     "onCommand:repo-ask.refresh",
-
     "onCommand:repo-ask.rank",
     "onCommand:repo-ask.check",
     "onCommand:repo-ask.checkAllDocs",
@@ -224,11 +223,10 @@
           "icon": "media/icon.svg"
         }
       ]
-    }
-  },
-  "configuration": {
-    "title": "RepoAsk",
-    "properties": {
+    },
+    "configuration": {
+      "title": "RepoAsk",
+      "properties": {
         "repoAsk.initKeywordNum": {
           "type": "number",
           "default": 50,
@@ -242,7 +240,7 @@
             "url": "http://localhost:8001",
             "spaceKey": "",
             "ancestorsPageId": "",
-            "token": ""
+            "securityToken": ""
           },
           "description": "Confluence connection profile used by RepoAsk.",
           "additionalProperties": false,
@@ -267,7 +265,7 @@
               "type": "string",
               "description": "Optional default ancestors page id."
             },
-            "token": {
+            "securityToken": {
               "type": "string",
               "description": "Optional Confluence access token."
             }
@@ -279,7 +277,7 @@
             "key": "ALM",
             "isDefault": true,
             "url": "http://localhost:8002",
-            "token": "",
+            "securityToken": "",
             "regex": [
               "PROJECT-\\d+"
             ]
@@ -299,7 +297,7 @@
               "type": "string",
               "description": "Base URL for the Jira API endpoint."
             },
-            "token": {
+            "securityToken": {
               "type": "string",
               "description": "Optional Jira access token."
             },
@@ -314,17 +312,8 @@
               ]
             }
           }
-        },
-        "repoAsk.confluenceBaseUrl": {
-          "type": "string",
-          "default": "http://localhost:8001",
-          "description": "Base URL for the Confluence API used by repoaskrefresh operations."
-        },
-        "repoAsk.jiraBaseUrl": {
-          "type": "string",
-          "default": "http://localhost:8002",
-          "description": "Base URL for the Jira API used by repoask Jira operations."
         }
+      }
     }
   },
   "scripts": {
