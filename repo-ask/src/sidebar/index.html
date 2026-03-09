@@ -205,8 +205,16 @@
             if (refreshIconBtn) {
                 if (isDownloadingFromSource) {
                     refreshIconBtn.classList.add('is-spinning');
+                    refreshIconBtn.disabled = true;
+                    refreshIconBtn.style.opacity = '0.5';
+                    refreshIconBtn.style.cursor = 'not-allowed';
+                    refreshIconBtn.title = 'Refresh in progress...';
                 } else {
                     refreshIconBtn.classList.remove('is-spinning');
+                    refreshIconBtn.disabled = false;
+                    refreshIconBtn.style.opacity = '1';
+                    refreshIconBtn.style.cursor = 'pointer';
+                    refreshIconBtn.title = 'Refresh Documents';
                 }
             }
         }

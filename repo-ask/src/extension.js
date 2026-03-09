@@ -58,6 +58,8 @@ function setupExtension(context) {
         rankDocumentsByIdf
     });
 
+    documentService.syncDefaultDocs(context.extensionPath);
+
     const sidebar = createSidebarController({
         vscode,
         context,

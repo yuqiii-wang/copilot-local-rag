@@ -1,5 +1,5 @@
 module.exports = function(context) {
-  const { vscode, storagePath, indexStoragePath, fetchConfluencePage, fetchAllConfluencePages, fetchConfluencePageChildren, fetchJiraIssue, truncate, tokenize, htmlToMarkdown, generateKeywords, generateExtendedKeywords, generateSummary, readAllMetadata, writeDocumentFiles, readDocumentContent, rankDocumentsByIdf, bm25Index, keywordsIndex, rankLocalDocuments, checkLocalDocumentsAgentic,        annotateDocumentByArg, annotateAllDocuments, annotateStoredDocument, generateAnnotationWithLlm, localizeMarkdownImageLinks, normalizeMarkdownLinkTarget, downloadImageAsset, downloadDataUriAsset, resolveAbsoluteImageUrl, isDataUri, determineImageExtension, mimeTypeToExtension, getKeywordConfig, buildKeywordOnlyIndexText, rebuildKeywordsIndexFromMetadata, normalizeKeywordsInput, cleanKeywords, normalizeMetadataKeywordFields, mergeKeywordsPreservingSignals, appendKeywordsToExisting, writeDocumentPromptFile, formatMetadataEntries, getStoredMetadataById, generateStoredMetadataById, updateStoredMetadataById, removeDocumentFromIndicesById, sanitizeFileSegment, getWorkspaceRootPath, getPageHtml, isLikelyHtml, extractHtmlTagData, resolveSourceUrl } = context;
+  const { fs, path, vscode, storagePath, indexStoragePath, fetchConfluencePage, fetchAllConfluencePages, fetchConfluencePageChildren, fetchJiraIssue, truncate, tokenize, htmlToMarkdown, generateKeywords, generateExtendedKeywords, generateSummary, readAllMetadata, writeDocumentFiles, readDocumentContent, rankDocumentsByIdf, bm25Index, keywordsIndex, rankLocalDocuments, checkLocalDocumentsAgentic,        annotateDocumentByArg, annotateAllDocuments, annotateStoredDocument, generateAnnotationWithLlm, localizeMarkdownImageLinks, normalizeMarkdownLinkTarget, downloadImageAsset, downloadDataUriAsset, resolveAbsoluteImageUrl, isDataUri, determineImageExtension, mimeTypeToExtension, getKeywordConfig, buildKeywordOnlyIndexText, rebuildKeywordsIndexFromMetadata, normalizeKeywordsInput, cleanKeywords, normalizeMetadataKeywordFields, mergeKeywordsPreservingSignals, appendKeywordsToExisting, writeDocumentPromptFile, formatMetadataEntries, getStoredMetadataById, generateStoredMetadataById, updateStoredMetadataById, removeDocumentFromIndicesById, sanitizeFileSegment, getWorkspaceRootPath, getPageHtml, isLikelyHtml, extractHtmlTagData, resolveSourceUrl } = context;
 
 async function refreshDocument(pageArg, options = {}) {
   const page = await fetchConfluencePage(pageArg);
@@ -211,7 +211,40 @@ async function finalizeBm25KeywordsForDocuments(docIds = []) {
   rebuildKeywordsIndexFromMetadata(refreshedMetadata);
 }
 
+  function syncDefaultDocs(extensionPath) {
+    const defaultDocsSrcDir = path.join(extensionPath, 'src', 'default_docs');
+    if (!fs.existsSync(defaultDocsSrcDir)) {
+      return;
+    }
+
+    const defaultDocFolders = fs.readdirSync(defaultDocsSrcDir).filter(f => fs.statSync(path.join(defaultDocsSrcDir, f)).isDirectory());
+    let addedAny = false;
+    for (const folder of defaultDocFolders) {
+      if (!fs.existsSync(path.join(storagePath, folder))) {
+        const srcFolder = path.join(defaultDocsSrcDir, folder);
+        const mdPath = path.join(srcFolder, 'content.md');
+        const jsonPath = path.join(srcFolder, 'metadata.json');
+        
+        if (fs.existsSync(mdPath) && fs.existsSync(jsonPath)) {
+          try {
+            const mdContent = fs.readFileSync(mdPath, 'utf8');
+            const metadata = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+            writeDocumentFiles(storagePath, folder, mdContent, metadata);
+            bm25Index.upsertDocument(folder, mdContent);
+            addedAny = true;
+          } catch (e) {
+            console.error(`Failed to sync default doc ${folder}:`, e);
+          }
+        }
+      }
+    }
+    if (addedAny) {
+      context.rebuildKeywordsIndexFromMetadata(readAllMetadata(storagePath));
+    }
+  }
+
   return {
+    syncDefaultDocs,
     refreshDocument,
     refreshConfluenceHierarchy,
     refreshAllDocuments,

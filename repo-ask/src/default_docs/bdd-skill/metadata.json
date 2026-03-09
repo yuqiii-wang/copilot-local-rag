@@ -1,0 +1,19 @@
+{
+  "id": "bdd-skill",
+  "title": "Behavior-Driven Development (BDD) Skill",
+  "author": "repoask-system",
+  "last_updated": "2026-03-10T00:00:00.000Z",
+  "parent_confluence_topic": "Skills",
+  "keywords": [
+    "bdd",
+    "behavior-driven-development",
+    "given-when-then",
+    "gherkin",
+    "testing",
+    "acceptance criteria",
+    "scenarios",
+    "tdd",
+    "sdd"
+  ],
+  "summary": "A guide on using Behavior-Driven Development (BDD) with Given-When-Then scenarios, defining acceptance criteria, and integrating with testing frameworks like Jest, Playwright, and Cypress."
+}

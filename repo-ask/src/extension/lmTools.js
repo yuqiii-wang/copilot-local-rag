@@ -283,8 +283,23 @@ function createLanguageModelTools(deps) {
                             }
                         }
                     }
-                    if (!diff || !diff.trim()) {
-                        return toToolResult('No code changes found compared to main/master.', { diff: '' });
+                    if (!diff || diff.trim().length < 50) {
+                        const fs = require('fs');
+                        const path = require('path');
+                        const promptsDir = path.join(workspaceFolder, '.github', 'prompts');
+                        let prompts = [];
+                        if (fs.existsSync(promptsDir)) {
+                            prompts = fs.readdirSync(promptsDir).filter(f => f.endsWith('.prompt.md')).map(f => {
+                                return { file: f, content: fs.readFileSync(path.join(promptsDir, f), 'utf8') };
+                            });
+                        }
+                        
+                        if (prompts.length > 0) {
+                            let promptsContent = prompts.map(p => `--- ${p.file} ---\n${p.content}`).join('\n\n');
+                            return toToolResult(`Little or no code changes found.\n\nPrompts found in .github/prompts/:\n${promptsContent}\n\nINSTRUCTION FOR AI: Based on the little/no code change, check the prompts above. If they contain any Jira or task to do, understand the project architecture and start implementing the Jira description. If there's no clear Jira/task, do not write code but guide the user to load a Jira to prompts, run 'git checkout -b <new-branch>', and possibly manually add a TODO list.`, { diff: diff || '' });
+                        } else {
+                            return toToolResult(`Little or no code changes found, and no Jira/TODO prompts found in .github/prompts.\n\nINSTRUCTION FOR AI: Do not write code. Give a guide to the user explaining that they should load a Jira to prompts, run 'git checkout -b <new-branch>', and possibly manually add a TODO list.`, { diff: diff || '' });
+                        }
                     }
                     return toToolResult(`Git diff:\n\n\`\`\`diff\n${diff}\n\`\`\``, { diff });
                 } catch (error) {

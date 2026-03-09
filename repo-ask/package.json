@@ -4,7 +4,6 @@
   "description": "A VS Code plugin for searching and managing Confluence documentation",
   "version": "0.1.0",
   "publisher": "repo-ask",
-  "icon": "media/icon.svg",
   "engines": {
     "vscode": ">=1.106.0"
   },
@@ -280,7 +279,8 @@
             "url": "http://localhost:8002",
             "securityToken": "",
             "regex": [
-              "PROJECT-\\d+"
+              "PROJECT-\\d+",
+              "PROJ-\\d+"
             ]
           },
           "description": "Jira connection profile used by RepoAsk.",
@@ -309,7 +309,8 @@
                 "type": "string"
               },
               "default": [
-                "PROJECT-\\d+"
+                "PROJECT-\\d+",
+                "PROJ-\\d+"
               ]
             }
           }

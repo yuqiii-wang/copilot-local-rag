@@ -72,6 +72,7 @@ function createDocumentService(deps) {
   const _ranking = ranking(proxyContext); Object.assign(context, _ranking);
 
   return {
+    syncDefaultDocs: _sync.syncDefaultDocs,
     rankLocalDocuments: _ranking.rankLocalDocuments,
     checkLocalDocumentsAgentic: _ranking.checkLocalDocumentsAgentic,
     refreshDocument: _sync.refreshDocument,

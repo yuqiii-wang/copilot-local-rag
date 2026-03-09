@@ -1,0 +1,9 @@
+{
+  "id": "repoask-guide",
+  "title": "Getting Started with @repoask",
+  "author": "repoask-system",
+  "last_updated": "2026-03-10T00:00:00.000Z",
+  "parent_confluence_topic": "Guides",
+  "keywords": ["repoask", "guide", "tutorial", "check", "rank", "refresh", "annotate", "commands", "tools"],
+  "summary": "A comprehensive guide on how to use @repoask tools, commands, and chat features to synchronize, rank, and check documentation."
+}
