@@ -4,6 +4,7 @@
   "description": "A VS Code plugin for searching and managing Confluence documentation",
   "version": "0.1.0",
   "publisher": "repo-ask",
+  "icon": "media/icon.svg",
   "engines": {
     "vscode": ">=1.106.0"
   },
@@ -60,7 +61,7 @@
             "limit": {
               "type": "number",
               "description": "Optional max number of results to return.",
-              "default": 5
+              "default": 3
             }
           }
         }
@@ -91,7 +92,7 @@
             "limit": {
               "type": "number",
               "description": "Optional max number of references to return.",
-              "default": 5
+              "default": 3
             }
           }
         }

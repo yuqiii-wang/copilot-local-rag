@@ -65,7 +65,20 @@ async function generateAnnotationWithLlm(metadata, content) {
         summary: fallbackSummary
       };
     }
-    const prompt = ['You are annotating a local Confluence document metadata record.', 'Return valid JSON only with shape: {"summary":"...","keywords":"keyword-a, keyword-b"}.', 'Summary must be just a one or two sentence description.', 'Keywords must be specific technical terms in one comma-separated string.', 'Include a few close synonyms or related alternate terms that help retrieval.', `Title: ${metadata.title || ''}`, `Topic: ${metadata.parent_confluence_topic || ''}`, `Author: ${metadata.author || ''}`, 'Document markdown content:', truncate(content, 100000)].join('\n');
+    const prompt = [
+      'You are annotating a local Confluence document metadata record.',
+      'Return valid JSON only with shape: {"summary":"...","keywords":"keyword-a, keyword-b"}.',
+      'Summary must be just a one or two sentence description.',
+      'Keywords must be specific technical terms in one comma-separated string.',
+      'Take existing document keywords (provided below) and filter out non-business-related words or stop words (e.g., "confluence", "jira", "and", "the", "that", etc.).',
+      'Include a few close synonyms or related alternate terms that help retrieval.',
+      `Title: ${metadata.title || ''}`,
+      `Topic: ${metadata.parent_confluence_topic || ''}`,
+      `Author: ${metadata.author || ''}`,
+      `Existing Keywords: ${originalKeywords.join(', ')}`,
+      'Document markdown content:',
+      truncate(content, 100000)
+    ].join('\\n');
     const response = await model.sendRequest([vscode.LanguageModelChatMessage.User(prompt)]);
     let responseText = '';
     for await (const fragment of response.text) {
@@ -74,10 +87,13 @@ async function generateAnnotationWithLlm(metadata, content) {
     const parsed = extractJsonObject(responseText) || {};
     const llmKeywords = cleanKeywords(parsed.keywords);
     const llmSummary = String(parsed.summary || '').trim();
-    const appendedWithLlm = appendKeywordsToExisting(originalKeywords, [...llmKeywords, ...fallbackKeywords], getKeywordConfig().DEFAULT_KEYWORD_LIMIT);
+    
+    // Replace original keywords entirely with the LLM output, filling with fallback if needed
+    const combinedLlmKeywords = cleanKeywords([...llmKeywords, ...fallbackKeywords]).slice(0, getKeywordConfig().DEFAULT_KEYWORD_LIMIT);
     const fallbackMergedKeywords = appendKeywordsToExisting(originalKeywords, fallbackKeywords, getKeywordConfig().DEFAULT_KEYWORD_LIMIT);
+    
     return {
-      keywords: appendedWithLlm.length > 0 ? appendSynonymKeywords(appendedWithLlm) : appendSynonymKeywords(fallbackMergedKeywords),
+      keywords: llmKeywords.length > 0 ? appendSynonymKeywords(combinedLlmKeywords) : appendSynonymKeywords(fallbackMergedKeywords),
       summary: llmSummary || fallbackSummary
     };
   } catch {

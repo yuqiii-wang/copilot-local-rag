@@ -36,29 +36,64 @@ function getHeaders(securityToken) {
     return headers;
 }
 
+function extractConfluencePageIdFromArg(pageArg) {
+    const raw = String(pageArg || '').trim();
+    if (!raw) {
+        return null;
+    }
+    const directMatch = raw.match(/(?:[?&]pageId=|\/pages\/viewpage\.action\?pageId=)(\d+)/i);
+    if (directMatch && directMatch[1]) {
+        return directMatch[1];
+    }
+    return '';
+}
+
+function buildResolveCandidates(pageArg) {
+    const raw = String(pageArg || '').trim();
+    if (!raw) {
+        return [];
+    }
+    const id = extractConfluencePageIdFromArg(raw);
+    if (id) {
+        return [id, raw];
+    }
+    return [raw];
+}
+
 async function fetchConfluencePage(pageArg) {
     const { url: base, securityToken } = getConfluenceConfig();
-    const encodedArg = encodeURIComponent(pageArg);
-    const resolveUrl = `${base}/rest/api/content/resolve?arg=${encodedArg}`;
     const headers = getHeaders(securityToken);
+    buildResolveCandidates(pageArg);
 
-    try {
-        const response = await axios.get(resolveUrl, { 
-            timeout: REQUEST_TIMEOUT_MS, 
-            headers,
-            maxContentLength: Infinity,
-            maxBodyLength: Infinity
-        });
-        return response.data;
-    } catch {
-        const response = await axios.get(`${base}/rest/api/content/${encodeURIComponent(pageArg)}?expand=body.storage`, { 
-            timeout: REQUEST_TIMEOUT_MS, 
-            headers,
-            maxContentLength: Infinity,
-            maxBodyLength: Infinity
-        });
-        return response.data;
+    let lastError = null;
+    for (const candidate of buildResolveCandidates(pageArg)) {
+        const resolveUrl = `${base}/rest/api/content/${encodeURIComponent(candidate)}`;
+
+        try {
+            const response = await axios.get(resolveUrl, { 
+                timeout: REQUEST_TIMEOUT_MS, 
+                headers,
+                maxContentLength: Infinity,
+                maxBodyLength: Infinity
+            });
+            return response.data;
+        } catch (error) {
+            lastError = error;
+        }
+        
+        try {
+            const response = await axios.get(`${base}/rest/api/content/${encodeURIComponent(pageArg)}?expand=body.storage`, { 
+                timeout: REQUEST_TIMEOUT_MS, 
+                headers,
+                maxContentLength: Infinity,
+                maxBodyLength: Infinity
+            });
+            return response.data;
+        } catch (error) {
+            lastError = error;
+        }
     }
+    throw lastError || new Error('Failed to fetch Confluence page with provided argument.');
 }
 
 async function fetchAllConfluencePages() {

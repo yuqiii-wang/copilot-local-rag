@@ -75,6 +75,7 @@ function createDocumentService(deps) {
     rankLocalDocuments: _ranking.rankLocalDocuments,
     checkLocalDocumentsAgentic: _ranking.checkLocalDocumentsAgentic,
     refreshDocument: _sync.refreshDocument,
+    refreshConfluenceHierarchy: _sync.refreshConfluenceHierarchy,
     refreshAllDocuments: _sync.refreshAllDocuments,
     refreshJiraIssue: _sync.refreshJiraIssue,
     annotateDocumentByArg: _annotation.annotateDocumentByArg,
