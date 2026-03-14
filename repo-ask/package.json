@@ -20,7 +20,8 @@
     "onLanguageModelTool:repoask_read_content",
     "onLanguageModelTool:repoask_new_code_check",
     "onLanguageModelTool:repoask_read_repo_prompts",
-    "onLanguageModelTool:repoask_code_splitter"
+    "onLanguageModelTool:repoask_code_splitter",
+    "onLanguageModelTool:repoask_optimize_query"
   ],
   "main": "index.js",
   "contributes": {
@@ -216,6 +217,32 @@
               "type": "array",
               "items": { "type": "string" },
               "description": "Proposed classes or functions to search for"
+            }
+          }
+        }
+      },
+      {
+        "name": "repoask_optimize_query",
+        "tags": [
+          "repoask",
+          "query",
+          "optimize"
+        ],
+        "toolReferenceName": "repoaskOptimizeQuery",
+        "displayName": "RepoAsk Optimize Query",
+        "modelDescription": "Analyze and refine user queries to improve clarity and relevance, extract keywords, match against existing tags, and identify relevant documents.",
+        "userDescription": "Optimize query for better document matching.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(search-refresh)",
+        "inputSchema": {
+          "type": "object",
+          "required": [
+            "query"
+          ],
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "User query to optimize."
             }
           }
         }

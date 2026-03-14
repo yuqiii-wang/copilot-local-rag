@@ -14,7 +14,7 @@ module.exports = function registerRankTool(deps) {
 
                 const ranked = documentService.rankLocalDocuments(query, limit);
                 if (!ranked || ranked.length === 0) {
-                    return toToolResult('No matching local documents found for the query.', { results: [] });
+                    return toToolResult('No matching local documents found for the query. Please search the document store in the sidebar to find the document ID, then use that ID in your query to retrieve the specific document.', { results: [] });
                 }
 
                 const repAskConfig = vscode.workspace.getConfiguration('repoAsk');

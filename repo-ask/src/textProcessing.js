@@ -1,10 +1,33 @@
 const TurndownService = require('turndown');
 const {
     tokenize: tokenizeFromTokenization,
-    generate_ngrams,
-    extract_capital_sequences,
-    generateExtendedKeywords: generateExtendedKeywordsFromTokenization
+    generateNGrams
 } = require('./tokenization');
+
+// Simple n-gram generator for backward compatibility
+function generate_ngrams(tokens, minSize = 1, maxSize = 2) {
+    const ngrams = [];
+    for (let n = minSize; n <= maxSize; n++) {
+        if (tokens.length >= n) {
+            for (let i = 0; i <= tokens.length - n; i++) {
+                ngrams.push(tokens.slice(i, i + n).join(' '));
+            }
+        }
+    }
+    return ngrams;
+}
+
+// Simple capital sequence extractor for backward compatibility
+function extract_capital_sequences(text) {
+    const capitalRegex = /\b[A-Z][A-Z]+\b/g;
+    const matches = text.match(capitalRegex) || [];
+    return [...new Set(matches)];
+}
+
+// Simple extended keywords generator for backward compatibility
+function generateExtendedKeywordsFromTokenization(keywords) {
+    return keywords.map(keyword => keyword.toLowerCase());
+}
 
 const turndownService = new TurndownService({
     headingStyle: 'atx',

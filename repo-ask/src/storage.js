@@ -172,16 +172,6 @@ function deleteDocumentFiles(storagePath, docId) {
     };
 }
 
-function formatDocumentDetails(metadata, content) {
-    return [
-        'Content:',
-        content || 'No content available.',
-        '',
-        'Metadata:',
-        `- title: ${metadata.title || 'Unknown'}`
-    ].join('\n');
-}
-
 module.exports = {
     ensureStoragePath,
     ensureIndexStoragePath,
@@ -190,6 +180,5 @@ module.exports = {
     readAllMetadata,
     writeDocumentFiles,
     readDocumentContent,
-    deleteDocumentFiles,
-    formatDocumentDetails
+    deleteDocumentFiles
 };

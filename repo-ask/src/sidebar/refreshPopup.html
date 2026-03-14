@@ -11,6 +11,9 @@
             <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
                 <input type="radio" name="syncType" value="all"> All Documents
             </label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                <input type="radio" name="syncType" value="reset"> Reset to Default
+            </label>
         </div>
         
         <div id="sync-single-container">
@@ -20,6 +23,10 @@
             <p style="margin:0;">Sync all documents from a parent Confluence page?</p>
     <input type="text" id="sync-all-input" class="search-input" placeholder="Enter a Confluence parent URL" style="width:100%; margin-top: 8px;">
             <p style="margin-top:8px; font-weight:bold;">All doc sync could take a long time...</p>
+        </div>
+        <div id="sync-reset-container" style="display:none; color: var(--vscode-descriptionForeground); font-size: 12px;">
+            <p style="margin:0;">Remove all current documents and reload default docs only.</p>
+            <p style="margin-top:8px; font-weight:bold; color: var(--vscode-editorError-foreground);">This will delete all existing local documents!</p>
         </div>
     </div>
     <div class="refresh-popup-footer" style="text-align:right;">

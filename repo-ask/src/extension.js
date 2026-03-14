@@ -20,7 +20,7 @@ const {
     readAllMetadata,
     readDocumentContent,
     deleteDocumentFiles,
-    formatDocumentDetails,
+
     writeDocumentFiles
 } = require('./storage');
 const { findRelevantDocuments, rankDocumentsByIdf } = require('./docIndex/relevance');
@@ -28,6 +28,7 @@ const { parseRefreshArg } = require('./extension/tools/llm');
 const { createDocumentService } = require('./extension/documentService');
 const { createSidebarController } = require('./extension/sidebarController');
 const { createLanguageModelTools } = require('./extension/tools/lmTools');
+const { createRefreshCommand } = require('./extension/commands');
 const { loadWorkspacePromptContext } = require('./extension/promptContext');
 const { answerGeneralPromptQuestion } = require('./extension/chat/generalAnswer');
 const { answerCodePromptQuestion } = require('./extension/chat/codeAnswer');
@@ -81,6 +82,7 @@ function setupExtension(context) {
         parseRefreshArg,
         fetchConfluencePage,
         setSidebarSyncStatus: sidebar.setSidebarSyncStatus,
+        setSidebarSyncError: sidebar.setSidebarSyncError,
         refreshSidebarView: sidebar.refreshSidebarView,
         upsertSidebarDocument: sidebar.upsertSidebarDocument,
         readAllMetadata: () => readAllMetadata(storagePath),
@@ -92,6 +94,15 @@ function setupExtension(context) {
 
     const webviewProviderDisposable = vscode.window.registerWebviewViewProvider('repo-ask-documents', sidebar.sidebarProvider);
     const lmToolDisposables = lmTools.registerRepoAskLanguageModelTools();
+
+    // Register refresh command with 10-second timeout
+    const refreshCommandDisposable = createRefreshCommand({
+        vscode,
+        documentService,
+        sidebar,
+        storagePath,
+        readAllMetadata
+    });
 
     let repoAskDocParticipant;
     let repoAskCodeParticipant;
@@ -154,7 +165,8 @@ function setupExtension(context) {
 
     const baseSubscriptions = [
         webviewProviderDisposable,
-        ...lmToolDisposables
+        ...lmToolDisposables,
+        refreshCommandDisposable
     ];
 
     if (repoAskDocParticipant) {

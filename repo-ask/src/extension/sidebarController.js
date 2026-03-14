@@ -1,12 +1,7 @@
 const fs = require('fs');
 const path = require('path');
-const MarkdownIt = require('markdown-it');
+const { createOpenDocCommand, createMetadataCommands, createSearchCommand, createPromptsCommand, createDeleteCommand, createResetCommand } = require('./commands');
 
-const markdownRenderer = new MarkdownIt({
-    html: false,
-    linkify: true,
-    breaks: true
-});
 
 function createSidebarController(deps) {
     const {
@@ -19,10 +14,19 @@ function createSidebarController(deps) {
         deleteDocumentFiles
     } = deps;
 
+    // Create command instances
+    const openDoc = createOpenDocCommand(deps);
+    const { generateMetadata, saveMetadata } = createMetadataCommands(deps);
+    const searchDocs = createSearchCommand(deps);
+    const addToPrompts = createPromptsCommand(deps);
+    const deleteDoc = createDeleteCommand(deps);
+    const resetToDefaultDocs = createResetCommand(deps);
+
     let docsWebviewView;
     let sidebarSyncStatus = '';
     let sidebarSyncError = '';
     let sidebarSyncSuccess = '';
+
 
     const sidebarProvider = {
         resolveWebviewView: async (webviewView) => {
@@ -59,170 +63,31 @@ function createSidebarController(deps) {
                     }
 
                     if (message?.command === 'openDoc' && message.docId) {
-                        const metadata = readAllMetadata(storagePath).find(doc => String(doc.id) === String(message.docId));
-                        const rawContent = metadata
-                            ? (readDocumentContent(storagePath, metadata.id) || 'No local markdown content found.')
-                            : 'No local markdown content found.';
-                        const content = metadata
-                            ? rewriteMarkdownImageLinksForWebview(rawContent, metadata.id, docsWebviewView.webview)
-                            : rawContent;
-                        const contentHtml = renderMarkdownForWebview(content);
-
-                        docsWebviewView.webview.postMessage({
-                            command: 'docDetails',
-                            payload: {
-                                id: message.docId,
-                                content,
-                                contentHtml,
-                                metadata: metadata || null
-                            }
-                        });
+                        await openDoc(message, docsWebviewView);
                     }
 
                     if (message?.command === 'generateMetadata' && message.docId) {
-                        const docId = String(message.docId);
-                        docsWebviewView.webview.postMessage({
-                            command: 'metadataGenerationState',
-                            payload: {
-                                docId,
-                                isGenerating: true
-                            }
-                        });
-                        try {
-                            const updatedMetadata = await documentService.generateStoredMetadataById(docId);
-                            upsertSidebarDocument(updatedMetadata);
-                            docsWebviewView.webview.postMessage({
-                                command: 'metadataUpdated',
-                                payload: {
-                                    id: updatedMetadata.id,
-                                    metadata: updatedMetadata
-                                }
-                            });
-                            vscode.window.showInformationMessage(`Generated summary and keywords for: ${updatedMetadata.title || updatedMetadata.id}`);
-                        } catch (error) {
-                            vscode.window.showErrorMessage(`Failed to generate metadata: ${error.message}`);
-                        } finally {
-                            docsWebviewView.webview.postMessage({
-                                command: 'metadataGenerationState',
-                                payload: {
-                                    docId,
-                                    isGenerating: false
-                                }
-                            });
-                        }
+                        await generateMetadata(message, docsWebviewView, upsertSidebarDocument);
                     }
 
                     if (message?.command === 'saveMetadata' && message.docId) {
-                        try {
-                            const updatedMetadata = documentService.updateStoredMetadataById(String(message.docId), {
-                                type: message.type,
-                                summary: message.summary,
-                                keywords: message.keywords
-                            });
-                            upsertSidebarDocument(updatedMetadata);
-                            docsWebviewView.webview.postMessage({
-                                command: 'metadataUpdated',
-                                payload: {
-                                    id: updatedMetadata.id,
-                                    metadata: updatedMetadata
-                                }
-                            });
-                            vscode.window.showInformationMessage(`Saved metadata for: ${updatedMetadata.title || updatedMetadata.id}`);
-                        } catch (error) {
-                            vscode.window.showErrorMessage(`Failed to save metadata: ${error.message}`);
-                        }
+                        await saveMetadata(message, upsertSidebarDocument);
                     }
 
                     if (message?.command === 'searchDocs') {
-                        const query = String(message.query || '').trim();
-                        const filterType = String(message.type || '').trim();
-                        let results = query.length > 0
-                            ? documentService.rankLocalDocuments(query, 50)
-                            : readAllMetadata(storagePath)
-                                .sort((a, b) => String(b.last_updated).localeCompare(String(a.last_updated)));
-
-                        if (filterType) {
-                            // If doc has no type, we fallback treating it as 'confluence' due to historical data or just keep original logic
-                            results = results.filter(doc => (doc.type || 'confluence') === filterType);
-                        }
-
-                        docsWebviewView.webview.postMessage({
-                            command: 'searchResults',
-                            payload: results.map(doc => ({
-                                id: doc.id,
-                                title: doc.title || 'Untitled'
-                            }))
-                        });
+                        await searchDocs(message, docsWebviewView);
                     }
 
                     if (message?.command === 'addToPrompts') {
-                        const docId = String(message.docId || '').trim();
-                        if (!docId) {
-                            vscode.window.showWarningMessage('Select a document first to add it to prompts.');
-                            return;
-                        }
-
-                        const metadata = readAllMetadata(storagePath).find(doc => String(doc.id) === docId);
-                        if (!metadata) {
-                            vscode.window.showWarningMessage('Document metadata not found. Run refresh and try again.');
-                            return;
-                        }
-
-                        const content = readDocumentContent(storagePath, metadata.id);
-                        if (!content || String(content).trim().length === 0) {
-                            vscode.window.showWarningMessage('Local document content is empty. Refresh this doc and try again.');
-                            return;
-                        }
-
-                        try {
-                            const createdPath = documentService.writeDocumentPromptFile(metadata, content);
-                            docsWebviewView.webview.postMessage({ command: 'addToPromptsSuccess', payload: createdPath });
-                        } catch (error) {
-                            docsWebviewView.webview.postMessage({ command: 'addToPromptsError', payload: error.message });
-                        }
+                        await addToPrompts(message, docsWebviewView);
                     }
 
                     if (message?.command === 'deleteDoc') {
-                        const docId = String(message.docId || '').trim();
-                        const docTitle = String(message.title || docId || 'this document').trim();
-                        if (!docId) {
-                            vscode.window.showWarningMessage('Select a document first to delete.');
-                            return;
-                        }
+                        await deleteDoc(message, docsWebviewView, refreshSidebarView);
+                    }
 
-                        try {
-                            const confirmation = await vscode.window.showWarningMessage(
-                                `Delete local document "${docTitle}"?`,
-                                { modal: true },
-                                'Delete'
-                            );
-                            if (confirmation !== 'Delete') {
-                                return;
-                            }
-
-                            const deletion = deleteDocumentFiles(storagePath, docId);
-                            if (typeof documentService.removeDocumentFromIndicesById === 'function') {
-                                documentService.removeDocumentFromIndicesById(docId);
-                            }
-                            docsWebviewView.webview.postMessage({
-                                command: 'docDeleted',
-                                payload: { id: docId }
-                            });
-                            refreshSidebarView();
-                            if (deletion.deletedCount > 0) {
-                                vscode.window.showInformationMessage(`Deleted local files (.md/.json) for: ${docId}`);
-                            } else {
-                                const docFolderPath = path.join(storagePath, String(docId));
-                                vscode.window.showWarningMessage(
-                                    `Delete may have failed for ${docId}. Manually delete this folder if it still exists:\n- ${docFolderPath}`
-                                );
-                            }
-                        } catch (error) {
-                            const docFolderPath = path.join(storagePath, String(docId));
-                            vscode.window.showErrorMessage(
-                                `Failed to delete ${docId}: ${error.message}. Please manually delete:\n- ${docFolderPath}`
-                            );
-                        }
+                    if (message?.command === 'resetToDefaultDocs') {
+                        await resetToDefaultDocs(message, docsWebviewView, refreshSidebarView, context);
                     }
                 });
 
@@ -268,17 +133,7 @@ function createSidebarController(deps) {
         });
     }
 
-    function setSidebarSyncSuccess(message) {
-        sidebarSyncSuccess = String(message || '');
-        if (!docsWebviewView) {
-            return;
-        }
 
-        docsWebviewView.webview.postMessage({
-            command: 'syncSuccess',
-            payload: sidebarSyncSuccess
-        });
-    }
 
     function refreshSidebarView() {
         if (!docsWebviewView) {
@@ -373,45 +228,7 @@ function createSidebarController(deps) {
             .replace('__REFRESH_POPUP__', popupHtml);
     }
 
-    function rewriteMarkdownImageLinksForWebview(markdownContent, docId, webview) {
-        const markdown = String(markdownContent || '');
-        const imagePattern = /!\[([^\]]*)\]\(([^)]+)\)/g;
 
-        return markdown.replace(imagePattern, (fullMatch, alt, srcRaw) => {
-            const source = normalizeMarkdownLinkTarget(srcRaw);
-            if (!source || /^https?:\/\//i.test(source) || /^data:image\//i.test(source)) {
-                return fullMatch;
-            }
-
-            const filePath = path.isAbsolute(source)
-                ? source
-                : path.join(storagePath, String(docId), source.replace(/\//g, path.sep));
-
-            if (!fs.existsSync(filePath)) {
-                return fullMatch;
-            }
-
-            const webviewUri = webview.asWebviewUri(vscode.Uri.file(filePath)).toString();
-            return `![${String(alt || '').trim()}](${webviewUri})`;
-        });
-    }
-
-    function normalizeMarkdownLinkTarget(rawValue) {
-        const value = String(rawValue || '').trim();
-        if (!value) {
-            return '';
-        }
-
-        if (value.startsWith('<') && value.endsWith('>')) {
-            return value.slice(1, -1).trim();
-        }
-
-        return value;
-    }
-
-    function renderMarkdownForWebview(markdownContent) {
-        return markdownRenderer.render(String(markdownContent || ''));
-    }
 
     function getSidebarErrorHtml(message) {
         return `<!DOCTYPE html>
@@ -435,7 +252,6 @@ function createSidebarController(deps) {
         refreshSidebarView,
         setSidebarSyncStatus,
         setSidebarSyncError,
-        setSidebarSyncSuccess,
         upsertSidebarDocument,
         revealDocumentInSidebar
     };

@@ -18,7 +18,8 @@ function buildKeywordOnlyIndexText(metadata) {
     DEFAULT_KEYWORD_LIMIT
   } = getKeywordConfig();
   const keywords = cleanKeywords(metadata.keywords, getKeywordConfig().DEFAULT_KEYWORD_LIMIT * 4);
-  return keywords.join(' ');
+  const tags = cleanKeywords(metadata.tags, getKeywordConfig().DEFAULT_KEYWORD_LIMIT * 4);
+  return [...keywords, ...tags].join(' ');
 }
 
 function rebuildKeywordsIndexFromMetadata(metadataList = []) {
@@ -51,9 +52,11 @@ function cleanKeywords(values, limit = getKeywordConfig().DEFAULT_KEYWORD_LIMIT)
 function normalizeMetadataKeywordFields(metadata = {}) {
   const base = metadata && typeof metadata === 'object' ? metadata : {};
   const keywords = cleanKeywords(base.keywords, getKeywordConfig().DEFAULT_KEYWORD_LIMIT);
+  const tags = cleanKeywords(base.tags, getKeywordConfig().DEFAULT_KEYWORD_LIMIT);
   return {
     ...base,
     keywords,
+    tags,
     extended_keywords: cleanKeywords(generateExtendedKeywords(keywords), 80)
   };
 }

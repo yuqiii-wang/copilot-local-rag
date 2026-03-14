@@ -10,14 +10,11 @@ function tokenize(text) {
     for (const sentence of sentences) {
         // Words inside this sentence/paragraph
         const words = sentence.trim().split(/\s+/);
+        
+        // Process individual words
         for (let i = 0; i < words.length; i++) {
             let word = words[i];
             
-            // exclude words that are at the start of a sentence or paragraph
-            if (i === 0) {
-                continue;
-            }
-
             // keep dashes for dashed-linked words, normalize rest
             const cleanWord = word.toLowerCase()
                 .replace(/[^a-z0-9-]/g, '')

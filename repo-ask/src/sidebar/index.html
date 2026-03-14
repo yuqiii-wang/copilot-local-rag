@@ -134,6 +134,7 @@
         const syncSingleInput = document.getElementById('sync-single-input');
         const syncSingleContainer = document.getElementById('sync-single-container');
         const syncAllContainer = document.getElementById('sync-all-container');
+        const syncResetContainer = document.getElementById('sync-reset-container');
         const syncRadios = document.querySelectorAll('input[name="syncType"]');
 
         if (openRefreshPopupBtn && refreshPopup) {
@@ -149,18 +150,32 @@
                     if (e.target.value === 'all') {
                         if (syncSingleContainer) syncSingleContainer.style.display = 'none';
                         if (syncAllContainer) syncAllContainer.style.display = 'block';
+                        if (syncResetContainer) syncResetContainer.style.display = 'none';
+                    } else if (e.target.value === 'reset') {
+                        if (syncSingleContainer) syncSingleContainer.style.display = 'none';
+                        if (syncAllContainer) syncAllContainer.style.display = 'none';
+                        if (syncResetContainer) syncResetContainer.style.display = 'block';
                     } else {
                         if (syncSingleContainer) syncSingleContainer.style.display = 'block';
                         if (syncAllContainer) syncAllContainer.style.display = 'none';
+                        if (syncResetContainer) syncResetContainer.style.display = 'none';
                         if (syncSingleInput) syncSingleInput.focus();
                     }
                 });
             });
             submitRefreshBtn.addEventListener('click', () => {
                 let isAll = false;
+                let isReset = false;
                 const allRadio = document.querySelector('input[name="syncType"][value="all"]');
+                const resetRadio = document.querySelector('input[name="syncType"][value="reset"]');
                 if (allRadio && allRadio.checked) isAll = true;
-                if (isAll) {
+                if (resetRadio && resetRadio.checked) isReset = true;
+                if (isReset) {
+                    if(typeof renderSyncError === 'function') renderSyncError('');
+                    if(typeof renderSuccessMessage === 'function') renderSuccessMessage('');
+                    if(typeof renderSyncStatus === 'function') renderSyncStatus('resetting to default documents...');
+                    vscode.postMessage({ command: 'resetToDefaultDocs' });
+                } else if (isAll) {
                     if(typeof renderSyncError === 'function') renderSyncError('');
                     if(typeof renderSuccessMessage === 'function') renderSuccessMessage('');
                     if(typeof renderSyncStatus === 'function') renderSyncStatus('downloading from confluence/jira cloud ...');

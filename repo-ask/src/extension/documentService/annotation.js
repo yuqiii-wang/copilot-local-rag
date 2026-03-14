@@ -74,7 +74,7 @@ async function generateAnnotationWithLlm(metadata, content) {
     const prompt = [
       'You are annotating a local Confluence document metadata record.',
       'Return valid JSON only with shape: {"summary":"...","keywords":"keyword-a, keyword-b"}.',
-      'Summary must be just a one or two sentence description.',
+      'Summary must be clear, relevant, and contain key information from the source content, with a maximum of 4 sentences.',
       'Keywords must be specific technical terms in one comma-separated string.',
       'Take existing document keywords (provided below) and filter out non-business-related words or stop words (e.g., "confluence", "jira", "and", "the", "that", etc.).',
       'Include a few close synonyms or related alternate terms that help retrieval.',
@@ -82,6 +82,8 @@ async function generateAnnotationWithLlm(metadata, content) {
       `Topic: ${metadata.parent_confluence_topic || ''}`,
       `Author: ${metadata.author || ''}`,
       `Existing Keywords: ${originalKeywords.join(', ')}`,
+      `Existing Tags: ${metadata.tags ? metadata.tags.join(', ') : ''}`,
+      `Existing Feedback: ${metadata.feedback || ''}`,
       'Document markdown content:',
       truncate(content, 100000)
     ].join('\\n');

@@ -34,32 +34,7 @@ function writeDocumentPromptFile(metadata, content) {
   return filePath;
 }
 
-function formatMetadataEntries(metadata) {
-  if (!metadata || typeof metadata !== 'object') {
-    return [{
-      key: 'title',
-      value: 'Unknown'
-    }];
-  }
-  return Object.entries(metadata).map(([key, value]) => {
-    if (Array.isArray(value)) {
-      return {
-        key,
-        value: value.join(', ')
-      };
-    }
-    if (value && typeof value === 'object') {
-      return {
-        key,
-        value: JSON.stringify(value)
-      };
-    }
-    return {
-      key,
-      value: String(value ?? '')
-    };
-  });
-}
+
 
 function getPageHtml(page) {
   if (typeof page?.content === 'string') {
@@ -174,10 +149,14 @@ function updateStoredMetadataById(docId, patch = {}) {
   });
   const nextSummary = String(patch.summary || '').trim();
   const nextType = patch.type !== undefined ? String(patch.type || '').trim() : metadata.type;
+  const nextTags = cleanKeywords(patch.tags, getKeywordConfig().DEFAULT_KEYWORD_LIMIT);
+  const nextFeedback = String(patch.feedback || '').trim();
   const updatedMetadata = normalizeMetadataKeywordFields({
     ...metadata,
     type: nextType,
     keywords: nextKeywords,
+    tags: nextTags,
+    feedback: nextFeedback,
     summary: nextSummary
   });
   writeDocumentFiles(storagePath, metadata.id, content, updatedMetadata);
@@ -204,7 +183,6 @@ function getWorkspaceRootPath() {
 
   return {
     writeDocumentPromptFile,
-    formatMetadataEntries,
     getStoredMetadataById,
     generateStoredMetadataById,
     updateStoredMetadataById,

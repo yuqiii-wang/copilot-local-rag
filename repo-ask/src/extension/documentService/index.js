@@ -75,6 +75,7 @@ function createDocumentService(deps) {
     syncDefaultDocs: _sync.syncDefaultDocs,
     rankLocalDocuments: _ranking.rankLocalDocuments,
     checkLocalDocumentsAgentic: _ranking.checkLocalDocumentsAgentic,
+    optimizeQueryAndRank: _ranking.optimizeQueryAndRank,
     refreshDocument: _sync.refreshDocument,
     refreshConfluenceHierarchy: _sync.refreshConfluenceHierarchy,
     refreshAllDocuments: _sync.refreshAllDocuments,
@@ -85,8 +86,7 @@ function createDocumentService(deps) {
     generateStoredMetadataById: _utils.generateStoredMetadataById,
     updateStoredMetadataById: _utils.updateStoredMetadataById,
     removeDocumentFromIndicesById: _utils.removeDocumentFromIndicesById,
-    writeDocumentPromptFile: _utils.writeDocumentPromptFile,
-    formatMetadataEntries: _utils.formatMetadataEntries
+    writeDocumentPromptFile: _utils.writeDocumentPromptFile
   };
 }
 

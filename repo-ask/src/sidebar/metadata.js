@@ -5,6 +5,8 @@
         const metadataEditToggleBtnEl = document.getElementById('metadata-edit-toggle-btn');
         const summaryInputEl = document.getElementById('summary-input');
         const keywordsInputEl = document.getElementById('keywords-input');
+        const tagsInputEl = document.getElementById('tags-input');
+        const feedbackInputEl = document.getElementById('feedback-input');
         const typeInputEl = document.getElementById('type-input');
         const metadataPaneEl = document.querySelector('.metadata-pane');
         
@@ -17,7 +19,7 @@
                 return [];
             }
             return Object.entries(metadata)
-                .filter(([key]) => key !== 'summary' && key !== 'keywords' && key !== 'extended_keywords' && key !== 'type')
+                .filter(([key]) => key !== 'summary' && key !== 'keywords' && key !== 'tags' && key !== 'feedback' && key !== 'extended_keywords' && key !== 'type')
                 .map(([key, value]) => {
                     if (Array.isArray(value)) return { key, value: value.join(', ') };
                     if (value && typeof value === 'object') return { key, value: JSON.stringify(value) };
@@ -31,6 +33,8 @@
             const inputsEnabled = canEditDoc && isMetadataEditMode && !isMetadataGenerating;
             summaryInputEl.disabled = !inputsEnabled;
             keywordsInputEl.disabled = !inputsEnabled;
+            if (typeof tagsInputEl !== 'undefined' && tagsInputEl) tagsInputEl.disabled = !inputsEnabled;
+            if (typeof feedbackInputEl !== 'undefined' && feedbackInputEl) feedbackInputEl.disabled = !inputsEnabled;
             if (typeof typeInputEl !== 'undefined' && typeInputEl) typeInputEl.disabled = !inputsEnabled;
             metadataEditToggleBtnEl.disabled = !canEditDoc || isMetadataGenerating;
             metadataEditToggleBtnEl.textContent = isMetadataEditMode ? 'Save' : 'Edit';
@@ -53,6 +57,8 @@
             if(metadataEditToggleBtnEl) metadataEditToggleBtnEl.disabled = !hasDoc || isMetadataGenerating;
             if(summaryInputEl) summaryInputEl.disabled = !hasDoc || !isMetadataEditMode || isMetadataGenerating;
             if(keywordsInputEl) keywordsInputEl.disabled = !hasDoc || !isMetadataEditMode || isMetadataGenerating;
+            if (typeof tagsInputEl !== 'undefined' && tagsInputEl) tagsInputEl.disabled = !hasDoc || !isMetadataEditMode || isMetadataGenerating;
+            if (typeof feedbackInputEl !== 'undefined' && feedbackInputEl) feedbackInputEl.disabled = !hasDoc || !isMetadataEditMode || isMetadataGenerating;
             if (typeof typeInputEl !== 'undefined' && typeInputEl) typeInputEl.disabled = !hasDoc || !isMetadataEditMode || isMetadataGenerating;
         }
 
@@ -67,6 +73,9 @@
             if (typeof typeInputEl !== 'undefined' && typeInputEl) typeInputEl.value = selectedMetadata ? String(selectedMetadata.type || 'custom') : 'custom';
             const keywordValues = selectedMetadata && Array.isArray(selectedMetadata.keywords) ? selectedMetadata.keywords : [];
             if(keywordsInputEl) keywordsInputEl.value = keywordValues.join(', ');
+            const tagValues = selectedMetadata && Array.isArray(selectedMetadata.tags) ? selectedMetadata.tags : [];
+            if(tagsInputEl) tagsInputEl.value = tagValues.join(', ');
+            if(feedbackInputEl) feedbackInputEl.value = selectedMetadata ? String(selectedMetadata.feedback || '') : '';
 
             if (metadataListEl) {
                 if (items.length === 0) {
@@ -104,12 +113,16 @@
                 }
                 const keywords = String(keywordsInputEl ? keywordsInputEl.value : '')
                     .split(',').map(k => k.trim()).filter(k => k.length > 0).join(', ');
+                const tags = String(tagsInputEl ? tagsInputEl.value : '')
+                    .split(',').map(t => t.trim()).filter(t => t.length > 0).join(', ');
                 vscode.postMessage({
                     command: 'saveMetadata',
                     docId: selectedDocId,
                     type: typeof typeInputEl !== 'undefined' && typeInputEl ? typeInputEl.value : 'custom',
                     summary: summaryInputEl ? summaryInputEl.value : '',
-                    keywords
+                    keywords,
+                    tags,
+                    feedback: feedbackInputEl ? feedbackInputEl.value : ''
                 });
                 setMetadataEditMode(false);
             });
