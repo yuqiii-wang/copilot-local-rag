@@ -19,7 +19,8 @@
     "onLanguageModelTool:repoask_read_metadata",
     "onLanguageModelTool:repoask_read_content",
     "onLanguageModelTool:repoask_new_code_check",
-    "onLanguageModelTool:repoask_read_repo_prompts"
+    "onLanguageModelTool:repoask_read_repo_prompts",
+    "onLanguageModelTool:repoask_code_splitter"
   ],
   "main": "index.js",
   "contributes": {
@@ -187,6 +188,37 @@
           "type": "object",
           "properties": {}
         }
+      },
+      {
+        "name": "repoask_code_splitter",
+        "tags": [
+          "repoask",
+          "code",
+          "splitter",
+          "tree-sitter",
+          "search"
+        ],
+        "toolReferenceName": "repoaskCodeSplitter",
+        "displayName": "RepoAsk Code Splitter",
+        "modelDescription": "Use Langchain CodeSplitter module built on top of Tree-sitter to find user query related code and answer questions. Pass user query and init background knowledge (proposed class/funcs to search).",
+        "userDescription": "Search via tree-sitter code splitter.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(symbol-class)",
+        "inputSchema": {
+          "type": "object",
+          "required": ["query"],
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "User query / context"
+            },
+            "classesOrFuncs": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Proposed classes or functions to search for"
+            }
+          }
+        }
       }
     ],
     "viewsContainers": {
@@ -325,9 +357,13 @@
     "@babel/generator": "^7.29.1",
     "@babel/parser": "^7.29.0",
     "@babel/traverse": "^7.29.0",
+    "@langchain/textsplitters": "^1.0.1",
     "axios": "^1.6.0",
     "cheerio": "^1.0.0-rc.12",
     "markdown-it": "^14.1.1",
-    "turndown": "^7.2.2"
+    "tree-sitter": "^0.25.0",
+    "tree-sitter-javascript": "^0.25.0",
+    "turndown": "^7.2.2",
+    "web-tree-sitter": "^0.26.6"
   }
 }

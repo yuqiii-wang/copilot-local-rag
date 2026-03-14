@@ -14,7 +14,10 @@ user-invocable: false
 ## BDD Process with Cucumber
 BDD uses natural language scenarios (Gherkin syntax) that become executable tests via Cucumber step definitions. Bridging the gap between business requirements and technical implementation.
 
+Read `pom.xml` or gradle to understand what cucumber version to use to ensure code compatibility.
+
 ### 1. Scenario Definition (Gherkin)
+
 Write business-readable scenarios in `src/test/resources/cucumber/*.feature` files:
 
 ```gherkin
@@ -25,6 +28,23 @@ Feature: User Authentication
     When the user submits the login form with valid credentials
     Then the dashboard should be displayed
 ```
+
+Consider to use `Scenario Outline` and `Examples` tables to run the same scenario with multiple sets of data.
+
+```gherkin
+Feature: Data-Driven Login
+
+  Scenario Outline: Login with different credentials
+    Given a registered user with email "<email>"
+    When the user submits the login form with password "<password>"
+    Then the login should be <status>
+
+    Examples:
+      | email            | password  | status  |
+      | user@example.com | pass123   | success |
+      | bad@example.com  | wrongpass | failure |
+```
+
 
 ### 2. Step Definitions (Cucumber)
 Implement the executable Cucumber glue code, constructing the path from the source input as much as possible:
@@ -54,7 +74,9 @@ public class LoginSteps {
 }
 ```
 
-Cucumber context run as
+ Cucumber context run as below.
+MUST output the **html** and **json** report in the desired dir.
+In other words, MUST in plugin include `"html:target/cucumber-report.html"` and `"json:target/cucumber/cucumber-report.json"`
 
 ```java
 @RunWith(Cucumber.class)

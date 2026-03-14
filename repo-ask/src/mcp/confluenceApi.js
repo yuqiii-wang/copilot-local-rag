@@ -1,5 +1,6 @@
 const axios = require('axios');
 const vscode = require('vscode');
+const { confluenceApiMap } = require('./apiMap');
 
 const DEFAULT_CONFLUENCE_BASE_URL = 'http://127.0.0.1:8001';
 const REQUEST_TIMEOUT_MS = 15000;
@@ -65,16 +66,15 @@ async function fetchConfluencePage(pageArg) {
     if (String(pageArg).startsWith('http')) {
         base = new URL(pageArg).origin;
     }
+    
     const headers = getHeaders(securityToken);
-    buildResolveCandidates(pageArg);
-
+    
     let lastError = null;
     for (const candidate of buildResolveCandidates(pageArg)) {
-        const resolveUrl = `${base}/confluence/rest/api/content/${encodeURIComponent(candidate)}`;
-
         try {
-            const response = await axios.get(resolveUrl, { 
-                timeout: REQUEST_TIMEOUT_MS, 
+            const resolveUrl = confluenceApiMap.contentResolve(base, candidate);
+            const response = await axios.get(resolveUrl, {
+                timeout: REQUEST_TIMEOUT_MS,
                 headers,
                 maxContentLength: Infinity,
                 maxBodyLength: Infinity
@@ -85,8 +85,9 @@ async function fetchConfluencePage(pageArg) {
         }
         
         try {
-            const response = await axios.get(`${base}/confluence/rest/api/content/${encodeURIComponent(pageArg)}?expand=body.storage`, { 
-                timeout: REQUEST_TIMEOUT_MS, 
+            const storageUrl = confluenceApiMap.contentStorage(base, candidate);
+            const response = await axios.get(storageUrl, {
+                timeout: REQUEST_TIMEOUT_MS,
                 headers,
                 maxContentLength: Infinity,
                 maxBodyLength: Infinity
@@ -96,14 +97,32 @@ async function fetchConfluencePage(pageArg) {
             lastError = error;
         }
     }
+    
     throw lastError || new Error('Failed to fetch Confluence page with provided argument.');
 }
 
 async function fetchAllConfluencePages() {
     const { url: base, securityToken } = getConfluenceConfig();
     const headers = getHeaders(securityToken);
-    const response = await axios.get(`${base}/rest/api/content?expand=body.storage`, { 
-        timeout: REQUEST_TIMEOUT_MS, 
+    
+    const response = await axios.get(confluenceApiMap.contentAll(base), {
+        timeout: REQUEST_TIMEOUT_MS,
+        headers,
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity
+    });
+    return response.data;
+}
+
+async function fetchConfluencePageChildren(pageId) {
+    let { url: base, securityToken } = getConfluenceConfig();
+    if (String(pageId).startsWith('http')) {
+        base = new URL(pageId).origin;
+    }
+    const headers = getHeaders(securityToken);
+    
+    const response = await axios.get(confluenceApiMap.contentChildren(base, pageId), {
+        timeout: REQUEST_TIMEOUT_MS,
         headers,
         maxContentLength: Infinity,
         maxBodyLength: Infinity
@@ -116,17 +135,3 @@ module.exports = {
     fetchAllConfluencePages,
     fetchConfluencePageChildren
 };
-async function fetchConfluencePageChildren(pageId) {
-    let { url: base, securityToken } = getConfluenceConfig();
-    if (String(pageId).startsWith('http')) {
-        base = new URL(pageId).origin;
-    }
-    const headers = getHeaders(securityToken);
-    const response = await axios.get(`${base}/confluence/rest/api/content/${encodeURIComponent(pageId)}/child/page?expand=body.storage`, {
-        timeout: REQUEST_TIMEOUT_MS,
-        headers,
-        maxContentLength: Infinity,
-        maxBodyLength: Infinity
-    });
-    return response.data;
-}

@@ -1,7 +1,11 @@
 const vscode = require('vscode');
 
-const { fetchConfluencePage, fetchAllConfluencePages, fetchConfluencePageChildren } = require('./confluenceApi');
-const { fetchJiraIssue } = require('./jiraApi');
+const { 
+    fetchConfluencePage, 
+    fetchAllConfluencePages, 
+    fetchConfluencePageChildren,
+    fetchJiraIssue
+} = require('./mcp');
 const {
     truncate,
     tokenize,
@@ -19,11 +23,11 @@ const {
     formatDocumentDetails,
     writeDocumentFiles
 } = require('./storage');
-const { findRelevantDocuments, rankDocumentsByIdf } = require('./relevance');
-const { parseRefreshArg } = require('./extension/llm');
+const { findRelevantDocuments, rankDocumentsByIdf } = require('./docIndex/relevance');
+const { parseRefreshArg } = require('./extension/tools/llm');
 const { createDocumentService } = require('./extension/documentService');
 const { createSidebarController } = require('./extension/sidebarController');
-const { createLanguageModelTools } = require('./extension/lmTools');
+const { createLanguageModelTools } = require('./extension/tools/lmTools');
 const { loadWorkspacePromptContext } = require('./extension/promptContext');
 const { answerGeneralPromptQuestion } = require('./extension/chat/generalAnswer');
 const { answerCodePromptQuestion } = require('./extension/chat/codeAnswer');

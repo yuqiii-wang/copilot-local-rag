@@ -44,4 +44,12 @@ Behind the scenes, the extension provides multiple LLM Tools:
 - `repoask_refresh`: Syncs dynamically.
 - `repoask_new_code_check`: Auto-checks PR diffs and searches `.github/prompts/` to start working on new Jira tasks directly upon codebase synchronization.
 
+## Local Store
+
+The local document store is kept in your VS Code global storage directory. Depending on your operating system, the path is:
+
+- **Windows:** `%APPDATA%\Code\User\globalStorage\repo-ask.repo-ask`
+- **macOS:** `~/Library/Application Support/Code/User/globalStorage/repo-ask.repo-ask`
+- **Linux:** `~/.config/Code/User/globalStorage/repo-ask.repo-ask`
+
 Happy coding with `@repoask`!

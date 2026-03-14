@@ -19,6 +19,7 @@ async function annotateDocumentByArg(pageArg) {
       message: `No local plain text content for ${metadata.title}. Run refresh first.`
     };
   }
+  await finalizeBm25KeywordsForDocuments([metadata.id]);
   return {
     message: `Annotated document: ${metadata.title}`
   };
@@ -27,11 +28,16 @@ async function annotateDocumentByArg(pageArg) {
 async function annotateAllDocuments() {
   const allMetadata = readAllMetadata(storagePath);
   let updatedCount = 0;
+  const updatedIds = [];
   for (const metadata of allMetadata) {
     const updated = await annotateStoredDocument(metadata);
     if (updated) {
       updatedCount += 1;
+      updatedIds.push(metadata.id);
     }
+  }
+  if (updatedCount > 0) {
+    await finalizeBm25KeywordsForDocuments(updatedIds);
   }
   return {
     message: updatedCount > 0 ? `Annotated ${updatedCount} document(s)` : 'No local documents available to annotate. Run refresh first.'

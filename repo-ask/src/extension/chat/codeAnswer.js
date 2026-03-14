@@ -256,7 +256,8 @@ async function answerCodePromptQuestion(vscodeApi, prompt, workspacePromptContex
         'Wait for tool results before explaining the final answer.',
         '- DO use the `.github/prompts/*.md` code guidelines dynamically via repoask_read_repo_prompts.',
         '- Use `repoask_new_code_check` to review branch changes vs main/master.',
-        '- If asked to update or rewrite code, attempt to do so using available tools. If not permissioned or you lack the tool, output "not permissioned".',
+        '- Use `repoask_code_splitter` when the user query mentions specific classes or functions, or you propose classes/functions to search for. This tool uses tree-sitter based splitting to find related code chunks directly from the workspace.',
+        '- If asked to update or rewrite code, output the code changes in your message as a unified diff and use repoask_new_code_check to validate the changes. Always ask the user if they want to apply the changes directly in code or create a new file.',
         '- If there is no need to change code based on the question, answer the question with the provided code and prompt context.',
         '',
         contextText ? `Workspace guidelines:\n${contextText}` : 'Workspace guidelines: (none)',
@@ -272,7 +273,7 @@ async function answerCodePromptQuestion(vscodeApi, prompt, workspacePromptContex
     
     // Tools logic
     let toolsToUse = (vscodeApi.lm.tools || []).filter(t => t.name.startsWith('repoask_'));
-    toolsToUse = toolsToUse.filter(t => t.name === 'repoask_new_code_check' || t.name === 'repoask_read_repo_prompts');
+    toolsToUse = toolsToUse.filter(t => t.name === 'repoask_new_code_check' || t.name === 'repoask_read_repo_prompts' || t.name === 'repoask_code_splitter');
 
     const requestOptions = {
         tools: toolsToUse

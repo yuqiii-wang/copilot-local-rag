@@ -2,8 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const cheerio = require('cheerio');
 const axios = require('axios');
-const { extractJsonObject } = require('./../llm');
-const { createBm25Index } = require('../../bm25');
+const { extractJsonObject } = require('./../tools/llm');
+const { createBm25Index } = require('../../docIndex/bm25');
 
 const ranking = require('./ranking');
 const sync = require('./sync');

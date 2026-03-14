@@ -39,8 +39,21 @@ def generate_dummy_data():
             }
         }
 
+    jira_topics = [
+        {'title': 'Fix memory leak in HFT module', 'desc': 'Trading engine crashes under high load. Profile memory and fix the leak.'},
+        {'title': 'Upgrade FIX protocol library', 'desc': 'Update QuickFIX engine to version 1.15 to resolve latency spike bugs.'},
+        {'title': 'Add OAuth2 to oms API', 'desc': 'Secure the Order Management System backend endpoints with OAuth2.'},
+        {'title': 'Refactor PnL reconciliation job', 'desc': 'Daily PnL job is timing out. Optimize the SQL queries and add indexing.'},
+        {'title': 'Implement Black-Scholes Greeks', 'desc': 'Add Delta, Gamma, Theta, Vega, and Rho calculations to the options engine.'},
+        {'title': 'Create Dockerfile for FX Engine', 'desc': 'Containerize the Foreign Exchange engine for Kubernetes deployment.'},
+        {'title': 'Add Prometheus metrics to ledger', 'desc': 'Expose /metrics endpoint in Ledger service with transaction counts and errors.'},
+        {'title': 'Fix UI sorting in Bond Yield table', 'desc': 'The frontend yield-to-maturity table sorts numbers alphabetically. Fix this.'},
+        {'title': 'Migrate market data to Kafka', 'desc': 'Move from RabbitMQ to Kafka for Bloomberg feed ingestion due to throughput.'},
+        {'title': 'Audit SWIFT messaging integration', 'desc': 'Perform security audit and compliance checks on the SWIFT post-trade messages.'}
+    ]
+
     # Generate 10 Jira Issues
-    for i, topic in enumerate(topics, 1):
+    for i, topic in enumerate(jira_topics, 1):
         issue_id = str(10000 + i)
         issue_key = f'PROJ-{i}'
         title = topic['title']
