@@ -53,10 +53,16 @@ function normalizeMetadataKeywordFields(metadata = {}) {
   const base = metadata && typeof metadata === 'object' ? metadata : {};
   const keywords = cleanKeywords(base.keywords, getKeywordConfig().DEFAULT_KEYWORD_LIMIT);
   const tags = cleanKeywords(base.tags, getKeywordConfig().DEFAULT_KEYWORD_LIMIT);
+  const referencedQueries = Array.isArray(base.referencedQueries)
+    ? [...new Set(base.referencedQueries.map(value => String(value || '').trim()).filter(Boolean))]
+    : typeof base.referencedQueries === 'string'
+      ? [...new Set(base.referencedQueries.split(',').map(value => value.trim()).filter(Boolean))]
+      : [];
   return {
     ...base,
     keywords,
     tags,
+    referencedQueries,
     extended_keywords: cleanKeywords(generateExtendedKeywords(keywords), 80)
   };
 }

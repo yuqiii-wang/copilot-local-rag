@@ -143,7 +143,102 @@ async function fetchConfluencePageChildren(pageId) {
     return response.data;
 }
 
-async function updateConfluencePage(pageId, feedbackEntry) {
+function escapeHtml(value) {
+    return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function normalizeFeedbackPayload(feedbackPayload) {
+    const payload = feedbackPayload && typeof feedbackPayload === 'object' ? feedbackPayload : {};
+    return {
+        datetime: String(payload.datetime || new Date().toISOString().slice(0, 16)).trim(),
+        submittedBy: String(payload.submittedBy || 'RepoAsk User').trim(),
+        sourceQuery: String(payload.sourceQuery || '').trim(),
+        conversationSummary: String(payload.conversationSummary || '').trim(),
+        confluenceLink: String(payload.confluenceLink || '').trim(),
+        confluencePageId: String(payload.confluencePageId || '').trim(),
+        jiraId: String(payload.jiraId || '').trim(),
+        tags: String(payload.tags || '').trim()
+    };
+}
+
+function buildFeedbackRowHtml(feedbackPayload) {
+    const normalized = normalizeFeedbackPayload(feedbackPayload);
+    const details = [];
+
+    if (normalized.sourceQuery) {
+        details.push(`<li><strong>Source Query:</strong> ${escapeHtml(normalized.sourceQuery)}</li>`);
+    }
+
+    if (normalized.conversationSummary) {
+        details.push(
+            `<li><strong>Conversation Summary:</strong><pre style="white-space: pre-wrap; word-break: break-word; margin: 4px 0 0;">${escapeHtml(normalized.conversationSummary)}</pre></li>`
+        );
+    }
+
+    if (normalized.confluenceLink) {
+        const safeLink = escapeHtml(normalized.confluenceLink);
+        const isHttpLink = /^https?:\/\//i.test(normalized.confluenceLink);
+        const linkValue = isHttpLink ? `<a href="${safeLink}">${safeLink}</a>` : safeLink;
+        details.push(`<li><strong>Confluence/Jira Link:</strong> ${linkValue}</li>`);
+    }
+
+    if (normalized.confluencePageId) {
+        details.push(`<li><strong>Confluence Page ID:</strong> ${escapeHtml(normalized.confluencePageId)}</li>`);
+    }
+
+    if (normalized.jiraId) {
+        details.push(`<li><strong>Jira ID:</strong> ${escapeHtml(normalized.jiraId)}</li>`);
+    }
+
+    if (normalized.tags) {
+        details.push(`<li><strong>Tags:</strong> ${escapeHtml(normalized.tags)}</li>`);
+    }
+
+    if (details.length === 0) {
+        details.push('<li>No additional feedback details provided.</li>');
+    }
+
+    return [
+        '<tr>',
+        `<td>${escapeHtml(normalized.datetime)}</td>`,
+        `<td>${escapeHtml(normalized.submittedBy)}</td>`,
+        `<td><ul>${details.join('')}</ul></td>`,
+        '</tr>'
+    ].join('');
+}
+
+function appendFeedbackToStorageValue(currentContent, feedbackPayload) {
+    const rowHtml = buildFeedbackRowHtml(feedbackPayload);
+    const content = String(currentContent || '');
+
+    if (/<tbody[^>]*>/i.test(content)) {
+        return content.replace(/<\/tbody>/i, `${rowHtml}</tbody>`);
+    }
+
+    if (/<table[^>]*>/i.test(content)) {
+        return content.replace(/<\/table>/i, `<tbody>${rowHtml}</tbody></table>`);
+    }
+
+    const feedbackTable = [
+        '<table>',
+        '<tbody><tr><th>Date</th><th>User</th><th>Feedback</th></tr>',
+        `${rowHtml}</tbody>`,
+        '</table>'
+    ].join('');
+
+    if (/\<\/div\>\s*$/i.test(content)) {
+        return content.replace(/\<\/div\>\s*$/i, `${feedbackTable}</div>`);
+    }
+
+    return `${content}${content ? '\n' : ''}${feedbackTable}`;
+}
+
+async function updateConfluencePage(pageId, feedbackPayload) {
     let { url: base, securityToken } = getConfluenceConfig();
     let pageIdForApi = pageId;
     
@@ -163,16 +258,10 @@ async function updateConfluencePage(pageId, feedbackEntry) {
     // First, get the current page content
     const currentPage = await fetchConfluencePage(pageId);
     
-    // Extract current content and append the new feedback entry
+    // Extract current content and append the new feedback row in table format.
     let currentContent = currentPage.body?.storage?.value || '';
-    
-    // Ensure the content ends with a newline before appending
-    if (currentContent && !currentContent.endsWith('\n')) {
-        currentContent += '\n';
-    }
-    
-    // Append the new feedback entry
-    const updatedContent = currentContent + feedbackEntry;
+
+    const updatedContent = appendFeedbackToStorageValue(currentContent, feedbackPayload);
     
     // Prepare the update request payload
     const payload = {

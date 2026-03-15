@@ -48,8 +48,7 @@ module.exports = function createMetadataCommands(deps) {
                 type: message.type,
                 summary: message.summary,
                 keywords: message.keywords,
-                tags: message.tags,
-                feedback: message.feedback
+                tags: message.tags
             });
             upsertSidebarDocument(updatedMetadata);
             vscode.window.showInformationMessage(`Saved metadata for: ${updatedMetadata.title || updatedMetadata.id}`);

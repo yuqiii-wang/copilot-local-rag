@@ -17,15 +17,6 @@ function hideBanner(bannerId) {
     }
 }
 
-function escapeHtml(value) {
-    return String(value || '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-}
-
 function setButtonLoadingState(button, isLoading, label) {
     if (!button) {
         return;
@@ -76,11 +67,95 @@ function initFeedbackForm() {
     const datetimeInput = document.getElementById('datetime');
     
     // Set default datetime to current time
-    const now = new Date();
-    const formattedDate = now.toISOString().slice(0, 16);
-    if (datetimeInput) {
-        datetimeInput.value = formattedDate;
-    }
+        const now = new Date();
+        const formattedDate = now.toISOString().slice(0, 16);
+        if (datetimeInput) {
+            datetimeInput.value = formattedDate;
+        }
+
+        // Add event listener to confluence-link input to extract IDs
+        const confluenceLinkInput = document.getElementById('confluence-link');
+        const confluencePageIdGroup = document.querySelector('label[for="confluence-page-id"]').parentElement;
+        const jiraIdGroup = document.querySelector('label[for="jira-id"]').parentElement;
+        const confluencePageIdInput = document.getElementById('confluence-page-id');
+        const jiraIdInput = document.getElementById('jira-id');
+        
+        // Function to sync ID and link fields
+        function syncIdAndLink() {
+            // Get current values
+            const link = confluenceLinkInput.value.trim();
+            const confluenceId = confluencePageIdInput.value.trim();
+            const jiraId = jiraIdInput.value.trim();
+            
+            // Determine which ID is present
+            if (confluenceId) {
+                // Confluence ID is present, hide Jira field
+                if (confluencePageIdGroup) confluencePageIdGroup.style.display = 'block';
+                if (jiraIdGroup) jiraIdGroup.style.display = 'none';
+                if (jiraIdInput) jiraIdInput.value = '';
+                
+                // Try to get link from local store via message to extension
+                vscode.postMessage({ 
+                    command: 'getDocumentByID', 
+                    id: confluenceId 
+                });
+            } else if (jiraId) {
+                // Jira ID is present, hide Confluence field
+                if (jiraIdGroup) jiraIdGroup.style.display = 'block';
+                if (confluencePageIdGroup) confluencePageIdGroup.style.display = 'none';
+                if (confluencePageIdInput) confluencePageIdInput.value = '';
+                
+                // Try to get link from local store via message to extension
+                vscode.postMessage({ 
+                    command: 'getDocumentByID', 
+                    id: jiraId 
+                });
+            } else if (link) {
+                // Only link is present, extract ID from link
+                // Try to extract Confluence page ID
+                const confluenceMatch = link.match(/(?:[?&]pageId=|\/pages\/|\/viewpage\/|\.action\/|\?pageId=)(\d+)/i);
+                if (confluenceMatch && confluenceMatch[1]) {
+                    // It's a Confluence link, extract page ID
+                    if (confluencePageIdGroup) confluencePageIdGroup.style.display = 'block';
+                    if (jiraIdGroup) jiraIdGroup.style.display = 'none';
+                    if (confluencePageIdInput) confluencePageIdInput.value = confluenceMatch[1];
+                    if (jiraIdInput) jiraIdInput.value = '';
+                    return;
+                }
+
+                // Try to extract Jira issue ID
+                const jiraMatch = link.match(/[A-Z]+-\d+/i);
+                if (jiraMatch) {
+                    // It's a Jira link, extract issue ID
+                    if (jiraIdGroup) jiraIdGroup.style.display = 'block';
+                    if (confluencePageIdGroup) confluencePageIdGroup.style.display = 'none';
+                    if (jiraIdInput) jiraIdInput.value = jiraMatch[0].toUpperCase();
+                    if (confluencePageIdInput) confluencePageIdInput.value = '';
+                    return;
+                }
+
+                // If no ID found, show both fields
+                if (confluencePageIdGroup) confluencePageIdGroup.style.display = 'block';
+                if (jiraIdGroup) jiraIdGroup.style.display = 'block';
+            } else {
+                // No values, show both fields
+                if (confluencePageIdGroup) confluencePageIdGroup.style.display = 'block';
+                if (jiraIdGroup) jiraIdGroup.style.display = 'block';
+            }
+        }
+        
+        // Add event listeners
+        if (confluenceLinkInput) {
+            confluenceLinkInput.addEventListener('input', syncIdAndLink);
+        }
+        
+        if (confluencePageIdInput) {
+            confluencePageIdInput.addEventListener('input', syncIdAndLink);
+        }
+        
+        if (jiraIdInput) {
+            jiraIdInput.addEventListener('input', syncIdAndLink);
+        }
     
     // Submit button handler
     if (submitBtn) {
@@ -91,12 +166,16 @@ function initFeedbackForm() {
             const sourceQueryRaw = document.getElementById('source-query')?.value || '';
             const conversationSummaryRaw = document.getElementById('conversation-summary')?.value || '';
             const confluenceLinkRaw = document.getElementById('confluence-link')?.value || '';
+            const confluencePageIdRaw = document.getElementById('confluence-page-id')?.value || '';
+            const jiraIdRaw = document.getElementById('jira-id')?.value || '';
             const datetimeRaw = document.getElementById('datetime')?.value || '';
             const tagsRaw = document.getElementById('tags')?.value || '';
 
             const sourceQuery = sourceQueryRaw.trim();
             const conversationSummary = conversationSummaryRaw.trim();
             const confluenceLink = confluenceLinkRaw.trim();
+            const confluencePageId = confluencePageIdRaw.trim();
+            const jiraId = jiraIdRaw.trim();
             const datetime = datetimeRaw.trim();
             const tags = tagsRaw.trim();
             
@@ -110,6 +189,30 @@ function initFeedbackForm() {
                 showBanner('error-banner', 'Please fill in all required fields: Source Query and Datetime');
                 return;
             }
+
+            // Check if either Confluence page ID or Jira ID is provided
+            if (!confluencePageId && !jiraId) {
+                showBanner('error-banner', 'Please provide either Confluence Page ID or Jira ID');
+                return;
+            }
+
+            // Validate Confluence page ID format (should be numeric) if provided
+            if (confluencePageId && !/^\d+$/.test(confluencePageId)) {
+                showBanner('error-banner', 'Confluence Page ID must be a numeric value');
+                return;
+            }
+
+            // Validate Jira ID format (e.g., PROJ-123) if provided
+            if (jiraId && !/^[A-Z]+-\d+$/.test(jiraId)) {
+                showBanner('error-banner', 'Jira ID must be in the format PROJ-123');
+                return;
+            }
+
+            // Validate Confluence/Jira Link format if provided
+            if (confluenceLink && !/^https?:\/\//i.test(confluenceLink)) {
+                showBanner('error-banner', 'Confluence/Jira Link must be a valid URL');
+                return;
+            }
             
             // Disable submit button and show loading state
             setButtonLoadingState(submitBtn, true, 'Submit');
@@ -118,22 +221,21 @@ function initFeedbackForm() {
             // Yield one frame so the loading style paints before posting to the extension host.
             await new Promise((resolve) => requestAnimationFrame(resolve));
             
-            // Create HTML-formatted feedback entry
-            const feedbackEntry = `<div style="margin-top: 20px; padding: 10px; border-top: 1px solid #ddd;">
-                <h3>Feedback Entry</h3>
-                <p><strong>Source Query:</strong> ${escapeHtml(sourceQueryRaw)}</p>
-                <p><strong>Conversation Summary:</strong></p>
-                <pre style="white-space: pre-wrap; word-break: break-word; margin: 4px 0 10px;">${escapeHtml(conversationSummaryRaw)}</pre>
-                <p><strong>Confluence Link:</strong> <a href="${escapeHtml(confluenceLink)}">${escapeHtml(confluenceLink)}</a></p>
-                <p><strong>Datetime:</strong> ${escapeHtml(datetimeRaw)}</p>
-                <p><strong>Tags:</strong> ${escapeHtml(tagsRaw)}</p>
-            </div>`;
+            const feedbackPayload = {
+                sourceQuery: sourceQueryRaw,
+                conversationSummary: conversationSummaryRaw,
+                confluenceLink: confluenceLinkRaw,
+                confluencePageId: confluencePageIdRaw,
+                jiraId: jiraIdRaw,
+                datetime: datetimeRaw,
+                tags: tagsRaw
+            };
             
             try {
                 // Send feedback to extension
                 vscode.postMessage({ 
                     command: 'submitFeedback', 
-                    feedbackEntry 
+                    feedbackPayload
                 });
             } catch (error) {
                 console.error('Error submitting feedback:', error);
@@ -189,9 +291,13 @@ function initFeedbackForm() {
 }
 
 // Function to show the feedback form
-function showFeedbackForm(firstUserQuery, firstRankedDocUrl, fullAiResponse) {
+function showFeedbackForm(firstUserQuery, selectedDocumentOrUrl, fullAiResponse) {
     const feedbackSection = document.getElementById('feedback-section');
     const viewerSection = document.querySelector('.viewer');
+    const selectedDocument = selectedDocumentOrUrl && typeof selectedDocumentOrUrl === 'object'
+        ? selectedDocumentOrUrl
+        : null;
+    const fallbackUrl = typeof selectedDocumentOrUrl === 'string' ? selectedDocumentOrUrl : '';
     
     if (feedbackSection) {
         feedbackSection.style.display = 'block';
@@ -209,12 +315,18 @@ function showFeedbackForm(firstUserQuery, firstRankedDocUrl, fullAiResponse) {
         }
     }
     
-    // Copy the first ranked doc URL to the confluence link field
-    if (firstRankedDocUrl) {
-        const confluenceLinkField = document.getElementById('confluence-link');
-        if (confluenceLinkField) {
-            confluenceLinkField.value = firstRankedDocUrl;
-        }
+    const confluenceLinkField = document.getElementById('confluence-link');
+    const confluencePageIdField = document.getElementById('confluence-page-id');
+    const jiraIdField = document.getElementById('jira-id');
+
+    if (confluenceLinkField) {
+        confluenceLinkField.value = selectedDocument?.url || fallbackUrl || '';
+    }
+    if (confluencePageIdField) {
+        confluencePageIdField.value = selectedDocument?.confluencePageId || '';
+    }
+    if (jiraIdField) {
+        jiraIdField.value = selectedDocument?.jiraId || '';
     }
 
     // Copy the full AI response into conversation summary when available.
@@ -255,7 +367,7 @@ window.populateSummary = populateSummary;
 window.addEventListener('message', (event) => {
     const message = event.data;
     if (message?.command === 'showFeedbackForm') {
-        showFeedbackForm(message.firstUserQuery, message.firstRankedDocUrl, message.fullAiResponse);
+        showFeedbackForm(message.firstUserQuery, message.selectedDocument || message.firstRankedDocUrl, message.fullAiResponse);
     }
     if (message?.command === 'populateSummary') {
         populateSummary(String(message.summary || ''));
@@ -273,6 +385,8 @@ window.addEventListener('message', (event) => {
                     document.getElementById('source-query').value = '';
                     document.getElementById('conversation-summary').value = '';
                     document.getElementById('confluence-link').value = '';
+                    document.getElementById('confluence-page-id').value = '';
+                    document.getElementById('jira-id').value = '';
                     document.getElementById('datetime').value = new Date().toISOString().slice(0, 16);
                     document.getElementById('tags').value = '';
                     
@@ -298,4 +412,11 @@ window.addEventListener('message', (event) => {
                     settleSubmitState(submitBtn, false, 'Submit');
                 }
             }
+    if (message?.command === 'documentFound') {
+        // Update link field with document URL if found
+        const confluenceLinkInput = document.getElementById('confluence-link');
+        if (confluenceLinkInput && message.document && message.document.source) {
+            confluenceLinkInput.value = message.document.source;
+        }
+    }
 });

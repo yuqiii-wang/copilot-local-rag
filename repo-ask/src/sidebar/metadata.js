@@ -6,7 +6,7 @@
         const summaryInputEl = document.getElementById('summary-input');
         const keywordsInputEl = document.getElementById('keywords-input');
         const tagsInputEl = document.getElementById('tags-input');
-        const feedbackInputEl = document.getElementById('feedback-input');
+        const referencedQueriesListEl = document.getElementById('referenced-queries-list');
         const typeInputEl = document.getElementById('type-input');
         const metadataPaneEl = document.querySelector('.metadata-pane');
         
@@ -19,7 +19,7 @@
                 return [];
             }
             return Object.entries(metadata)
-                .filter(([key]) => key !== 'summary' && key !== 'keywords' && key !== 'tags' && key !== 'feedback' && key !== 'extended_keywords' && key !== 'type')
+                .filter(([key]) => key !== 'summary' && key !== 'keywords' && key !== 'tags' && key !== 'referencedQueries' && key !== 'extended_keywords' && key !== 'type')
                 .map(([key, value]) => {
                     if (Array.isArray(value)) return { key, value: value.join(', ') };
                     if (value && typeof value === 'object') return { key, value: JSON.stringify(value) };
@@ -34,7 +34,6 @@
             summaryInputEl.disabled = !inputsEnabled;
             keywordsInputEl.disabled = !inputsEnabled;
             if (typeof tagsInputEl !== 'undefined' && tagsInputEl) tagsInputEl.disabled = !inputsEnabled;
-            if (typeof feedbackInputEl !== 'undefined' && feedbackInputEl) feedbackInputEl.disabled = !inputsEnabled;
             if (typeof typeInputEl !== 'undefined' && typeInputEl) typeInputEl.disabled = !inputsEnabled;
             metadataEditToggleBtnEl.disabled = !canEditDoc || isMetadataGenerating;
             metadataEditToggleBtnEl.textContent = isMetadataEditMode ? 'Save' : 'Edit';
@@ -75,7 +74,24 @@
             if(keywordsInputEl) keywordsInputEl.value = keywordValues.join(', ');
             const tagValues = selectedMetadata && Array.isArray(selectedMetadata.tags) ? selectedMetadata.tags : [];
             if(tagsInputEl) tagsInputEl.value = tagValues.join(', ');
-            if(feedbackInputEl) feedbackInputEl.value = selectedMetadata ? String(selectedMetadata.feedback || '') : '';
+            
+            // Render referenced queries as a read-only list
+            if(referencedQueriesListEl) {
+                if (selectedMetadata && selectedMetadata.referencedQueries) {
+                    const queries = Array.isArray(selectedMetadata.referencedQueries) ? selectedMetadata.referencedQueries : 
+                        String(selectedMetadata.referencedQueries).split(',').map(q => q.trim()).filter(q => q.length > 0);
+                    
+                    if (queries.length > 0) {
+                        referencedQueriesListEl.innerHTML = queries.map(query => `
+                            <li class="referenced-query-item">${escapeHtml(query)}</li>
+                        `).join('');
+                    } else {
+                        referencedQueriesListEl.innerHTML = '<li class="referenced-query-item">No referenced queries</li>';
+                    }
+                } else {
+                    referencedQueriesListEl.innerHTML = '<li class="referenced-query-item">No referenced queries</li>';
+                }
+            }
 
             if (metadataListEl) {
                 if (items.length === 0) {
@@ -121,8 +137,7 @@
                     type: typeof typeInputEl !== 'undefined' && typeInputEl ? typeInputEl.value : 'custom',
                     summary: summaryInputEl ? summaryInputEl.value : '',
                     keywords,
-                    tags,
-                    feedback: feedbackInputEl ? feedbackInputEl.value : ''
+                    tags
                 });
                 setMetadataEditMode(false);
             });

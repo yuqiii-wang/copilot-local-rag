@@ -136,20 +136,24 @@ function generateKeywords(text) {
             continue;
         }
 
+        // Give title (h1) words even higher priority
+        const isTitle = /^#\s+/.test(trimmedLine);
+        const adjustedLineWeight = isTitle ? lineWeight * 1.5 : lineWeight;
+
         const patternCandidates = extractPatternCandidateTokens(lineText);
         for (const token of patternCandidates) {
-            addKeywordScore(scoreMap, token, lineWeight * 3);
+            addKeywordScore(scoreMap, token, adjustedLineWeight * 3);
         }
 
         const capitalSequences = extract_capital_sequences(lineText);
         for (const capitalSequence of capitalSequences) {
-            addKeywordScore(scoreMap, capitalSequence, lineWeight * 2);
+            addKeywordScore(scoreMap, capitalSequence, adjustedLineWeight * 2);
         }
 
         const baseTokens = tokenizeFromTokenization(lineText);
         const ngrams = generate_ngrams(baseTokens, 1, 2);
         for (const ngram of ngrams) {
-            const ngramWeight = ngram.includes(' ') ? lineWeight * 0.85 : lineWeight;
+            const ngramWeight = ngram.includes(' ') ? adjustedLineWeight * 0.85 : adjustedLineWeight;
             addKeywordScore(scoreMap, ngram, ngramWeight);
         }
     }

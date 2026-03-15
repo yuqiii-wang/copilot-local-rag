@@ -12,6 +12,9 @@
                 <input type="radio" name="syncType" value="all"> All Documents
             </label>
             <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                <input type="radio" name="syncType" value="feedback"> Feedback Referenced Docs
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
                 <input type="radio" name="syncType" value="reset"> Reset to Default
             </label>
         </div>
@@ -28,13 +31,18 @@
             <p style="margin:0;">Remove all current documents and reload default docs only.</p>
             <p style="margin-top:8px; font-weight:bold; color: var(--vscode-editorError-foreground);">This will delete all existing local documents!</p>
         </div>
+        <div id="sync-feedback-container" style="display:none; color: var(--vscode-descriptionForeground); font-size: 12px;">
+            <p style="margin:0;">Sync documents from Confluence URLs referenced in feedback submissions.</p>
+            <p style="margin-top:8px; font-weight:bold;">This will download and index all documents referenced in feedback.</p>
+        </div>
         
         <div style="display:flex;align-items:center;gap:6px;margin-top:12px;">
             <input type="checkbox" id="full-index-refresh" name="fullIndexRefresh">
             <label for="full-index-refresh" style="cursor:pointer;font-size:10px;">Full document index refresh after sync</label>
         </div>
     </div>
-    <div class="refresh-popup-footer" style="text-align:right;">
+    <div class="refresh-popup-footer" style="display:flex;justify-content:space-between;align-items:center;">
+        <button id="open-doc-store-btn" class="action-btn">Open Doc Store</button>
         <button id="submit-refresh-btn" class="action-btn">Sync</button>
     </div>
 </div>

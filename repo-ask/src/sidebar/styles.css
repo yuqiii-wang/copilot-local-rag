@@ -309,6 +309,32 @@ body {
     margin: 0 0 4px;
 }
 
+.referenced-queries-list {
+    width: 100%;
+    max-width: 100%;
+    list-style: none;
+    padding: 8px;
+    margin: 0 0 8px;
+    border: 1px solid var(--vscode-editorWidget-border);
+    border-radius: 4px;
+    background: var(--vscode-editor-background);
+    overflow: auto;
+    min-height: 64px;
+}
+
+.referenced-query-item {
+    margin: 0 0 4px;
+    padding: 4px 6px;
+    border-radius: 3px;
+    background: var(--vscode-list-hoverBackground);
+    font-size: 12px;
+    line-height: 1.3;
+}
+
+.referenced-query-item:last-child {
+    margin-bottom: 0;
+}
+
 .metadata-label {
     font-size: 11px;
     margin: 2px 0 4px;

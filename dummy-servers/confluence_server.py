@@ -41,6 +41,12 @@ async def confluence_ui_view(spaceKey: str, pageId: str, title: str):
                     .page-container {{ border: 1px solid #ddd; padding: 20px; border-radius: 5px; }}
                     .page-title {{ font-size: 24px; font-weight: bold; color: #1a73e8; margin-bottom: 20px; }}
                     .page-content {{ margin: 20px 0; }}
+                    .page-content table {{ border-collapse: collapse; width: 100%; margin: 16px 0; }}
+                    .page-content th, .page-content td {{ border: 1px solid #d1d5db; padding: 8px; text-align: left; vertical-align: top; }}
+                    .page-content th {{ background: #f3f4f6; }}
+                    .page-content ul, .page-content ol {{ margin: 8px 0 8px 20px; padding: 0; }}
+                    .page-content li {{ margin: 4px 0; }}
+                    .page-content pre {{ background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 4px; padding: 8px; overflow-x: auto; }}
                     .back-link {{ margin-top: 20px; }}
                 </style>
             </head>

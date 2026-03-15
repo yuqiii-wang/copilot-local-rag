@@ -52,15 +52,17 @@ function createSidebarController(deps) {
                     }
 
                     if (message?.command === 'refreshDocs') {
-                        const { isAll, arg } = message;
-                        if (isAll) {
+                        const { isAll, isFeedback, arg, fullIndexRefresh } = message;
+                        if (isFeedback) {
+                            vscode.commands.executeCommand('repo-ask.refresh', { type: 'feedback', fullIndexRefresh });
+                        } else if (isAll) {
                             if (arg) {
-                                vscode.commands.executeCommand('repo-ask.refresh', { type: 'recursive', arg: String(arg).trim() });
+                                vscode.commands.executeCommand('repo-ask.refresh', { type: 'recursive', arg: String(arg).trim(), fullIndexRefresh });
                             } else {
-                                vscode.commands.executeCommand('repo-ask.refresh', '');
+                                vscode.commands.executeCommand('repo-ask.refresh', { type: 'all', fullIndexRefresh });
                             }
                         } else if (arg) {
-                            vscode.commands.executeCommand('repo-ask.refresh', String(arg).trim());
+                            vscode.commands.executeCommand('repo-ask.refresh', { type: 'single', arg: String(arg).trim(), fullIndexRefresh });
                         }
                     }
 
@@ -92,12 +94,44 @@ function createSidebarController(deps) {
                         await resetToDefaultDocs(message, docsWebviewView, refreshSidebarView, context);
                     }
 
-                    if (message?.command === 'submitFeedback' && message.feedbackEntry) {
-                        await handleSubmitFeedback(message.feedbackEntry);
+                    if (message?.command === 'submitFeedback' && message.feedbackPayload) {
+                        await handleSubmitFeedback(message.feedbackPayload);
                     }
 
                     if (message?.command === 'generateSummary' && message.conversationSummary) {
                         await handleGenerateSummary(message.conversationSummary);
+                    }
+
+                    if (message?.command === 'getDocumentByID' && message.id) {
+                        // Find document by ID and return its source URL
+                        const allMetadata = readAllMetadata(storagePath);
+                        const document = allMetadata.find(doc => String(doc.id) === String(message.id));
+                        if (document) {
+                            docsWebviewView.webview.postMessage({ 
+                                command: 'documentFound', 
+                                document 
+                            });
+                        }
+                    }
+
+                    if (message?.command === 'openDocStore') {
+                        // Open the document store directory in file explorer
+                        try {
+                            const fs = require('fs');
+                            const path = require('path');
+                            const docStorePath = path.join(storagePath, 'documents');
+                            
+                            // Ensure the directory exists
+                            if (!fs.existsSync(docStorePath)) {
+                                fs.mkdirSync(docStorePath, { recursive: true });
+                            }
+                            
+                            // Open the directory
+                            vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(docStorePath));
+                        } catch (error) {
+                            console.error('Error opening document store:', error);
+                            vscode.window.showErrorMessage('Failed to open document store directory');
+                        }
                     }
                 });
 
@@ -263,7 +297,7 @@ function createSidebarController(deps) {
 </html>`;
     }
 
-    async function handleSubmitFeedback(feedbackEntry) {
+    async function handleSubmitFeedback(feedbackPayload) {
         try {
             const configuration = vscode.workspace.getConfiguration('repoAsk');
             const confluenceUrl = configuration.get('logActionConfluenceUrl');
@@ -281,7 +315,77 @@ function createSidebarController(deps) {
                 return;
             }
             
-            await updateConfluencePage(confluenceUrl, feedbackEntry);
+            // Extract data points from feedback submission
+            const { sourceQuery, confluencePageId, jiraId, confluenceLink } = feedbackPayload;
+            
+            // Implement mapping system: associate Source Query with reference queries
+            if (sourceQuery && (confluencePageId || jiraId || confluenceLink)) {
+                try {
+                    // Find the document in local store using Confluence page ID or Jira ID
+                    const allMetadata = readAllMetadata(storagePath);
+                    let targetDocument = null;
+                    
+                    if (confluencePageId) {
+                        targetDocument = allMetadata.find(doc => String(doc.id) === String(confluencePageId));
+                    }
+                    
+                    if (!targetDocument && jiraId) {
+                        targetDocument = allMetadata.find(doc => String(doc.id) === String(jiraId));
+                    }
+                    
+                    if (!targetDocument && confluenceLink) {
+                        try {
+                            // Try to extract ID from the link
+                            const url = new URL(confluenceLink);
+                            const pageIdMatch = url.search.match(/pageId=(\d+)/);
+                            if (pageIdMatch && pageIdMatch[1]) {
+                                targetDocument = allMetadata.find(doc => String(doc.id) === String(pageIdMatch[1]));
+                            }
+                        } catch (urlError) {
+                            console.error('Error parsing Confluence link:', urlError);
+                            // Continue without extracting ID from link
+                        }
+                    }
+                    
+                    // Add Source Query to referenceQueries section if document found
+                    if (targetDocument) {
+                        const currentReferenceQueries = Array.isArray(targetDocument.referencedQueries) ? targetDocument.referencedQueries : [];
+                        
+                        // Check if the source query is already in the list
+                        if (!currentReferenceQueries.includes(sourceQuery)) {
+                            const updatedReferenceQueries = [...currentReferenceQueries, sourceQuery];
+                            
+                            // Update the document metadata
+                            const updatedMetadata = {
+                                ...targetDocument,
+                                referencedQueries: updatedReferenceQueries
+                            };
+                            
+                            // Write the updated metadata back to storage
+                            try {
+                                const content = readDocumentContent(storagePath, targetDocument.id);
+                                if (content) {
+                                    writeDocumentFiles(storagePath, targetDocument.id, content, updatedMetadata);
+                                    vscode.window.showInformationMessage(`Added reference query to document: ${targetDocument.title || targetDocument.id}`);
+                                } else {
+                                    console.error('No content found for document:', targetDocument.id);
+                                }
+                            } catch (writeError) {
+                                console.error('Error writing document metadata:', writeError);
+                            }
+                        } else {
+                            console.log('Source query already in reference queries for document:', targetDocument.id);
+                        }
+                    } else {
+                        console.log('No document found for mapping source query:', sourceQuery);
+                    }
+                } catch (mappingError) {
+                    console.error('Error mapping source query to reference queries:', mappingError);
+                    // Continue with feedback submission even if mapping fails
+                }
+            }
+            
+            await updateConfluencePage(confluenceUrl, feedbackPayload);
             vscode.window.showInformationMessage('Feedback submitted successfully!');
             
             // Send success message to webview
@@ -397,13 +501,14 @@ function createSidebarController(deps) {
         }
     }
 
-    function showLogActionButton(firstUserQuery, firstRankedDocUrl, fullAiResponse) {
+    function showLogActionButton(firstUserQuery, firstRankedDocUrl, fullAiResponse, selectedDocument) {
         if (docsWebviewView) {
             docsWebviewView.webview.postMessage({ 
                 command: 'showFeedbackForm',
                 firstUserQuery: firstUserQuery,
                 firstRankedDocUrl: firstRankedDocUrl,
-                fullAiResponse: fullAiResponse
+                fullAiResponse: fullAiResponse,
+                selectedDocument: selectedDocument || null
             });
         }
     }

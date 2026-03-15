@@ -25,6 +25,27 @@ function ensureIndexStoragePath(context) {
     return indexPath;
 }
 
+function rewriteMetadataFile(metadataPath, fallbackId) {
+    if (!fs.existsSync(metadataPath)) {
+        return false;
+    }
+
+    try {
+        const raw = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
+        const normalized = normalizeStoredMetadataSchema(fallbackId, raw);
+        const rawText = JSON.stringify(raw, null, 2);
+        const normalizedText = JSON.stringify(normalized, null, 2);
+        if (rawText !== normalizedText) {
+            fs.writeFileSync(metadataPath, normalizedText, 'utf8');
+            return true;
+        }
+    } catch {
+        // Ignore malformed metadata files during backfill.
+    }
+
+    return false;
+}
+
 function getDocumentDirectory(storagePath, docId) {
     return path.join(storagePath, String(docId));
 }
@@ -93,17 +114,59 @@ function readAllMetadata(storagePath) {
     return metadataList;
 }
 
+function backfillStoredMetadataSchema(storagePath) {
+    const entries = fs.existsSync(storagePath)
+        ? fs.readdirSync(storagePath, { withFileTypes: true })
+        : [];
+
+    for (const entry of entries) {
+        if (entry.isDirectory()) {
+            rewriteMetadataFile(path.join(storagePath, entry.name, METADATA_FILE_NAME), entry.name);
+            continue;
+        }
+
+        if (entry.isFile() && entry.name.endsWith('.json')) {
+            rewriteMetadataFile(path.join(storagePath, entry.name), path.parse(entry.name).name);
+        }
+    }
+}
+
+function normalizeStoredMetadataSchema(docId, metadata) {
+    const base = metadata && typeof metadata === 'object' ? metadata : {};
+    const normalizedReferencedQueries = Array.isArray(base.referencedQueries)
+        ? [...new Set(base.referencedQueries.map(value => String(value || '').trim()).filter(Boolean))]
+        : typeof base.referencedQueries === 'string'
+            ? [...new Set(base.referencedQueries.split(',').map(value => value.trim()).filter(Boolean))]
+            : [];
+
+    return {
+        ...base,
+        id: base.id !== undefined && base.id !== null ? base.id : pageIdToId(docId),
+        keywords: Array.isArray(base.keywords) ? base.keywords : [],
+        extended_keywords: Array.isArray(base.extended_keywords) ? base.extended_keywords : [],
+        tags: Array.isArray(base.tags) ? base.tags : [],
+        referencedQueries: normalizedReferencedQueries,
+        summary: typeof base.summary === 'string' ? base.summary : '',
+        feedback: typeof base.feedback === 'string' ? base.feedback : ''
+    };
+}
+
+function pageIdToId(docId) {
+    return String(docId);
+}
+
 function writeDocumentFiles(storagePath, pageId, markdownContent, metadata) {
     const docDir = getDocumentDirectory(storagePath, pageId);
     const imagesDir = getDocumentImagesDirectory(storagePath, pageId);
     const contentPath = getDocumentContentPath(storagePath, pageId);
     const metadataPath = getDocumentMetadataPath(storagePath, pageId);
+    const normalizedMetadata = normalizeStoredMetadataSchema(pageId, metadata);
 
     fs.mkdirSync(docDir, { recursive: true });
     fs.mkdirSync(imagesDir, { recursive: true });
 
     fs.writeFileSync(contentPath, markdownContent, 'utf8');
-    fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2), 'utf8');
+    fs.writeFileSync(metadataPath, JSON.stringify(normalizedMetadata, null, 2), 'utf8');
 }
 
 function readDocumentContent(storagePath, docId) {
@@ -175,6 +238,7 @@ function deleteDocumentFiles(storagePath, docId) {
 module.exports = {
     ensureStoragePath,
     ensureIndexStoragePath,
+    backfillStoredMetadataSchema,
     getDocumentDirectory,
     getDocumentImagesDirectory,
     readAllMetadata,

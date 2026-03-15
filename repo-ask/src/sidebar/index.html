@@ -132,10 +132,12 @@
         const refreshPopup = document.getElementById('refresh-popup');
         const closeRefreshPopupBtn = document.getElementById('close-refresh-popup-btn');
         const submitRefreshBtn = document.getElementById('submit-refresh-btn');
+        const openDocStoreBtn = document.getElementById('open-doc-store-btn');
         const syncSingleInput = document.getElementById('sync-single-input');
         const syncSingleContainer = document.getElementById('sync-single-container');
         const syncAllContainer = document.getElementById('sync-all-container');
         const syncResetContainer = document.getElementById('sync-reset-container');
+        const syncFeedbackContainer = document.getElementById('sync-feedback-container');
         const syncRadios = document.querySelectorAll('input[name="syncType"]');
 
         if (openRefreshPopupBtn && refreshPopup) {
@@ -152,14 +154,22 @@
                         if (syncSingleContainer) syncSingleContainer.style.display = 'none';
                         if (syncAllContainer) syncAllContainer.style.display = 'block';
                         if (syncResetContainer) syncResetContainer.style.display = 'none';
+                        if (syncFeedbackContainer) syncFeedbackContainer.style.display = 'none';
                     } else if (e.target.value === 'reset') {
                         if (syncSingleContainer) syncSingleContainer.style.display = 'none';
                         if (syncAllContainer) syncAllContainer.style.display = 'none';
                         if (syncResetContainer) syncResetContainer.style.display = 'block';
+                        if (syncFeedbackContainer) syncFeedbackContainer.style.display = 'none';
+                    } else if (e.target.value === 'feedback') {
+                        if (syncSingleContainer) syncSingleContainer.style.display = 'none';
+                        if (syncAllContainer) syncAllContainer.style.display = 'none';
+                        if (syncResetContainer) syncResetContainer.style.display = 'none';
+                        if (syncFeedbackContainer) syncFeedbackContainer.style.display = 'block';
                     } else {
                         if (syncSingleContainer) syncSingleContainer.style.display = 'block';
                         if (syncAllContainer) syncAllContainer.style.display = 'none';
                         if (syncResetContainer) syncResetContainer.style.display = 'none';
+                        if (syncFeedbackContainer) syncFeedbackContainer.style.display = 'none';
                         if (syncSingleInput) syncSingleInput.focus();
                     }
                 });
@@ -171,10 +181,13 @@
                 
                 let isAll = false;
                 let isReset = false;
+                let isFeedback = false;
                 const allRadio = document.querySelector('input[name="syncType"][value="all"]');
                 const resetRadio = document.querySelector('input[name="syncType"][value="reset"]');
+                const feedbackRadio = document.querySelector('input[name="syncType"][value="feedback"]');
                 if (allRadio && allRadio.checked) isAll = true;
                 if (resetRadio && resetRadio.checked) isReset = true;
+                if (feedbackRadio && feedbackRadio.checked) isFeedback = true;
                 
                 // Check if full index refresh is requested
                 const fullIndexRefreshCheckbox = document.getElementById('full-index-refresh');
@@ -185,6 +198,11 @@
                     if(typeof renderSuccessMessage === 'function') renderSuccessMessage('');
                     if(typeof renderSyncStatus === 'function') renderSyncStatus('resetting to default documents...');
                     vscode.postMessage({ command: 'resetToDefaultDocs', fullIndexRefresh });
+                } else if (isFeedback) {
+                    if(typeof renderSyncError === 'function') renderSyncError('');
+                    if(typeof renderSuccessMessage === 'function') renderSuccessMessage('');
+                    if(typeof renderSyncStatus === 'function') renderSyncStatus('syncing documents from feedback submissions...');
+                    vscode.postMessage({ command: 'refreshDocs', isFeedback: true, fullIndexRefresh });
                 } else if (isAll) {
                     if(typeof renderSyncError === 'function') renderSyncError('');
                     if(typeof renderSuccessMessage === 'function') renderSuccessMessage('');
@@ -207,6 +225,12 @@
                 }
                 refreshPopup.style.display = 'none';
             });
+            
+            if (openDocStoreBtn) {
+                openDocStoreBtn.addEventListener('click', () => {
+                    vscode.postMessage({ command: 'openDocStore' });
+                });
+            }
         }
         
     </script>
@@ -236,8 +260,8 @@
             if (message?.command === 'syncStatus' || message?.command === 'syncError' || message?.command === 'syncSuccess') {
                 const submitRefreshBtn = document.getElementById('submit-refresh-btn');
                 if (submitRefreshBtn) {
-                    // Keep button disabled after sync
-                    submitRefreshBtn.disabled = true;
+                    // Re-enable button after sync completes
+                    submitRefreshBtn.disabled = false;
                     submitRefreshBtn.innerHTML = 'Sync';
                 }
             }

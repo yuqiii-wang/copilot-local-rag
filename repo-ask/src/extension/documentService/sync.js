@@ -71,6 +71,7 @@ function notifyDocumentProcessed(options, metadata, index, total) {
 }
 
 async function processDocument(page) {
+  const existingMetadata = getStoredMetadataById(page.id) || {};
   const rawContent = getPageHtml(page);
   const isHtmlContent = isLikelyHtml(rawContent);
   const htmlTagData = isHtmlContent ? extractHtmlTagData(rawContent) : {
@@ -90,7 +91,10 @@ async function processDocument(page) {
     type: 'confluence',
     keywords: [],
     extended_keywords: [],
-    summary: ''
+    summary: '',
+    tags: Array.isArray(existingMetadata.tags) ? existingMetadata.tags : [],
+    feedback: String(existingMetadata.feedback || '').trim(),
+    referencedQueries: Array.isArray(existingMetadata.referencedQueries) ? existingMetadata.referencedQueries : []
   };
   const tokenizationKeywords = cleanKeywords(generateKeywords(markdownContent), getKeywordConfig().TOKENIZATION_KEYWORD_LIMIT);
   bm25Index.upsertDocument(page.id, markdownContent);
@@ -103,16 +107,18 @@ async function processDocument(page) {
     limit: getKeywordConfig().DEFAULT_KEYWORD_LIMIT
   });
   const metadata = {
+    ...existingMetadata,
     ...baseMetadata,
     keywords: mergedKeywords,
     extended_keywords: cleanKeywords(generateExtendedKeywords(mergedKeywords), 80),
-    summary: ''
+    summary: String(existingMetadata.summary || '').trim()
   };
   writeDocumentFiles(storagePath, page.id, markdownContent, metadata);
   return metadata;
 }
 
 async function processJiraIssue(issue) {
+  const existingMetadata = getStoredMetadataById(issue?.id) || {};
   const fields = issue?.fields || {};
   const reporter = fields?.reporter?.displayName || 'Unknown';
   const projectKey = fields?.project?.key || 'Jira';
@@ -145,7 +151,10 @@ async function processJiraIssue(issue) {
     type: 'jira',
     keywords: [],
     extended_keywords: [],
-    summary: ''
+    summary: '',
+    tags: Array.isArray(existingMetadata.tags) ? existingMetadata.tags : [],
+    feedback: String(existingMetadata.feedback || '').trim(),
+    referencedQueries: Array.isArray(existingMetadata.referencedQueries) ? existingMetadata.referencedQueries : []
   };
   const tokenizationKeywords = cleanKeywords(generateKeywords(markdownContent), getKeywordConfig().TOKENIZATION_KEYWORD_LIMIT);
   bm25Index.upsertDocument(issue?.id, markdownContent);
@@ -158,10 +167,11 @@ async function processJiraIssue(issue) {
     limit: getKeywordConfig().DEFAULT_KEYWORD_LIMIT
   });
   const metadata = {
+    ...existingMetadata,
     ...baseMetadata,
     keywords: mergedKeywords,
     extended_keywords: cleanKeywords(generateExtendedKeywords(mergedKeywords), 80),
-    summary: ''
+    summary: String(existingMetadata.summary || '').trim()
   };
   writeDocumentFiles(storagePath, issue?.id, markdownContent, metadata);
   return metadata;

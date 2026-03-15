@@ -18,6 +18,7 @@ const {
 const {
     ensureStoragePath,
     ensureIndexStoragePath,
+    backfillStoredMetadataSchema,
     readAllMetadata,
     readDocumentContent,
     deleteDocumentFiles,
@@ -43,6 +44,7 @@ const TOOL_NAMES = {
 function setupExtension(context) {
     const storagePath = ensureStoragePath(context);
     const indexStoragePath = ensureIndexStoragePath(context);
+    backfillStoredMetadataSchema(storagePath);
 
     const documentService = createDocumentService({
         vscode,
@@ -102,7 +104,9 @@ function setupExtension(context) {
         documentService,
         sidebar,
         storagePath,
-        readAllMetadata
+        readAllMetadata,
+        readDocumentContent,
+        writeDocumentFiles
     });
 
     let repoAskDocParticipant;
@@ -174,7 +178,10 @@ function setupExtension(context) {
     const showLogActionButtonCommandDisposable = createShowLogActionButtonCommand({
         vscode,
         context,
-        sidebar
+        sidebar,
+        documentService,
+        readAllMetadata,
+        storagePath
     });
 
     const baseSubscriptions = [
