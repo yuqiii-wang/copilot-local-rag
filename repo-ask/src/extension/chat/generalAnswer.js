@@ -41,7 +41,7 @@ async function answerGeneralPromptQuestion(vscodeApi, prompt, workspacePromptCon
     ].join('\n\n');
 
     let toolsToUse = (vscodeApi.lm.tools || []).filter(t => t.name.startsWith('repoask_'));
-    toolsToUse = toolsToUse.filter(t => t.name !== 'repoask_code_check' && t.name !== 'repoask_read_repo_prompts');
+    toolsToUse = toolsToUse.filter(t => t.name !== 'repoask_code_diff_check' && t.name !== 'repoask_read_repo_prompts' && t.name !== 'repoask_code_explore');
     const finalText = await runModelWithTools({
         vscodeApi,
         model,

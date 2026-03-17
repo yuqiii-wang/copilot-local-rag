@@ -1,8 +1,8 @@
 const registerRankTool = require('./rankTool');
 const registerCheckTool = require('./checkTool');
-const registerCodeCheckTool = require('./codeCheckTool');
+const registerCodeDiffCheckTool = require('./codeCheckTool');
 const registerReadRepoPromptsTool = require('./readRepoPromptsTool');
-const registerCodeSplitterTool = require('./codeSplitterTool');
+const registerCodeExploreTool = require('./codeExploreTool');
 
 function createLanguageModelTools(deps) {
     const { vscode } = deps;
@@ -14,11 +14,11 @@ function createLanguageModelTools(deps) {
 
         const rankTool = registerRankTool(deps);
         const checkTool = registerCheckTool(deps);
-        const codeCheckTool = registerCodeCheckTool(deps);
+        const codeDiffCheckTool = registerCodeDiffCheckTool(deps);
         const readRepoPromptsTool = registerReadRepoPromptsTool(deps);
-        const codeSplitterTool = registerCodeSplitterTool(deps);
+        const codeExploreTool = registerCodeExploreTool(deps);
 
-        return [rankTool, checkTool, codeCheckTool, readRepoPromptsTool, codeSplitterTool];
+        return [rankTool, checkTool, codeDiffCheckTool, readRepoPromptsTool, codeExploreTool];
     }
 
     return {

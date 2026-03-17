@@ -1,7 +1,0 @@
-{
-  "dependencies": {
-    "@langchain/textsplitters": "^1.0.1",
-    "axios": "^1.13.6",
-    "web-tree-sitter": "^0.26.6"
-  }
-}

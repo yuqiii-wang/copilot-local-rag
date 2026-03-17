@@ -105,6 +105,22 @@ function stripMarkdownPrefix(line) {
         .trim();
 }
 
+function jiraTextToMarkdown(jiraText) {
+    let processedText = String(jiraText || '').trim();
+    
+    // Handle Jira headings: h1., h2., h3., h4.
+    processedText = processedText
+        .replace(/^h1\.\s+/gm, '# ')
+        .replace(/^h2\.\s+/gm, '## ')
+        .replace(/^h3\.\s+/gm, '### ')
+        .replace(/^h4\.\s+/gm, '#### ');
+    
+    // Ensure proper line breaks
+    processedText = processedText.replace(/\r?\n/g, '\n');
+    
+    return processedText;
+}
+
 function htmlToMarkdown(html) {
     return turndownService.turndown(String(html || '')).trim();
 }
@@ -195,6 +211,7 @@ module.exports = {
     truncate,
     tokenize: tokenizeFromTokenization,
     htmlToMarkdown,
+    jiraTextToMarkdown,
     generateKeywords,
     generateSummary,
     generateExtendedKeywords

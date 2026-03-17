@@ -11,6 +11,7 @@ const {
     truncate,
     tokenize,
     htmlToMarkdown,
+    jiraTextToMarkdown,
     generateKeywords,
     generateSummary,
     generateExtendedKeywords
@@ -57,6 +58,7 @@ function setupExtension(context) {
         truncate,
         tokenize,
         htmlToMarkdown,
+        jiraTextToMarkdown,
         generateKeywords,
         generateExtendedKeywords,
         generateSummary,

@@ -1,9 +1,9 @@
 const { toToolResult } = require('./utils');
 
-module.exports = function registerCodeCheckTool(deps) {
+module.exports = function registerCodeDiffCheckTool(deps) {
     const { vscode } = deps;
-    return vscode.lm.registerTool('repoask_code_check', {
-            prepareInvocation() {
+    return vscode.lm.registerTool('repoask_code_diff_check', {
+            prepareInvocation({ args }) {
                 return {
                     invocationMessage: 'Generating new code check vs main/master branch...',
                     confirmationMessages: {
@@ -12,7 +12,7 @@ module.exports = function registerCodeCheckTool(deps) {
                     }
                 };
             },
-            async invoke() {
+            async invoke({ args }) {
                 const { execSync } = require('child_process');
                 const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
                 if (!workspaceFolder) {
@@ -21,15 +21,46 @@ module.exports = function registerCodeCheckTool(deps) {
                 
                 try {
                     execSync('git rev-parse --is-inside-work-tree', { cwd: workspaceFolder, stdio: 'ignore' });
-                    
-                    const currentBranch = execSync('git branch --show-current', { cwd: workspaceFolder, encoding: 'utf8' }).trim();
-                    if (currentBranch === 'main' || currentBranch === 'master') {
-                        return toToolResult(`You are currently on the ${currentBranch} branch. Please switch to a dev branch first.`, { diff: null, error: `On ${currentBranch} branch` });
-                    }
                 } catch (e) {
                     return toToolResult('This workspace is not a valid git repository or git is not installed/permitted.', { diff: null, error: 'Not a git repository or git lacks permission' });
                 }
 
+                // Extract Jira ID from user query if provided
+                let jiraId = null;
+                if (args && args.query) {
+                    const jiraConfig = vscode.workspace.getConfiguration('repoAsk').get('jira');
+                    if (jiraConfig && jiraConfig.regex) {
+                        const regexPatterns = Array.isArray(jiraConfig.regex) ? jiraConfig.regex : [jiraConfig.regex];
+                        for (const pattern of regexPatterns) {
+                            const regex = new RegExp(pattern, 'g');
+                            const match = regex.exec(args.query);
+                            if (match) {
+                                jiraId = match[0];
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // If Jira ID found, search for commits containing it
+                if (jiraId) {
+                    try {
+                        const commits = execSync(`git log --grep="${jiraId}" --oneline`, { cwd: workspaceFolder, encoding: 'utf8' });
+                        if (commits && commits.trim()) {
+                            // Get the latest commit with the Jira ID
+                            const latestCommit = commits.trim().split('\n')[0].split(' ')[0];
+                            // Get the diff for that commit
+                            const commitDiff = execSync(`git show ${latestCommit}`, { cwd: workspaceFolder, encoding: 'utf8' });
+                            return toToolResult(`Found commits for Jira ID ${jiraId}:\n\n${commits}\n\nGit diff for latest commit:\n\n\`\`\`diff\n${commitDiff}\n\`\`\``, { diff: commitDiff, jiraId, commits });
+                        } else {
+                            return toToolResult(`No commits found for Jira ID ${jiraId}`, { diff: null, jiraId });
+                        }
+                    } catch (error) {
+                        return toToolResult(`Error searching for commits with Jira ID ${jiraId}: ${error.message}`, { diff: null, error: error.message });
+                    }
+                }
+
+                // Original functionality - check git diff
                 try {
                     let diff = '';
                     try {
