@@ -17,7 +17,7 @@ async function answerGeneralPromptQuestion(vscodeApi, prompt, workspacePromptCon
         return;
     }
 
-    const model = await selectDefaultChatModel(vscodeApi);
+    const model = await selectDefaultChatModel(vscodeApi, options);
     if (!model) {
         response.markdown('No language model is available in this VS Code session.');
         return;

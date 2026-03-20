@@ -67,8 +67,8 @@ async function selectToolAndArg(vscode, prompt, options = {}) {
 
     if (vscode.lm && vscode.LanguageModelChatMessage) {
         try {
-            const models = await withTimeout(vscode.lm.selectChatModels({}), LLM_TIMEOUT_MS, []);
-            const model = models?.[0];
+            const shared = require('../chat/shared');
+            const model = await shared.selectDefaultChatModel(vscode, options);
             if (model) {
                 const instruction = [
                     'You are a helper that chooses which local repoask tool to run based on a user query.',
@@ -202,8 +202,8 @@ async function extractConfluenceIdentifierWithLlm(vscode, rawInput, options = {}
     const boundedPromptContext = workspacePromptContext.slice(0, 12000);
 
     try {
-        const models = await withTimeout(vscode.lm.selectChatModels({}), LLM_TIMEOUT_MS, []);
-        const model = models?.[0];
+        const shared = require('../chat/shared');
+        const model = await shared.selectDefaultChatModel(vscode, options);
         if (!model) {
             return null;
         }

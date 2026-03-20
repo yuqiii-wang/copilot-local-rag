@@ -75,11 +75,17 @@ exports.withTimeout = async function withTimeout(promise, timeoutMs, timeoutValu
 /**
  * Selects the default chat model for this VS Code session.
  * @param {Object} vscodeApi - VS Code API object
+ * @param {Object} [options] - Options containing the chat request object
  * @returns {Promise<Object|null>} Selected chat model or null if unavailable
  */
-exports.selectDefaultChatModel = async function selectDefaultChatModel(vscodeApi) {
+exports.selectDefaultChatModel = async function selectDefaultChatModel(vscodeApi, options = {}) {
     if (!vscodeApi?.lm || !vscodeApi?.LanguageModelChatMessage) {
         return null;
+    }
+
+    if (options.request && options.request.model) {
+        console.log(`[RepoAsk] Selected chat model from request: ${options.request.model.name || options.request.model.id || 'unknown'}`);
+        return options.request.model;
     }
 
     const models = await exports.withTimeout(
@@ -88,7 +94,14 @@ exports.selectDefaultChatModel = async function selectDefaultChatModel(vscodeApi
         []
     );
 
-    return models?.[0] || null;
+    const fallbackModel = models?.[0] || null;
+    if (fallbackModel) {
+        console.log(`[RepoAsk] Selected fallback chat model: ${fallbackModel.name || fallbackModel.id || 'unknown'}`);
+    } else {
+        console.log(`[RepoAsk] No chat model available.`);
+    }
+
+    return fallbackModel;
 };
 
 /**

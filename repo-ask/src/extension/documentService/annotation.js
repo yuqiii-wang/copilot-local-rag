@@ -63,8 +63,8 @@ async function generateAnnotationWithLlm(metadata, content) {
     };
   }
   try {
-    const models = await vscode.lm.selectChatModels({});
-    const model = models?.[0];
+    const shared = require('../chat/shared');
+    const model = await shared.selectDefaultChatModel(vscode);
     if (!model) {
       return {
         keywords: appendSynonymKeywords([...originalKeywords, ...fallbackKeywords]),

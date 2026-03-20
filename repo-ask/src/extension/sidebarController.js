@@ -442,8 +442,8 @@ function createSidebarController(deps) {
             // Try to use VS Code's built-in LLM to rewrite the provided conversation summary.
             if (vscode.lm && vscode.LanguageModelChatMessage) {
                 try {
-                    const models = await vscode.lm.selectChatModels({});
-                    const model = models?.[0];
+                    const shared = require('./chat/shared');
+                    const model = await shared.selectDefaultChatModel(vscode);
                     if (model) {
                         const instruction = [
                             'You are a helpful assistant that rewrites conversation summaries.',
