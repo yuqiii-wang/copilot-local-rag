@@ -1,10 +1,9 @@
 module.exports = function(context) {
-  const { fs, path, vscode, storagePath, indexStoragePath, fetchConfluencePage, fetchAllConfluencePages, fetchConfluencePageChildren, fetchJiraIssue, truncate, tokenize, htmlToMarkdown, jiraTextToMarkdown, generateSynonyms, generateSummary, readAllMetadata, writeDocumentFiles, readDocumentContent, bm25Index, keywordsIndex, rankLocalDocuments,        annotateDocumentByArg, annotateAllDocuments, annotateStoredDocument, generateAnnotationWithLlm, localizeMarkdownImageLinks, normalizeMarkdownLinkTarget, downloadImageAsset, downloadDataUriAsset, resolveAbsoluteImageUrl, isDataUri, determineImageExtension, mimeTypeToExtension, getKeywordConfig, buildKeywordOnlyIndexText, rebuildKeywordsIndexFromMetadata, normalizeKeywordsInput, cleanKeywords, normalizeMetadataKeywordFields, mergeKeywordsPreservingSignals, appendKeywordsToExisting, writeDocumentPromptFile, formatMetadataEntries, getStoredMetadataById, generateStoredMetadataById, updateStoredMetadataById, removeDocumentFromIndicesById, sanitizeFileSegment, getWorkspaceRootPath, getPageHtml, isLikelyHtml, extractHtmlTagData, resolveSourceUrl } = context;
+  const { fs, path, vscode, storagePath, indexStoragePath, fetchConfluencePage, fetchAllConfluencePages, fetchConfluencePageChildren, fetchJiraIssue, truncate, tokenize, htmlToMarkdown, jiraTextToMarkdown, generateSynonyms, generateSummary, readAllMetadata, writeDocumentFiles, readDocumentContent, rankLocalDocuments,        annotateDocumentByArg, annotateAllDocuments, annotateStoredDocument, generateAnnotationWithLlm, localizeMarkdownImageLinks, normalizeMarkdownLinkTarget, downloadImageAsset, downloadDataUriAsset, resolveAbsoluteImageUrl, isDataUri, determineImageExtension, mimeTypeToExtension, getKeywordConfig, buildKeywordOnlyIndexText, rebuildKeywordsIndexFromMetadata, normalizeKeywordsInput, cleanKeywords, normalizeMetadataKeywordFields, mergeKeywordsPreservingSignals, appendKeywordsToExisting, writeDocumentPromptFile, formatMetadataEntries, getStoredMetadataById, generateStoredMetadataById, updateStoredMetadataById, removeDocumentFromIndicesById, sanitizeFileSegment, getWorkspaceRootPath, getPageHtml, isLikelyHtml, extractHtmlTagData, resolveSourceUrl } = context;
 
 async function refreshDocument(pageArg, options = {}) {
   const page = await fetchConfluencePage(pageArg);
   const metadata = await processDocument(page);
-  await finalizeBm25KeywordsForDocuments([metadata.id]);
   notifyDocumentProcessed(options, metadata, 1, 1);
 }
 
@@ -19,7 +18,6 @@ async function refreshConfluenceHierarchy(pageArg, options = {}) {
     if (processedIds.has(page.id)) continue;
     processedIds.add(page.id);
     const metadata = await processDocument(page);
-    await finalizeBm25KeywordsForDocuments([metadata.id]);
     currentIndex++;
     notifyDocumentProcessed(options, metadata, currentIndex, currentIndex + pagesToProcess.length);
     try {
@@ -46,7 +44,6 @@ async function refreshAllDocuments(options = {}) {
     refreshedIds.push(metadata.id);
     notifyDocumentProcessed(options, metadata, index + 1, total);
   }
-  await finalizeBm25KeywordsForDocuments(refreshedIds);
 }
 
 async function refreshJiraIssue(issueArg, options = {}) {
@@ -97,13 +94,8 @@ async function processDocument(page) {
     referencedQueries: Array.isArray(existingMetadata.referencedQueries) ? existingMetadata.referencedQueries : []
   };
   const tokenizationKeywords = cleanKeywords(tokenize(markdownContent), getKeywordConfig().TOKENIZATION_KEYWORD_LIMIT);
-  bm25Index.upsertDocument(page.id, markdownContent);
-  const bm25Keywords = cleanKeywords(bm25Index.extractKeywordsForDocument(page.id, {
-    limit: getKeywordConfig().BM25_KEYWORD_LIMIT
-  }), getKeywordConfig().BM25_KEYWORD_LIMIT);
   const mergedKeywords = mergeKeywordsPreservingSignals({
     structuralKeywords: tokenizationKeywords,
-    modelKeywords: bm25Keywords,
     limit: getKeywordConfig().DEFAULT_KEYWORD_LIMIT
   });
   const metadata = {
@@ -157,13 +149,8 @@ async function processJiraIssue(issue) {
     referencedQueries: Array.isArray(existingMetadata.referencedQueries) ? existingMetadata.referencedQueries : []
   };
   const tokenizationKeywords = cleanKeywords(tokenize(markdownContent), getKeywordConfig().TOKENIZATION_KEYWORD_LIMIT);
-  bm25Index.upsertDocument(issue?.id, markdownContent);
-  const bm25Keywords = cleanKeywords(bm25Index.extractKeywordsForDocument(issue?.id, {
-    limit: getKeywordConfig().BM25_KEYWORD_LIMIT
-  }), getKeywordConfig().BM25_KEYWORD_LIMIT);
   const mergedKeywords = mergeKeywordsPreservingSignals({
     structuralKeywords: tokenizationKeywords,
-    modelKeywords: bm25Keywords,
     limit: getKeywordConfig().DEFAULT_KEYWORD_LIMIT
   });
   const metadata = {
@@ -182,43 +169,12 @@ async function finalizeBm25KeywordsForDocuments(docIds = []) {
   if (!Array.isArray(metadataList) || metadataList.length === 0) {
     return;
   }
-  const corpus = metadataList.map(item => ({
-    id: item.id,
-    text: readDocumentContent(storagePath, item.id) || ''
-  }));
-  bm25Index.rebuildDocuments(corpus);
+
   const targetIdSet = new Set((Array.isArray(docIds) ? docIds : []).map(value => String(value || '').trim()).filter(value => value.length > 0));
   if (targetIdSet.size === 0) {
     return;
   }
-  for (const metadataEntry of metadataList) {
-    const metadata = normalizeMetadataKeywordFields(metadataEntry);
-    const id = String(metadata?.id || '').trim();
-    if (!id || !targetIdSet.has(id)) {
-      continue;
-    }
-    const content = readDocumentContent(storagePath, id);
-    if (!content) {
-      continue;
-    }
-    const bm25Keywords = cleanKeywords(bm25Index.extractKeywordsForDocument(id, {
-      limit: getKeywordConfig().BM25_KEYWORD_LIMIT
-    }), getKeywordConfig().BM25_KEYWORD_LIMIT);
-    const tokenizationKeywords = cleanKeywords(tokenize(content), getKeywordConfig().TOKENIZATION_KEYWORD_LIMIT);
-    const mergedKeywords = mergeKeywordsPreservingSignals({
-      structuralKeywords: tokenizationKeywords,
-      modelKeywords: bm25Keywords,
-      limit: getKeywordConfig().DEFAULT_KEYWORD_LIMIT
-    });
-    if (mergedKeywords.length === 0) {
-      continue;
-    }
-    const updatedMetadata = normalizeMetadataKeywordFields({
-      ...metadata,
-      keywords: mergedKeywords
-    });
-    writeDocumentFiles(storagePath, id, content, updatedMetadata);
-  }
+
   const refreshedMetadata = readAllMetadata(storagePath).map(normalizeMetadataKeywordFields);
   rebuildKeywordsIndexFromMetadata(refreshedMetadata);
 }
@@ -242,7 +198,6 @@ async function finalizeBm25KeywordsForDocuments(docIds = []) {
             const mdContent = fs.readFileSync(mdPath, 'utf8');
             const metadata = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
             writeDocumentFiles(storagePath, folder, mdContent, metadata);
-            bm25Index.upsertDocument(folder, mdContent);
             addedAny = true;
           } catch (e) {
             console.error(`Failed to sync default doc ${folder}:`, e);

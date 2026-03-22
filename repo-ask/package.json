@@ -140,7 +140,12 @@
               "summary": 2,
               "content": 4
             },
-            "BM25_WEIGHT": 1.0
+            "BM25_NGRAM_WEIGHTS": {
+              "1gram": 1.0,
+              "2gram": 1.5,
+              "3gram": 2.0,
+              "4gram": 2.5
+            }
           },
           "description": "Ranking search weights for local documents."
         },

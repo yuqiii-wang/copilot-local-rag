@@ -1,5 +1,5 @@
 module.exports = function(context) {
-  const { vscode, storagePath, fetchConfluencePage, truncate, tokenize, generateSynonyms, generateSummary, readAllMetadata, writeDocumentFiles, readDocumentContent, keywordsIndex,finalizeBm25KeywordsForDocuments,  getKeywordConfig, buildKeywordOnlyIndexText, cleanKeywords, normalizeMetadataKeywordFields, appendKeywordsToExisting, extractJsonObject } = context;
+  const { vscode, storagePath, fetchConfluencePage, truncate, tokenize, generateSynonyms, generateSummary, readAllMetadata, writeDocumentFiles, readDocumentContent, getKeywordConfig, buildKeywordOnlyIndexText, cleanKeywords, normalizeMetadataKeywordFields, appendKeywordsToExisting, extractJsonObject } = context;
 
 async function annotateDocumentByArg(pageArg) {
   const allMetadata = readAllMetadata(storagePath);

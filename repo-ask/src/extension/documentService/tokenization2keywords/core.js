@@ -13,10 +13,12 @@ function tokenize(text) {
         const titleWords = titleText.split(/\s+/);
         for (const word of titleWords) {
             const cleanWord = word.toLowerCase()
-                .replace(/[^a-z0-9-]/g, '')
                 .replace(/^-+|-+$/g, '');
             if (cleanWord.length > 2 && !STOP_WORDS.has(cleanWord)) {
                 tokens.push(cleanWord, cleanWord, cleanWord);
+                // Split at , ; and " to create additional tokens
+                const splitTokens = cleanWord.split(/[,;"\s]+/).filter(t => t.length > 2 && !STOP_WORDS.has(t));
+                splitTokens.forEach(token => tokens.push(token));
             }
         }
     }
@@ -28,10 +30,12 @@ function tokenize(text) {
             const boldWords = boldText.split(/\s+/);
             for (const word of boldWords) {
                 const cleanWord = word.toLowerCase()
-                    .replace(/[^a-z0-9-]/g, '')
                     .replace(/^-+|-+$/g, '');
                 if (cleanWord.length > 2 && !STOP_WORDS.has(cleanWord)) {
                     tokens.push(cleanWord, cleanWord);
+                    // Split at , ; and " to create additional tokens
+                    const splitTokens = cleanWord.split(/[,;"\s]+/).filter(t => t.length > 2 && !STOP_WORDS.has(t));
+                    splitTokens.forEach(token => tokens.push(token));
                 }
             }
         }
@@ -44,10 +48,12 @@ function tokenize(text) {
             const italicWords = italicText.split(/\s+/);
             for (const word of italicWords) {
                 const cleanWord = word.toLowerCase()
-                    .replace(/[^a-z0-9-]/g, '')
                     .replace(/^-+|-+$/g, '');
                 if (cleanWord.length > 2 && !STOP_WORDS.has(cleanWord)) {
                     tokens.push(cleanWord);
+                    // Split at , ; and " to create additional tokens
+                    const splitTokens = cleanWord.split(/[,;"\s]+/).filter(t => t.length > 2 && !STOP_WORDS.has(t));
+                    splitTokens.forEach(token => tokens.push(token));
                 }
             }
         }
@@ -59,13 +65,17 @@ function tokenize(text) {
         for (let i = 0; i < words.length; i++) {
             let word = words[i];
             const cleanWord = word.toLowerCase()
-                .replace(/[^a-z0-9-]/g, '')
                 .replace(/^-+|-+$/g, '');
             if (cleanWord.length <= 2 || STOP_WORDS.has(cleanWord)) continue;
 
             tokens.push(cleanWord);
 
-            if (cleanWord.includes('-')) {
+            // Split at , ; " and hyphens to create additional tokens
+            const splitTokens = cleanWord.split(/[,;"\s-]+/).filter(t => t.length > 2 && !STOP_WORDS.has(t));
+            splitTokens.forEach(token => tokens.push(token));
+
+            // Add extra weight for words with hyphens or punctuation
+            if (cleanWord.includes('-') || /[,;"@#$%^&*(){}[\]\\:;"'=+_]/.test(cleanWord)) {
                 tokens.push(cleanWord, cleanWord);
             }
             if (cleanWord.length > 8) {

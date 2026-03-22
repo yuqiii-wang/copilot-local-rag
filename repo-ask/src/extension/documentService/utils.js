@@ -6,10 +6,10 @@ module.exports = function(context) {
     fetchAllConfluencePages, fetchJiraIssue, truncate, tokenize, 
     htmlToMarkdown, generateSynonyms, 
     generateSummary, readAllMetadata, writeDocumentFiles, readDocumentContent, 
-    bm25Index, keywordsIndex, rankLocalDocuments, 
+    rankLocalDocuments, 
     refreshDocument, refreshAllDocuments, 
     refreshJiraIssue, notifyDocumentProcessed, processDocument, processJiraIssue, 
-    finalizeBm25KeywordsForDocuments, annotateDocumentByArg, annotateAllDocuments,
+    annotateDocumentByArg, annotateAllDocuments,
      annotateStoredDocument, generateAnnotationWithLlm, localizeMarkdownImageLinks, 
      normalizeMarkdownLinkTarget, downloadImageAsset, downloadDataUriAsset, 
      resolveAbsoluteImageUrl, isDataUri, determineImageExtension, mimeTypeToExtension, 
@@ -127,7 +127,6 @@ async function generateStoredMetadataById(docId) {
     summary: String(annotation.summary || '').trim()
   });
   writeDocumentFiles(storagePath, metadata.id, content, updatedMetadata);
-  keywordsIndex.upsertDocument(updatedMetadata.id, buildKeywordOnlyIndexText(updatedMetadata));
   return updatedMetadata;
 }
 
@@ -160,13 +159,10 @@ function updateStoredMetadataById(docId, patch = {}) {
     summary: nextSummary
   });
   writeDocumentFiles(storagePath, metadata.id, content, updatedMetadata);
-  keywordsIndex.upsertDocument(updatedMetadata.id, buildKeywordOnlyIndexText(updatedMetadata));
   return updatedMetadata;
 }
 
 function removeDocumentFromIndicesById(docId) {
-  bm25Index.removeDocument(docId);
-  keywordsIndex.removeDocument(docId);
 }
 
 function sanitizeFileSegment(value) {

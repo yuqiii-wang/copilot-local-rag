@@ -1,5 +1,5 @@
 module.exports = function(context) {
-  const { vscode, storagePath, truncate, tokenize, readAllMetadata, readDocumentContent, bm25Index, keywordsIndex, rebuildKeywordsIndexFromMetadata, normalizeMetadataKeywordFields,  } = context;
+  const { vscode, storagePath, truncate, tokenize, readAllMetadata, readDocumentContent, rebuildKeywordsIndexFromMetadata, normalizeMetadataKeywordFields,  } = context;
 
 const TOP_SCORE_THRESHOLD_RATIO = 0.5;
 
@@ -9,53 +9,9 @@ function rankLocalDocuments(query, limit = 20) {
     return [];
   }
 
-  // Rank/search should use the latest metadata keywords as the keyword index corpus.
-  rebuildKeywordsIndexFromMetadata(metadataList);
   const metadataById = Object.fromEntries(metadataList.map(item => [String(item.id), item]));
-  const rankedByKeywords = keywordsIndex.rankDocuments ? keywordsIndex.rankDocuments(query, metadataById, {
-    limit: 1000
-  }) : [];
-
-  // Re-implementing BM25 ranking based on ngrams up to 4
-  const lowerQuery = (query || '').toLowerCase().trim();
-  const queryTokens = typeof tokenize === 'function' ? tokenize(lowerQuery) : lowerQuery.split(/\s+/).filter(t => t.length > 0);
-  const queryTerms = [];
-  for (let i = 0; i < queryTokens.length; i++) {
-      queryTerms.push(queryTokens[i]); // 1-gram
-      if (i < queryTokens.length - 1) queryTerms.push(queryTokens[i] + ' ' + queryTokens[i+1]); // 2-gram
-      if (i < queryTokens.length - 2) queryTerms.push(queryTokens[i] + ' ' + queryTokens[i+1] + ' ' + queryTokens[i+2]); // 3-gram
-      if (i < queryTokens.length - 3) queryTerms.push(queryTokens[i] + ' ' + queryTokens[i+1] + ' ' + queryTokens[i+2] + ' ' + queryTokens[i+3]); // 4-gram
-  }
-  const uniqueQueryTerms = [...new Set(queryTerms)];
 
   let rankedByContent = [];
-  try {
-      const { bm25TermScore } = require('./bm25Core');
-      const index = bm25Index.loadIndex();
-      const stats = bm25Index.buildStats(index);
-      
-      if (stats.totalDocs > 0 && uniqueQueryTerms.length > 0) {
-          rankedByContent = Object.values(stats.docs)
-              .map((doc) => {
-                  let score = 0;
-                  for (const term of uniqueQueryTerms) {
-                      score += bm25TermScore(term, doc, stats, { limit: 1000 });
-                  }
-
-                  const metadata = metadataById[String(doc.id)] || {};
-                  return {
-                      ...metadata,
-                      id: metadata.id || doc.id,
-                      score
-                  };
-              })
-              .filter((item) => Number(item.score) > 0)
-              .sort((a, b) => b.score - a.score)
-              .slice(0, 1000);
-      }
-  } catch (e) {
-      console.error('Error during fallback ranking:', e);
-  }
 
   const combinedScores = new Map();
 
@@ -64,7 +20,12 @@ function rankLocalDocuments(query, limit = 20) {
   const WHOLE_QUERY_WEIGHTS = configuredWeights.WHOLE_QUERY_WEIGHTS || {};
   const TERM_WEIGHTS = configuredWeights.TERM_WEIGHTS || {};
   const NGRAM_WEIGHTS = configuredWeights.NGRAM_WEIGHTS || {};
-  const BM25_WEIGHT = typeof configuredWeights.BM25_WEIGHT === 'number' ? configuredWeights.BM25_WEIGHT : 1.0;
+  const BM25_NGRAM_WEIGHTS = configuredWeights.BM25_NGRAM_WEIGHTS || {
+    "1gram": 1.0,
+    "2gram": 1.5,
+    "3gram": 2.0,
+    "4gram": 2.5
+  };
 
   // Add explicit hits for keywords, id, title, tags, and type
   const lowerQueryStr = (query || '').toLowerCase().trim();
@@ -132,29 +93,8 @@ function rankLocalDocuments(query, limit = 20) {
     }
   }
 
-  for (const doc of rankedByKeywords) {
-    // Give keywords a slightly higher weight since they are explicit signals
-    const id = String(doc.id);
-    if (combinedScores.has(id)) {
-      combinedScores.get(id).score += doc.score * 1.5;
-    } else {
-      combinedScores.set(id, {
-        ...doc,
-        score: doc.score * 1.5
-      });
-    }
-  }
-  for (const doc of rankedByContent) {
-    const id = String(doc.id);
-    if (combinedScores.has(id)) {
-      combinedScores.get(id).score += doc.score * BM25_WEIGHT;
-    } else {
-      combinedScores.set(id, {
-        ...doc,
-        score: doc.score * BM25_WEIGHT
-      });
-    }
-  }
+
+
   let combinedRanked = Array.from(combinedScores.values()).sort((a, b) => b.score - a.score).slice(0, limit * 2);
   
   // Group related documents and ensure logical flow
