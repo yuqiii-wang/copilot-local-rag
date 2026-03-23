@@ -122,7 +122,7 @@ function normalizeFeedbackPayload(feedbackPayload) {
     const payload = feedbackPayload && typeof feedbackPayload === 'object' ? feedbackPayload : {};
     return {
         datetime: String(payload.datetime || new Date().toISOString().slice(0, 16)).trim(),
-        username: String(payload.username || 'anonymous').trim(),
+        username: String(payload.username || 'Anonymous').trim(),
         elapsedTime: String(payload.elapsedTime || '').trim(),
         sourceQuery: String(payload.sourceQuery || '').trim(),
         conversationSummary: String(payload.conversationSummary || '').trim(),

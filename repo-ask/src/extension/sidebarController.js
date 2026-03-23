@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const vscode = require('vscode');
 const { updateConfluencePage } = require('../mcp/confluenceApi');
+const { mapFeedbackError } = require('./errMap');
 const { createOpenDocCommand, createMetadataCommands, createSearchCommand, createPromptsCommand, createDeleteCommand, createResetCommand } = require('./commands');
 
 
@@ -299,153 +300,110 @@ function createSidebarController(deps) {
 
     async function handleSubmitFeedback(feedbackPayload) {
         try {
+            console.log('[handleSubmitFeedback] Received feedbackPayload:', feedbackPayload);
             const configuration = vscode.workspace.getConfiguration('repoAsk');
             const confluenceUrl = configuration.get('logActionConfluenceUrl');
-            
+
             if (!confluenceUrl) {
-                vscode.window.showErrorMessage('Please set the logActionConfluenceUrl setting in RepoAsk configuration.');
-                
-                // Send error message to webview
+                const errMsg = 'Please set the logActionConfluenceUrl setting in RepoAsk configuration.';
+                vscode.window.showErrorMessage(errMsg);
+                console.error('[handleSubmitFeedback] ' + errMsg);
                 if (docsWebviewView) {
-                    docsWebviewView.webview.postMessage({ 
-                        command: 'feedbackSubmitted', 
-                        success: false 
+                    docsWebviewView.webview.postMessage({
+                        command: 'feedbackSubmitted',
+                        success: false,
+                        error: errMsg
                     });
                 }
                 return;
             }
-            
+
             // Extract data points from feedback submission
             const { sourceQuery, confluencePageId, jiraId, confluenceLink } = feedbackPayload;
-            
+
             // Implement mapping system: associate Source Query with reference queries
             if (sourceQuery && (confluencePageId || jiraId || confluenceLink)) {
                 try {
-                    // Find the document in local store using Confluence page ID or Jira ID
                     const allMetadata = readAllMetadata(storagePath);
                     let targetDocument = null;
-                    
+
                     if (confluencePageId) {
                         targetDocument = allMetadata.find(doc => String(doc.id) === String(confluencePageId));
                     }
-                    
                     if (!targetDocument && jiraId) {
                         targetDocument = allMetadata.find(doc => String(doc.id) === String(jiraId));
                     }
-                    
                     if (!targetDocument && confluenceLink) {
                         try {
-                            // Try to extract ID from the link
                             const url = new URL(confluenceLink);
                             const pageIdMatch = url.search.match(/pageId=(\d+)/);
                             if (pageIdMatch && pageIdMatch[1]) {
                                 targetDocument = allMetadata.find(doc => String(doc.id) === String(pageIdMatch[1]));
                             }
                         } catch (urlError) {
-                            console.error('Error parsing Confluence link:', urlError);
-                            // Continue without extracting ID from link
+                            const { errorMessage, detailedError } = mapFeedbackError(urlError);
+                            vscode.window.showErrorMessage(errorMessage);
+                            console.error('[handleSubmitFeedback] Error parsing Confluence link:', detailedError);
                         }
                     }
-                    
-                    // Add Source Query to referenceQueries section if document found
+
                     if (targetDocument) {
                         const currentReferenceQueries = Array.isArray(targetDocument.referencedQueries) ? targetDocument.referencedQueries : [];
-                        
-                        // Check if the source query is already in the list
                         if (!currentReferenceQueries.includes(sourceQuery)) {
                             const updatedReferenceQueries = [...currentReferenceQueries, sourceQuery];
-                            
-                            // Update the document metadata
                             const updatedMetadata = {
                                 ...targetDocument,
                                 referencedQueries: updatedReferenceQueries
                             };
-                            
-                            // Write the updated metadata back to storage
                             try {
                                 const content = readDocumentContent(storagePath, targetDocument.id);
                                 if (content) {
                                     writeDocumentFiles(storagePath, targetDocument.id, content, updatedMetadata);
                                     vscode.window.showInformationMessage(`Added reference query to document: ${targetDocument.title || targetDocument.id}`);
+                                    console.log(`[handleSubmitFeedback] Added reference query to document: ${targetDocument.id}`);
                                 } else {
-                                    console.error('No content found for document:', targetDocument.id);
+                                    vscode.window.showErrorMessage('No content found for document: ' + targetDocument.id);
+                                    console.error('[handleSubmitFeedback] No content found for document:', targetDocument.id);
                                 }
                             } catch (writeError) {
-                                console.error('Error writing document metadata:', writeError);
+                                const { errorMessage, detailedError } = mapFeedbackError(writeError);
+                                vscode.window.showErrorMessage(errorMessage);
+                                console.error('[handleSubmitFeedback] Error writing document metadata:', detailedError);
                             }
                         } else {
-                            console.log('Source query already in reference queries for document:', targetDocument.id);
+                            console.log('[handleSubmitFeedback] Source query already in reference queries for document:', targetDocument.id);
                         }
                     } else {
-                        console.log('No document found for mapping source query:', sourceQuery);
+                        vscode.window.showErrorMessage('No document found for mapping source query: ' + sourceQuery);
+                        console.log('[handleSubmitFeedback] No document found for mapping source query:', sourceQuery);
                     }
                 } catch (mappingError) {
-                    console.error('Error mapping source query to reference queries:', mappingError);
-                    // Continue with feedback submission even if mapping fails
+                    const { errorMessage, detailedError } = mapFeedbackError(mappingError);
+                    vscode.window.showErrorMessage(errorMessage);
+                    console.error('[handleSubmitFeedback] Error mapping source query to reference queries:', detailedError);
                 }
             }
-            
+
             await updateConfluencePage(confluenceUrl, feedbackPayload);
             vscode.window.showInformationMessage('Feedback submitted successfully!');
-            
-            // Send success message to webview
+            console.log('[handleSubmitFeedback] Feedback submitted successfully!');
             if (docsWebviewView) {
-                docsWebviewView.webview.postMessage({ 
-                    command: 'feedbackSubmitted', 
-                    success: true 
+                docsWebviewView.webview.postMessage({
+                    command: 'feedbackSubmitted',
+                    success: true
                 });
             }
         } catch (error) {
-            console.error('Error submitting feedback:', error);
-            
-            // Provide more specific error messages
-            let errorMessage = 'Failed to submit feedback. Please try again.';
-            
-            const body = error.response?.data || error.response?.body;
-            let bodyMessage = '';
-            if (typeof body === 'string') {
-                bodyMessage = body.trim();
-            } else if (body && typeof body === 'object') {
-                bodyMessage = (body.message || body.error || JSON.stringify(body)).trim();
-            }
-
-            if (bodyMessage && bodyMessage !== '{}') {
-                errorMessage = `Failed to connect to Confluence server: ${bodyMessage}`;
-            } else if (error.message && error.message.includes('not configured')) {
-                errorMessage = 'Confluence base URL not configured. Please set the repoAsk.confluence.url setting.';
-            } else if (error.code === 'ECONNABORTED' || (error.message && error.message.includes('timeout'))) {
-                errorMessage = 'Failed to connect to Confluence server: Connection timed out. Please check your network connection and server URL.';
-            } else if (error.response) {
-                const status = error.response.status;
-                if (status === 400) {
-                    errorMessage = 'Failed to connect to Confluence server: Bad Request (400). Please check your request data.';
-                } else if (status === 401) {
-                    errorMessage = 'Failed to connect to Confluence server: Unauthorized (401). Please check your credentials.';
-                } else if (status === 402) {
-                    errorMessage = 'Failed to connect to Confluence server: Payment Required (402).';
-                } else if (status === 403) {
-                    errorMessage = 'Failed to connect to Confluence server: Forbidden (403). You do not have permission to perform this action.';
-                } else if (status === 404) {
-                    errorMessage = 'Failed to connect to Confluence server: Page not found (404). Please check the URL and ensure the server is running.';
-                } else if (status === 504) {
-                    errorMessage = 'Failed to connect to Confluence server: Gateway Timeout (504). The server took too long to respond.';
-                } else if (status >= 500) {
-                    errorMessage = `Failed to connect to Confluence server: Server error (${status}). Please check if the server is running and accessible.`;
-                } else {
-                    errorMessage = `Failed to connect to Confluence server: HTTP Error ${status}.`;
-                }
-            } else if (error.message && error.message.includes('getaddrinfo')) {
-                errorMessage = 'Failed to connect to Confluence server: Host not found. Please check the server URL.';
-            }
-            
+            console.error('[handleSubmitFeedback] Error submitting feedback:', error);
+            const { errorMessage, detailedError } = mapFeedbackError(error);
             vscode.window.showErrorMessage(errorMessage);
-            
-            // Send error message to webview
+            console.error('[handleSubmitFeedback] Detailed error:', detailedError);
             if (docsWebviewView) {
-                docsWebviewView.webview.postMessage({ 
-                    command: 'feedbackSubmitted', 
+                docsWebviewView.webview.postMessage({
+                    command: 'feedbackSubmitted',
                     success: false,
-                    error: errorMessage
+                    error: errorMessage,
+                    detailedError: detailedError
                 });
             }
         }
@@ -527,7 +485,37 @@ function createSidebarController(deps) {
         }
     }
 
-function showLogActionButton(firstUserQuery, firstRankedDocUrl, fullAiResponse, selectedDocument, queryStartTime) {
+async function getVSCodeUsername() {
+        try {
+            // Try to get user info from VS Code authentication first
+            const sessions = await vscode.authentication.getSessions('github', ['user:email']);
+            if (sessions && sessions.length > 0) {
+                const username = sessions[0].account.label;
+                if (username && username.trim()) {
+                    return username;
+                }
+            }
+        } catch (err) {
+            console.log('[getVSCodeUsername] No GitHub session found or error:', err);
+        }
+        
+        try {
+            // Fallback to user's configured username alias
+            const configuration = vscode.workspace.getConfiguration('repoAsk');
+            const usernameAlias = configuration.get('usernameAlias');
+            if (usernameAlias && String(usernameAlias).trim()) {
+                return String(usernameAlias).trim();
+            }
+        } catch (err) {
+            console.log('[getVSCodeUsername] Error getting username alias from settings:', err);
+        }
+        
+        // Final hardcoded fallback
+        return 'Anonymous';
+    }
+
+    async function showLogActionButton(firstUserQuery, firstRankedDocUrl, fullAiResponse, selectedDocument, queryStartTime) {
+        const username = await getVSCodeUsername();
         if (docsWebviewView) {
             docsWebviewView.webview.postMessage({
                 command: 'showFeedbackForm',
@@ -535,7 +523,8 @@ function showLogActionButton(firstUserQuery, firstRankedDocUrl, fullAiResponse, 
                 firstRankedDocUrl: firstRankedDocUrl,
                 fullAiResponse: fullAiResponse,
                 selectedDocument: selectedDocument || null,
-                queryStartTime: queryStartTime || 0
+                queryStartTime: queryStartTime || 0,
+                username: username
             });
         }
     }

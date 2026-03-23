@@ -151,7 +151,7 @@ function initFeedbackForm() {
             const confluenceLinkRaw = document.getElementById('confluence-link')?.value || '';
             const confluencePageIdRaw = document.getElementById('confluence-page-id')?.value || '';
             const jiraIdRaw = document.getElementById('jira-id')?.value || '';
-            const usernameRaw = document.getElementById('username')?.value || 'anonymous';
+            const usernameRaw = document.getElementById('username')?.value || 'Anonymous';
             const elapsedTimeRaw = document.getElementById('elapsed-time')?.value || '';
             const datetimeRaw = document.getElementById('datetime')?.value || '';
             const tagsRaw = document.getElementById('tags')?.value || '';
@@ -161,7 +161,7 @@ function initFeedbackForm() {
             const confluenceLink = confluenceLinkRaw.trim();
             const confluencePageId = confluencePageIdRaw.trim();
             const jiraId = jiraIdRaw.trim();
-            const username = usernameRaw.trim() || 'anonymous';
+            const username = usernameRaw.trim() || 'Anonymous';
             const elapsedTime = elapsedTimeRaw.trim();
             const datetime = datetimeRaw.trim();
             const tags = tagsRaw.trim();
@@ -280,7 +280,7 @@ function initFeedbackForm() {
 }
 
 // Function to show the feedback form
-function showFeedbackForm(firstUserQuery, selectedDocumentOrUrl, fullAiResponse, queryStartTime) {
+function showFeedbackForm(firstUserQuery, selectedDocumentOrUrl, fullAiResponse, queryStartTime, username) {
     const feedbackSection = document.getElementById('feedback-section');
     const viewerSection = document.querySelector('.viewer');
     const selectedDocument = selectedDocumentOrUrl && typeof selectedDocumentOrUrl === 'object'
@@ -334,6 +334,14 @@ function showFeedbackForm(firstUserQuery, selectedDocumentOrUrl, fullAiResponse,
             summaryField.value = fullAiResponse;
         }
     }
+    
+    // Set the username field with the provided username, default to anonymous if not provided
+    if (username) {
+        const usernameField = document.getElementById('username');
+        if (usernameField) {
+            usernameField.value = username;
+        }
+    }
 }
 
 // Function to populate the summary field
@@ -365,51 +373,57 @@ window.populateSummary = populateSummary;
 window.addEventListener('message', (event) => {
     const message = event.data;
     if (message?.command === 'showFeedbackForm') {
-        showFeedbackForm(message.firstUserQuery, message.selectedDocument || message.firstRankedDocUrl, message.fullAiResponse, message.queryStartTime);
+        showFeedbackForm(message.firstUserQuery, message.selectedDocument || message.firstRankedDocUrl, message.fullAiResponse, message.queryStartTime, message.username);
     }
     if (message?.command === 'populateSummary') {
         populateSummary(String(message.summary || ''));
     }
     if (message?.command === 'feedbackSubmitted') {
-                const success = message.success;
-                const errorMessage = message.error;
-                const submitBtn = document.getElementById('submit-feedback-btn');
-                
-                if (success) {
-                    // Show success message
-                    if (typeof renderSuccessMessage === 'function') renderSuccessMessage('Feedback submitted successfully!');
-                    
-                    // Clear form
-                    document.getElementById('source-query').value = '';
-                    document.getElementById('conversation-summary').value = '';
-                    document.getElementById('confluence-link').value = '';
-                    document.getElementById('confluence-page-id').value = '';
-                    document.getElementById('jira-id').value = '';
-                    document.getElementById('datetime').value = new Date().toISOString().slice(0, 16);
-                    document.getElementById('tags').value = '';
-                    
-                    settleSubmitState(submitBtn, true, 'Submit');
-                    
-                    // Hide feedback section and restore original content after a short delay
-                    setTimeout(() => {
-                        const feedbackSection = document.getElementById('feedback-section');
-                        if (feedbackSection) {
-                            feedbackSection.style.display = 'none';
-                        }
-                        
-                        const viewerSection = document.querySelector('.viewer');
-                        if (viewerSection) {
-                            viewerSection.style.display = 'grid';
-                        }
-                    }, 2000);
-                } else {
-                    // Show error message
-                    if (typeof renderSyncError === 'function') renderSyncError(errorMessage || 'Unknown error');
-                    
-                    // Re-enable submit button
-                    settleSubmitState(submitBtn, false, 'Submit');
+        const success = message.success;
+        const errorMessage = message.error;
+        const detailedError = message.detailedError;
+        const submitBtn = document.getElementById('submit-feedback-btn');
+
+        if (success) {
+            // Show success message
+            if (typeof renderSuccessMessage === 'function') renderSuccessMessage('Feedback submitted successfully!');
+
+            // Clear form
+            document.getElementById('source-query').value = '';
+            document.getElementById('conversation-summary').value = '';
+            document.getElementById('confluence-link').value = '';
+            document.getElementById('confluence-page-id').value = '';
+            document.getElementById('jira-id').value = '';
+            document.getElementById('datetime').value = new Date().toISOString().slice(0, 16);
+            document.getElementById('tags').value = '';
+
+            settleSubmitState(submitBtn, true, 'Submit');
+
+            // Hide feedback section and restore original content after a short delay
+            setTimeout(() => {
+                const feedbackSection = document.getElementById('feedback-section');
+                if (feedbackSection) {
+                    feedbackSection.style.display = 'none';
                 }
+
+                const viewerSection = document.querySelector('.viewer');
+                if (viewerSection) {
+                    viewerSection.style.display = 'grid';
+                }
+            }, 10000);
+        } else {
+            // Show error message, prefer detailed error if available
+            let displayError = errorMessage || 'Unknown error';
+            if (detailedError && detailedError !== errorMessage) {
+                displayError += `\nDetails: ${detailedError}`;
             }
+            console.error('[feedback.js] Feedback submission failed:', displayError, { errorMessage, detailedError });
+            if (typeof renderSyncError === 'function') renderSyncError(displayError);
+
+            // Re-enable submit button
+            settleSubmitState(submitBtn, false, 'Submit');
+        }
+    }
     if (message?.command === 'documentFound') {
         // Update link field with document URL if found
         const confluenceLinkInput = document.getElementById('confluence-link');

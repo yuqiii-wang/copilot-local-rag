@@ -115,6 +115,11 @@
           "default": "",
           "description": "Static URL of the target Confluence page where new feedback entries will be appended."
         },
+        "repoAsk.usernameAlias": {
+          "type": "string",
+          "default": "Anonymous",
+          "description": "Username alias to use for feedback submissions when user profile cannot be determined."
+        },
         "repoAsk.searchWeights": {
           "type": "object",
           "default": {
