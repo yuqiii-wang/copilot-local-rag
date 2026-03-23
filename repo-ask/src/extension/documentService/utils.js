@@ -46,7 +46,7 @@ function writeDocumentSkillFile(metadata, content) {
   const safeId = sanitizeFileSegment(metadata.id || 'unknown');
   const fileName = `${safeTitle}-${safeId}.skill.md`;
   const filePath = path.join(skillsDir, fileName);
-  const skillText = [`# ${metadata.title || 'Untitled'}`, '', `Source ID: ${metadata.id || ''}`, `Author: ${metadata.author || 'Unknown'}`, `Last Updated: ${metadata.last_updated || ''}`, `Parent Topic: ${metadata.parent_confluence_topic || ''}`, '', '## Skill Instructions', 'Use the following document content as a reference skill or knowledge base for completing tasks.', '', '## Content', content].join('\n');
+  const skillText = ['---', metadata.summary || '', '---', '', `# ${metadata.title || 'Untitled'}`, '', `Source ID: ${metadata.id || ''}`, `Author: ${metadata.author || 'Unknown'}`, `Last Updated: ${metadata.last_updated || ''}`, `Parent Topic: ${metadata.parent_confluence_topic || ''}`, '', '## Skill Instructions', 'Use the following document content as a reference skill or knowledge base for completing tasks.', '', '## Content', content].join('\n');
   fs.writeFileSync(filePath, skillText, 'utf8');
   return filePath;
 }

@@ -14,6 +14,11 @@ module.exports = function createSkillsCommand(deps) {
             return;
         }
 
+        if (!metadata.summary || String(metadata.summary).trim().length === 0) {
+            docsWebviewView.webview.postMessage({ command: 'addToSkillsError', payload: 'Please populate metadata summary either manually or via AI generation before adding to skill.' });
+            return;
+        }
+
         const content = readDocumentContent(storagePath, metadata.id);
         if (!content || String(content).trim().length === 0) {
             vscode.window.showWarningMessage('Local document content is empty. Refresh this doc and try again.');
