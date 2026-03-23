@@ -49,13 +49,13 @@
             "mode": {
               "type": "string",
               "enum": [
-                "search",
-                "metadata",
                 "content",
-                "all"
+                "metadata",
+                "content_partial",
+                "metadata.summary",
+                "metadata.id"
               ],
-              "default": "search",
-              "description": "Operation mode: search (default), metadata (read metadata), content (read content), all (read both)."
+              "description": "Operation mode. If mode is content_partial, read partial texts. Instruct LLM to read full mode 'content' to read full content if necessary."
             },
             "ids": {
               "type": "array",

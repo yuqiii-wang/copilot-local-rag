@@ -10,14 +10,8 @@
             __REFRESH_POPUP__
             <p class="subtitle">Local Confluence documents</p>
             <p id="sync-status" class="sync-status" aria-live="polite"></p>
-            <div id="error-banner" class="error-banner" style="display: none; background: var(--vscode-editorError-background, rgba(255,0,0,0.1)); color: var(--vscode-editorError-foreground, #ff0000); padding: 8px; margin-top: 8px; border-radius: 4px; border: 1px solid var(--vscode-editorError-border, transparent); align-items: center; justify-content: space-between; font-size: 12px; word-break: break-all;">
-                <span id="error-banner-text"></span>
-                <button id="close-error-banner-btn" class="icon-btn" style="background: none; border: none; cursor: pointer; color: inherit; margin-left: 8px; font-size: 14px;" aria-label="Dismiss error" title="Dismiss error">&times;</button>
-            </div>
-            <div id="success-banner" class="success-banner" style="display: none; background: var(--vscode-editorInfo-background, rgba(0,255,0,0.1)); color: var(--vscode-editorInfo-foreground, #00ff00); padding: 8px; margin-top: 8px; border-radius: 4px; border: 1px solid var(--vscode-editorInfo-border, transparent); align-items: center; justify-content: space-between; font-size: 12px; word-break: break-all;">
-                <span id="success-banner-text"></span>
-                <button id="close-success-banner-btn" class="icon-btn" style="background: none; border: none; cursor: pointer; color: inherit; margin-left: 8px; font-size: 14px;" aria-label="Dismiss success" title="Dismiss success">&times;</button>
-            </div>
+            
+            
             <div style="display: flex; gap: 4px; margin-top: 8px; align-items: stretch;">
                 <select id="search-type-filter" class="search-type-filter" aria-label="Filter by type" style="background: var(--vscode-dropdown-background); color: var(--vscode-dropdown-foreground); border: 1px solid var(--vscode-dropdown-border); border-radius: 2px;">
                     <option value="">All Types</option>
@@ -29,4 +23,4 @@
                 <input id="search-input" class="search-input" type="text" placeholder="Search local-store" style="flex: 1; min-width: 0;">
             </div>
         </header>
-        <section id="doc-list" class="doc-list"></section>
+        

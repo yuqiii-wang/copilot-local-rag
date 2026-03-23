@@ -13,7 +13,7 @@ module.exports = function(context) {
      annotateStoredDocument, generateAnnotationWithLlm, localizeMarkdownImageLinks, 
      normalizeMarkdownLinkTarget, downloadImageAsset, downloadDataUriAsset, 
      resolveAbsoluteImageUrl, isDataUri, determineImageExtension, mimeTypeToExtension, 
-     getKeywordConfig, buildKeywordOnlyIndexText, rebuildKeywordsIndexFromMetadata, 
+     getKeywordConfig, buildKeywordOnlyIndexText, 
      normalizeKeywordsInput, cleanKeywords, normalizeMetadataKeywordFields, 
      mergeKeywordsPreservingSignals, appendKeywordsToExisting, cheerio} = context;
 

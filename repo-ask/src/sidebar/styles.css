@@ -544,3 +544,47 @@ body.is-resizing {
     height: 12px;
     margin-top: -6px;
 }
+
+/* Banners */
+.banner {
+    display: none;
+    padding: 8px;
+    margin-top: 8px;
+    margin-bottom: 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    word-break: break-all;
+    border: 1px solid transparent;
+}
+
+.banner.error {
+    background: var(--vscode-editorError-background, rgba(255,0,0,0.1));
+    color: var(--vscode-editorError-foreground, #ff0000);
+    border-color: var(--vscode-editorError-border, transparent);
+}
+
+.banner.success {
+    background: var(--vscode-editorInfo-background, rgba(0,255,0,0.1));
+    color: var(--vscode-editorInfo-foreground, #00ff00);
+    border-color: var(--vscode-editorInfo-border, transparent);
+}
+
+.banner-message {
+    flex: 1;
+}
+
+.banner-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: inherit;
+    margin-left: 8px;
+    font-size: 14px;
+    padding: 0 4px;
+}
+
+.banner-close:hover {
+    background: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,0.2));
+    border-radius: 4px;
+}
+

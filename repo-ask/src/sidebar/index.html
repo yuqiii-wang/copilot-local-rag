@@ -8,7 +8,19 @@
 </head>
 <body>
     <main class="container">
-        __DOC_STORE_HTML__
+        
+        <div id="top-area" style="display: flex; flex-direction: column;">
+            <div id="error-banner" class="banner error" style="display: none; align-items: center; justify-content: space-between; margin: 8px 10px;">
+                <span id="error-banner-text" class="banner-message"></span>
+                <button id="close-error-banner-btn" class="banner-close" aria-label="Dismiss error" title="Dismiss error" onclick="this.parentElement.style.display='none'">&times;</button>
+            </div>
+            <div id="success-banner" class="banner success" style="display: none; align-items: center; justify-content: space-between; margin: 8px 10px;">
+                <span id="success-banner-text" class="banner-message"></span>
+                <button id="close-success-banner-btn" class="banner-close" aria-label="Dismiss success" title="Dismiss success" onclick="this.parentElement.style.display='none'">&times;</button>
+            </div>
+            __DOC_STORE_HTML__
+        </div>
+        <section id="doc-list" class="doc-list"></section>
         <div id="main-splitter" class="main-splitter" role="separator" aria-orientation="horizontal" aria-label="Resize list and detail"></div>
         <section class="viewer">
             <section class="content-pane">

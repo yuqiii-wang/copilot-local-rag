@@ -1,6 +1,6 @@
-const axios = require('axios');
 const vscode = require('vscode');
 const { jiraApiMap } = require('./apiMap');
+const { httpManager, getAuthHeaders } = require('./httpManager');
 
 const DEFAULT_JIRA_BASE_URL = 'http://127.0.0.1:8002';
 const REQUEST_TIMEOUT_MS = 15000;
@@ -23,20 +23,6 @@ function getJiraConfig() {
     };
 }
 
-function getHeaders(securityToken) {
-    const headers = {};
-    if (securityToken) {
-        if (securityToken.startsWith('Bearer ') || securityToken.startsWith('Basic ')) {
-            headers['Authorization'] = securityToken;
-        } else if (securityToken.includes(':')) {
-            headers['Authorization'] = `Basic ${Buffer.from(securityToken).toString('base64')}`;
-        } else {
-            headers['Authorization'] = `Bearer ${securityToken}`;
-        }
-    }
-    return headers;
-}
-
 async function fetchJiraIssue(issueArg) {
     let { url: base, securityToken } = getJiraConfig();
     let queryArg = issueArg;
@@ -51,40 +37,40 @@ async function fetchJiraIssue(issueArg) {
     }
 
     const resolveUrl = jiraApiMap.issueResolve(base, queryArg);
-    const headers = getHeaders(securityToken);
+    const headers = getAuthHeaders(securityToken);
 
     try {
-        const response = await axios.get(resolveUrl, {
+        const responseData = await httpManager.request({
+            method: 'GET',
+            url: resolveUrl,
             timeout: REQUEST_TIMEOUT_MS,
-            headers,
-            maxContentLength: Infinity,
-            maxBodyLength: Infinity
+            headers
         });
-        return response.data;
+        return responseData;
     } catch {
-        const response = await axios.get(jiraApiMap.issue(base, queryArg), {
+        const responseData = await httpManager.request({
+            method: 'GET',
+            url: jiraApiMap.issue(base, queryArg),
             timeout: REQUEST_TIMEOUT_MS,
-            headers,
-            maxContentLength: Infinity,
-            maxBodyLength: Infinity
+            headers
         });
-        return response.data;
+        return responseData;
     }
 }
 
 async function fetchAllJiraIssues(project) {
     const { url: base, securityToken } = getJiraConfig();
-    const headers = getHeaders(securityToken);
+    const headers = getAuthHeaders(securityToken);
     const query = project ? `?project=${encodeURIComponent(project)}` : '';
     
-    const response = await axios.get(jiraApiMap.search(base, query), {
+    const responseData = await httpManager.request({
+        method: 'GET',
+        url: jiraApiMap.search(base, query),
         timeout: REQUEST_TIMEOUT_MS,
-        headers,
-        maxContentLength: Infinity,
-        maxBodyLength: Infinity
+        headers
     });
     
-    const issues = Array.isArray(response.data?.issues) ? response.data.issues : [];
+    const issues = Array.isArray(responseData?.issues) ? responseData.issues : [];
     return issues;
 }
 

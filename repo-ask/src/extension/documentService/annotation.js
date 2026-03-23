@@ -124,7 +124,6 @@ async function annotateStoredDocument(metadata) {
     summary: annotation.summary
   });
   writeDocumentFiles(storagePath, metadata.id, content, updatedMetadata);
-  keywordsIndex.upsertDocument(updatedMetadata.id, buildKeywordOnlyIndexText(updatedMetadata));
   return true;
 }
 

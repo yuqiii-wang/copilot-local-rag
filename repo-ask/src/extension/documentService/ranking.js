@@ -1,5 +1,5 @@
 module.exports = function(context) {
-  const { vscode, storagePath, truncate, tokenize, readAllMetadata, readDocumentContent, rebuildKeywordsIndexFromMetadata, normalizeMetadataKeywordFields,  } = context;
+  const { vscode, storagePath, truncate, tokenize, readAllMetadata, readDocumentContent, normalizeMetadataKeywordFields,  } = context;
 
 const TOP_SCORE_THRESHOLD_RATIO = 0.5;
 

@@ -501,14 +501,15 @@ function createSidebarController(deps) {
         }
     }
 
-    function showLogActionButton(firstUserQuery, firstRankedDocUrl, fullAiResponse, selectedDocument) {
+function showLogActionButton(firstUserQuery, firstRankedDocUrl, fullAiResponse, selectedDocument, queryStartTime) {
         if (docsWebviewView) {
-            docsWebviewView.webview.postMessage({ 
+            docsWebviewView.webview.postMessage({
                 command: 'showFeedbackForm',
                 firstUserQuery: firstUserQuery,
                 firstRankedDocUrl: firstRankedDocUrl,
                 fullAiResponse: fullAiResponse,
-                selectedDocument: selectedDocument || null
+                selectedDocument: selectedDocument || null,
+                queryStartTime: queryStartTime || 0
             });
         }
     }

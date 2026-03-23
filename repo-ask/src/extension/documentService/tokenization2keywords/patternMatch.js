@@ -22,7 +22,22 @@ const STOP_WORDS = new Set([
     'and', 'or', 'but', 'if', 'then', 'else', 'when', 'at', 'by', 'for', 'with', 'without', 
     'on', 'in', 'to', 'from', 'of', 'as', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 
     'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'shall', 'should', 'can', 
-    'could', 'may', 'might', 'must', 'a', 'an', 'the', 'it', 'this', 'that', 'these', 'those'
+    'could', 'may', 'might', 'must', 'a', 'an', 'the', 'it', 'this', 'that', 'these', 'those',
+    'i', 'you', 'he', 'she', 'they', 'we', 'me', 'him', 'her', 'them', 'us', 'my', 'your', 'his', 
+    'its', 'our', 'their', 'mine', 'yours', 'hers', 'ours', 'theirs', 'what', 'which', 'who', 'whom', 'whose',
+    'all', 'any', 'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor', 
+    'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very', 's', 't', 'can', 'will', 
+    'just', 'don', 'should', 'now', 'd', 'll', 'm', 'o', 're', 've', 'y', 'ain', 'aren', 'couldn', 'didn', 
+    'doesn', 'hadn', 'hasn', 'haven', 'isn', 'ma', 'mightn', 'mustn', 'needn', 'shan', 
+    'shouldn', 'wasn', 'weren', 'won', 'wouldn', 't', 'please', 'thank', 'thanks',
+    'hello', 'hi', 'regards', 'dear', 'sincerely', 'best', 'wish', 'wishes', 'regard',
+    'change', 'update', 'new', 'latest', 'version', 'issue', 'problem', 'error', 'fix', 'bug',
+    'feature', 'request', 'task', 'note', 'notes', 'information', 'info', 'data', 'details',
+    'document', 'documents', 'file', 'files', 'attachment', 'attachments', 'report', 'reports',
+    'summary', 'overview', 'introduction', 'conclusion', 'section', 'sections', 'chapter', 'chapters',
+    'page', 'pages', 'line', 'lines', 'code', 'codes', 'script', 'scripts', 'function', 'functions',
+    'method', 'methods', 'class', 'classes', 'object', 'objects', 'variable', 'variables',
+    'constant', 'constants', 'parameter', 'parameters', 'argument', 'arguments'
 ]);
 
 const PATTERNS = [

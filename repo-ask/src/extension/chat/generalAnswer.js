@@ -7,6 +7,7 @@ const {
 } = require('./shared');
 
 async function answerGeneralPromptQuestion(vscodeApi, prompt, workspacePromptContext, response, deps, options = {}) {
+    const queryStartTime = Date.now();
     const {
         tokenize,
         storagePath,
@@ -168,7 +169,7 @@ async function answerGeneralPromptQuestion(vscodeApi, prompt, workspacePromptCon
         response.button({
             command: 'repo-ask.showLogActionButton',
             title: 'Log Action',
-            arguments: [prompt, firstRankedDocUrl || '[NO_URL]', finalAnswer]
+            arguments: [prompt, firstRankedDocUrl || '[NO_URL]', finalAnswer, queryStartTime]
         });
     }
 

@@ -1,4 +1,4 @@
-const { tokenize } = require('./tokenization2keywords/core');
+const { tokenize } = require('./core');
 
 /**
  * Generates sliding window n-grams for n=1, 2, 3, and 4

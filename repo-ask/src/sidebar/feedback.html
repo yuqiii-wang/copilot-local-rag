@@ -2,14 +2,6 @@
     <div class="feedback-header">
         <h2 class="feedback-title">Submit Feedback</h2>
     </div>
-    <div id="success-banner" class="banner success" style="display: none; padding: 10px; margin-bottom: 15px; background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; border-radius: 4px;">
-        <span class="banner-message"></span>
-        <button class="banner-close" onclick="this.parentElement.style.display='none'">×</button>
-    </div>
-    <div id="error-banner" class="banner error" style="display: none; padding: 10px; margin-bottom: 15px; background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; border-radius: 4px;">
-        <span class="banner-message"></span>
-        <button class="banner-close" onclick="this.parentElement.style.display='none'">×</button>
-    </div>
     <div class="feedback-form">
         <div class="form-group">
             <label for="source-query">Source Query</label>
@@ -31,6 +23,14 @@
         <div class="form-group">
             <label for="jira-id">Jira ID</label>
             <input type="text" id="jira-id" class="form-input" placeholder="Enter Jira issue ID">
+        </div>
+        <div class="form-group">
+            <label for="username">Username</label>
+            <input type="text" id="username" class="form-input" placeholder="Enter username" value="anonymous">
+        </div>
+        <div class="form-group">
+            <label for="elapsed-time">Elapsed Time (s)</label>
+            <input type="number" id="elapsed-time" class="form-input" placeholder="Elapsed Time">
         </div>
         <div class="form-group">
             <label for="datetime">Datetime</label>

@@ -213,6 +213,7 @@ module.exports = function createRefreshCommand(deps) {
                             if (processedId) {
                                 refreshedDocIds.add(processedId);
                                 existingIds.add(processedId);
+                                sidebar.upsertSidebarDocument(payload.metadata);
                             }
                         };
                         
@@ -286,6 +287,9 @@ module.exports = function createRefreshCommand(deps) {
                     documentService.refreshConfluenceHierarchy(refreshArg.arg, {
                         onDocumentProcessed: (data) => {
                             sidebar.setSidebarSyncStatus(`Downloading from source... (${data.index}/${data.total})`);
+                            if (data.metadata) {
+                                sidebar.upsertSidebarDocument(data.metadata);
+                            }
                         }
                     }),
                     timeoutPromise
@@ -297,6 +301,9 @@ module.exports = function createRefreshCommand(deps) {
                         documentService.refreshJiraIssue(refreshArg, {
                             onDocumentProcessed: (data) => {
                                 sidebar.setSidebarSyncStatus(`Downloading from source... (${data.index}/${data.total})`);
+                            if (data.metadata) {
+                                sidebar.upsertSidebarDocument(data.metadata);
+                            }
                             }
                         }),
                         timeoutPromise
@@ -306,6 +313,9 @@ module.exports = function createRefreshCommand(deps) {
                         documentService.refreshDocument(refreshArg, {
                             onDocumentProcessed: (data) => {
                                 sidebar.setSidebarSyncStatus(`Downloading from source... (${data.index}/${data.total})`);
+                            if (data.metadata) {
+                                sidebar.upsertSidebarDocument(data.metadata);
+                            }
                             }
                         }),
                         timeoutPromise
@@ -316,6 +326,9 @@ module.exports = function createRefreshCommand(deps) {
                     documentService.refreshAllDocuments({
                         onDocumentProcessed: (data) => {
                             sidebar.setSidebarSyncStatus(`Downloading from source... (${data.index}/${data.total})`);
+                            if (data.metadata) {
+                                sidebar.upsertSidebarDocument(data.metadata);
+                            }
                         }
                     }),
                     timeoutPromise

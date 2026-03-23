@@ -5,47 +5,51 @@ module.exports = function registerDocCheckTool(deps) {
     return vscode.lm.registerTool(toolNames.docCheck, {
             async invoke(options) {
                 const query = String(options?.input?.query || '').trim();
-                const mode = options?.input?.mode || 'search'; // search, metadata, content, all
+                const mode = options?.input?.mode; // content, metadata, content_partial, metadata.summary, metadata.id
                 const ids = options?.input?.ids || [];
                 const repAskConfig = vscode.workspace.getConfiguration('repoAsk');
-                const initKeywordNum = repAskConfig.get('initKeywordNum') || 50;
-                const rawLimit = Number(options?.input?.limit);
-                const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(Math.floor(rawLimit), initKeywordNum) : 5;
+
+                const allowedModes = ['content', 'metadata', 'content_partial', 'metadata.summary', 'metadata.id'];
+                if (!allowedModes.includes(mode)) {
+                    return toToolResult(`Invalid mode '${mode}'. Allowed modes are: ${allowedModes.join(', ')}`, { references: [] });
+                }
 
                 const metadataList = readAllMetadata();
                 if (metadataList.length === 0) {
                     return toToolResult(emptyStoreHint, { references: [] });
                 }
 
-                if (mode === 'metadata' || mode === 'content' || mode === 'all') {
-                    // Dynamic reading mode
-                    let filtered = metadataList;
-                    if (ids.length > 0) {
-                        filtered = metadataList.filter(m => 
-                            ids.includes(String(m.id)) || 
-                            ids.includes(m.id) ||
-                            ids.includes(m.title) ||
-                            ids.some(id => String(m.title).includes(String(id)))
-                        );
-                    }
+                let filtered = metadataList;
+                if (ids && ids.length > 0) {
+                    filtered = metadataList.filter(m => 
+                        ids.includes(String(m.id)) || 
+                        ids.includes(m.id) ||
+                        ids.includes(m.title) ||
+                        ids.some(id => String(m.title).includes(String(id)))
+                    );
+                }
 
-                    const confProfile = repAskConfig.get('confluence');
-                    const confUrl = String((confProfile && typeof confProfile === 'object' ? confProfile.url : '') || '').replace(/\/$/, '');
+                const confProfile = repAskConfig.get('confluence');
+                const confUrl = String((confProfile && typeof confProfile === 'object' ? confProfile.url : '') || '').replace(/\/$/, '');
+                
+                const jiraProfile = repAskConfig.get('jira');
+                const jiraUrl = String((jiraProfile && typeof jiraProfile === 'object' ? jiraProfile.url : '') || '').replace(/\/$/, '');
+
+                const results = [];
+                const summaryLines = [];
+                
+                for (const m of filtered) {
+                    const result = { id: m.id, title: m.title };
                     
-                    const jiraProfile = repAskConfig.get('jira');
-                    const jiraUrl = String((jiraProfile && typeof jiraProfile === 'object' ? jiraProfile.url : '') || '').replace(/\/$/, '');
-
-                    const results = [];
-                    for (const m of filtered) {
-                        const result = { id: m.id, title: m.title };
+                    if (mode.startsWith('metadata')) {
+                        let fullUrl = m.url || '';
+                        if (fullUrl && !fullUrl.startsWith('http')) {
+                            const isJira = m.parent_confluence_topic && String(m.parent_confluence_topic).startsWith('Jira');
+                            const baseUrl = isJira ? jiraUrl : confUrl;
+                            fullUrl = `${baseUrl}${fullUrl.startsWith('/') ? '' : '/'}${fullUrl}`;
+                        }
                         
-                        if (mode === 'metadata' || mode === 'all') {
-                            let fullUrl = m.url || '';
-                            if (fullUrl && !fullUrl.startsWith('http')) {
-                                const isJira = m.parent_confluence_topic && String(m.parent_confluence_topic).startsWith('Jira');
-                                const baseUrl = isJira ? jiraUrl : confUrl;
-                                fullUrl = `${baseUrl}${fullUrl.startsWith('/') ? '' : '/'}${fullUrl}`;
-                            }
+                        if (mode === 'metadata') {
                             result.metadata = {
                                 url: fullUrl,
                                 author: m.author,
@@ -54,89 +58,51 @@ module.exports = function registerDocCheckTool(deps) {
                                 keywords: m.keywords,
                                 summary: m.summary
                             };
-                        }
-
-                        if (mode === 'content' || mode === 'all') {
-                            const content = readDocumentContent(m.id);
-                            if (content) {
-                                result.content = content;
-                            }
-                        }
-
-                        results.push(result);
-                    }
-
-                    // Generate summary
-                    const summaryLines = [];
-                    if (mode === 'metadata' || mode === 'all') {
-                        summaryLines.push(`Metadata for ${results.length} docs:`);
-                        results.forEach(r => {
-                            if (r.metadata) {
-                                summaryLines.push(`- [${r.id}] ${r.title}`);
-                                if (r.metadata.url) summaryLines.push(`  URL: ${r.metadata.url}`);
-                                if (r.metadata.author) summaryLines.push(`  Author: ${r.metadata.author}`);
-                                if (r.metadata.last_updated) summaryLines.push(`  Last Updated: ${r.metadata.last_updated}`);
-                                if (r.metadata.parent_confluence_topic) summaryLines.push(`  Parent Topic: ${r.metadata.parent_confluence_topic}`);
-                                if (r.metadata.keywords) summaryLines.push(`  Keywords: ${Array.isArray(r.metadata.keywords) ? r.metadata.keywords.join(', ') : r.metadata.keywords}`);
-                                if (r.metadata.summary) summaryLines.push(`  Summary: ${r.metadata.summary}`);
-                                summaryLines.push('');
-                            }
-                        });
-                    }
-
-                    if (mode === 'content' || mode === 'all') {
-                        const contentResults = results.filter(r => r.content);
-                        summaryLines.push(`Content for ${contentResults.length} docs:`);
-                        contentResults.forEach(r => {
-                            summaryLines.push(`Doc [${r.id}] ${r.title}:`);
-                            summaryLines.push(r.content);
+                            summaryLines.push(`- [${m.id}] ${m.title}`);
+                            if (fullUrl) summaryLines.push(`  URL: ${fullUrl}`);
+                            if (m.author) summaryLines.push(`  Author: ${m.author}`);
+                            if (m.last_updated) summaryLines.push(`  Last Updated: ${m.last_updated}`);
+                            if (m.parent_confluence_topic) summaryLines.push(`  Parent Topic: ${m.parent_confluence_topic}`);
+                            if (m.keywords) summaryLines.push(`  Keywords: ${Array.isArray(m.keywords) ? m.keywords.join(', ') : m.keywords}`);
+                            if (m.summary) summaryLines.push(`  Summary: ${m.summary}`);
                             summaryLines.push('');
-                        });
-                    }
-
-                    return toToolResult(summaryLines.join('\n'), { results });
-                } else {
-                    // Default search mode
-                    if (!query) {
-                        return toToolResult('Missing required `query` input for check tool.', { references: [] });
-                    }
-
-                    const rankedDocs = documentService.rankLocalDocuments(query, limit);
-
-                    if (!rankedDocs || rankedDocs.length === 0) {
-                        return toToolResult(`No relevant documents found in local store. ${buildCheckAllDocsCommandLink(query)}`, { references: [] });
-                    }
-
-                    const confidentRefs = rankedDocs.filter(r => r.score > 0);
-                    if (confidentRefs.length === 0) {
-                        return toToolResult(`No confident local documents found for your query. Please ${buildCheckAllDocsCommandLink(query)}`, { references: [] });
-                    }
-
-                    const references = confidentRefs.map((ref) => {
-                        const content = readDocumentContent(ref.id) || '';
-                        return {
-                            ...ref,
-                            summary: ref.summary || 'No summary available',
-                            reference: content.length > 500 ? content.substring(0, 500) + '...' : content
-                        };
-                    });
-                    const lines = references.map((ref, index) => `${index + 1}. ${ref.title} (updated ${ref.last_updated || '-'})`);
-                    const summaryLines = [
-                        `Top relevant RepoAsk references (ranked check):`,
-                        '',
-                        ...lines,
-                        '',
-                        `Need broader confirmation? ${buildCheckAllDocsCommandLink(query)}`
-                    ];
-
-                    return toToolResult(summaryLines.join('\n'), {
-                        references,
-                        diagnostics: {
-                            docsFound: rankedDocs.length,
-                            confidentDocs: confidentRefs.length
+                        } else if (mode === 'metadata.summary') {
+                            result.metadata = { summary: m.summary };
+                            summaryLines.push(`- [${m.id}] ${m.title}`);
+                            if (m.summary) summaryLines.push(`  Summary: ${m.summary}`);
+                            summaryLines.push('');
+                        } else if (mode === 'metadata.id') {
+                            result.metadata = { id: m.id, title: m.title };
+                            summaryLines.push(`- [${m.id}] ${m.title}`);
                         }
-                    });
+                    } else if (mode.startsWith('content')) {
+                        let content = readDocumentContent(m.id);
+                        if (content) {
+                            if (mode === 'content_partial' && content.length > 1500) {
+                                const chunkSize = Math.min(500, Math.floor(content.length / 3));
+                                const topPart = content.substring(0, chunkSize);
+                                const middleStart = Math.floor(content.length / 2) - Math.floor(chunkSize / 2);
+                                const middlePart = content.substring(middleStart, middleStart + chunkSize);
+                                const bottomPart = content.substring(content.length - chunkSize);
+                                
+                                content = `${topPart}\n......\n${middlePart}\n......\n${bottomPart}\n\n[Note]: This is partial content. If the partial content is likely related to user query, MUST read full content. To read full content, instruct LLM to use mode 'content' to read full content.`;
+                            }
+                            result.content = content;
+                            summaryLines.push(`Doc [${m.id}] ${m.title}:`);
+                            summaryLines.push(content);
+                            summaryLines.push('');
+                        }
+                    }
+                    results.push(result);
                 }
+
+                if (mode.startsWith('metadata')) {
+                    summaryLines.unshift(`Metadata for ${results.length} docs:`);
+                } else if (mode.startsWith('content')) {
+                    summaryLines.unshift(`Content for ${results.filter(r => r.content).length} docs:`);
+                }
+
+                return toToolResult(summaryLines.join('\n'), { results });
             }
         });
 };

@@ -1,5 +1,5 @@
 module.exports = function(context) {
-  const { vscode, keywordsIndex, } = context;
+  const { vscode } = context;
   const { generateSynonyms } = require('./tokenization2keywords');
 
 function getKeywordConfig() {
@@ -22,14 +22,6 @@ function buildKeywordOnlyIndexText(metadata) {
   const tags = cleanKeywords(metadata.tags, DEFAULT_KEYWORD_LIMIT * 4);
   const extended = cleanKeywords(metadata.synonyms, 200);
   return [...keywords, ...tags, ...extended].join(' ');
-}
-
-function rebuildKeywordsIndexFromMetadata(metadataList = []) {
-  const documents = (Array.isArray(metadataList) ? metadataList : []).map(item => ({
-    id: item?.id,
-    text: buildKeywordOnlyIndexText(item)
-  })).filter(item => String(item.id || '').trim().length > 0);
-  keywordsIndex.rebuildDocuments(documents);
 }
 
 function normalizeKeywordsInput(values) {
@@ -134,7 +126,6 @@ function appendKeywordsToExisting(existingKeywords = [], addedKeywords = [], lim
   return {
     getKeywordConfig,
     buildKeywordOnlyIndexText,
-    rebuildKeywordsIndexFromMetadata,
     normalizeKeywordsInput,
     cleanKeywords,
     normalizeMetadataKeywordFields,

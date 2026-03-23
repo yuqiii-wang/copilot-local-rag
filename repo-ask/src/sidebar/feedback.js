@@ -1,22 +1,5 @@
 // feedback.js
 
-// Helper functions for banner notifications
-function showBanner(bannerId, message) {
-    const banner = document.getElementById(bannerId);
-    const bannerMessage = banner.querySelector('.banner-message');
-    if (banner && bannerMessage) {
-        bannerMessage.textContent = message;
-        banner.style.display = 'block';
-    }
-}
-
-function hideBanner(bannerId) {
-    const banner = document.getElementById(bannerId);
-    if (banner) {
-        banner.style.display = 'none';
-    }
-}
-
 function setButtonLoadingState(button, isLoading, label) {
     if (!button) {
         return;
@@ -160,14 +143,16 @@ function initFeedbackForm() {
     // Submit button handler
     if (submitBtn) {
         submitBtn.addEventListener('click', async () => {
-            hideBanner('success-banner');
-            hideBanner('error-banner');
+            if (typeof renderSuccessMessage === 'function') renderSuccessMessage('');
+            if (typeof renderSyncError === 'function') renderSyncError('');
 
             const sourceQueryRaw = document.getElementById('source-query')?.value || '';
             const conversationSummaryRaw = document.getElementById('conversation-summary')?.value || '';
             const confluenceLinkRaw = document.getElementById('confluence-link')?.value || '';
             const confluencePageIdRaw = document.getElementById('confluence-page-id')?.value || '';
             const jiraIdRaw = document.getElementById('jira-id')?.value || '';
+            const usernameRaw = document.getElementById('username')?.value || 'anonymous';
+            const elapsedTimeRaw = document.getElementById('elapsed-time')?.value || '';
             const datetimeRaw = document.getElementById('datetime')?.value || '';
             const tagsRaw = document.getElementById('tags')?.value || '';
 
@@ -176,41 +161,43 @@ function initFeedbackForm() {
             const confluenceLink = confluenceLinkRaw.trim();
             const confluencePageId = confluencePageIdRaw.trim();
             const jiraId = jiraIdRaw.trim();
+            const username = usernameRaw.trim() || 'anonymous';
+            const elapsedTime = elapsedTimeRaw.trim();
             const datetime = datetimeRaw.trim();
             const tags = tagsRaw.trim();
             
             // Validate input
             if (!conversationSummary) {
-                showBanner('error-banner', 'Conversation Summary is required. Please paste or generate the full AI response before submitting.');
+                if (typeof renderSyncError === 'function') renderSyncError('Conversation Summary is required. Please paste or generate the full AI response before submitting.');
                 return;
             }
 
             if (!sourceQuery || !datetime) {
-                showBanner('error-banner', 'Please fill in all required fields: Source Query and Datetime');
+                if (typeof renderSyncError === 'function') renderSyncError('Please fill in all required fields: Source Query and Datetime');
                 return;
             }
 
             // Check if either Confluence page ID or Jira ID is provided
             if (!confluencePageId && !jiraId) {
-                showBanner('error-banner', 'Please provide either Confluence Page ID or Jira ID');
+                if (typeof renderSyncError === 'function') renderSyncError('Please provide either Confluence Page ID or Jira ID');
                 return;
             }
 
             // Validate Confluence page ID format (should be numeric) if provided
             if (confluencePageId && !/^\d+$/.test(confluencePageId)) {
-                showBanner('error-banner', 'Confluence Page ID must be a numeric value');
+                if (typeof renderSyncError === 'function') renderSyncError('Confluence Page ID must be a numeric value');
                 return;
             }
 
             // Validate Jira ID format (e.g., PROJ-123) if provided
             if (jiraId && !/^[A-Z]+-\d+$/.test(jiraId)) {
-                showBanner('error-banner', 'Jira ID must be in the format PROJ-123');
+                if (typeof renderSyncError === 'function') renderSyncError('Jira ID must be in the format PROJ-123');
                 return;
             }
 
             // Validate Confluence/Jira Link format if provided
             if (confluenceLink && !/^https?:\/\//i.test(confluenceLink)) {
-                showBanner('error-banner', 'Confluence/Jira Link must be a valid URL');
+                if (typeof renderSyncError === 'function') renderSyncError('Confluence/Jira Link must be a valid URL');
                 return;
             }
             
@@ -227,6 +214,8 @@ function initFeedbackForm() {
                 confluenceLink: confluenceLinkRaw,
                 confluencePageId: confluencePageIdRaw,
                 jiraId: jiraIdRaw,
+                username: usernameRaw,
+                elapsedTime: elapsedTimeRaw,
                 datetime: datetimeRaw,
                 tags: tagsRaw
             };
@@ -239,7 +228,7 @@ function initFeedbackForm() {
                 });
             } catch (error) {
                 console.error('Error submitting feedback:', error);
-                showBanner('error-banner', 'Failed to submit feedback. Please try again.');
+                if (typeof renderSyncError === 'function') renderSyncError(error.message || String(error));
                 // Re-enable submit button
                 settleSubmitState(submitBtn, false, 'Submit');
             }
@@ -263,12 +252,12 @@ function initFeedbackForm() {
     // Generate AI summary button handler
     if (generateSummaryBtn) {
         generateSummaryBtn.addEventListener('click', () => {
-            hideBanner('success-banner');
-            hideBanner('error-banner');
+            if (typeof renderSuccessMessage === 'function') renderSuccessMessage('');
+            if (typeof renderSyncError === 'function') renderSyncError('');
 
             const conversationSummary = document.getElementById('conversation-summary')?.value || '';
             if (!conversationSummary.trim()) {
-                showBanner('error-banner', 'Please enter a conversation summary first');
+                if (typeof renderSyncError === 'function') renderSyncError('Please enter a conversation summary first');
                 return;
             }
             
@@ -291,20 +280,29 @@ function initFeedbackForm() {
 }
 
 // Function to show the feedback form
-function showFeedbackForm(firstUserQuery, selectedDocumentOrUrl, fullAiResponse) {
+function showFeedbackForm(firstUserQuery, selectedDocumentOrUrl, fullAiResponse, queryStartTime) {
     const feedbackSection = document.getElementById('feedback-section');
     const viewerSection = document.querySelector('.viewer');
     const selectedDocument = selectedDocumentOrUrl && typeof selectedDocumentOrUrl === 'object'
         ? selectedDocumentOrUrl
         : null;
     const fallbackUrl = typeof selectedDocumentOrUrl === 'string' ? selectedDocumentOrUrl : '';
-    
+
     if (feedbackSection) {
         feedbackSection.style.display = 'block';
     }
-    
+
     if (viewerSection) {
         viewerSection.style.display = 'none';
+    }
+
+    // Calculate elapsed time if queryStartTime is provided
+    if (queryStartTime) {
+        const elapsedTimeField = document.getElementById('elapsed-time');
+        if (elapsedTimeField) {
+            const elapsedMs = Date.now() - queryStartTime;
+            elapsedTimeField.value = Math.round(elapsedMs / 1000); // converting to seconds
+        }
     }
     
     // Copy the first user query to the source query field
@@ -367,7 +365,7 @@ window.populateSummary = populateSummary;
 window.addEventListener('message', (event) => {
     const message = event.data;
     if (message?.command === 'showFeedbackForm') {
-        showFeedbackForm(message.firstUserQuery, message.selectedDocument || message.firstRankedDocUrl, message.fullAiResponse);
+        showFeedbackForm(message.firstUserQuery, message.selectedDocument || message.firstRankedDocUrl, message.fullAiResponse, message.queryStartTime);
     }
     if (message?.command === 'populateSummary') {
         populateSummary(String(message.summary || ''));
@@ -379,7 +377,7 @@ window.addEventListener('message', (event) => {
                 
                 if (success) {
                     // Show success message
-                    showBanner('success-banner', 'Feedback submitted successfully!');
+                    if (typeof renderSuccessMessage === 'function') renderSuccessMessage('Feedback submitted successfully!');
                     
                     // Clear form
                     document.getElementById('source-query').value = '';
@@ -406,7 +404,7 @@ window.addEventListener('message', (event) => {
                     }, 2000);
                 } else {
                     // Show error message
-                    showBanner('error-banner', errorMessage || 'Failed to submit feedback. Please try again.');
+                    if (typeof renderSyncError === 'function') renderSyncError(errorMessage || 'Unknown error');
                     
                     // Re-enable submit button
                     settleSubmitState(submitBtn, false, 'Submit');

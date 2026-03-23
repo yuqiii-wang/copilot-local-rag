@@ -78,7 +78,7 @@ module.exports = function createShowLogActionButtonCommand(deps) {
         return null; // Do not fall back to naive rank
     }
 
-    return vscode.commands.registerCommand('repo-ask.showLogActionButton', async (firstUserQuery, firstRankedDocUrl, fullAiResponse) => {
+    return vscode.commands.registerCommand('repo-ask.showLogActionButton', async (firstUserQuery, firstRankedDocUrl, fullAiResponse, queryStartTime) => {
         // Store the logged prompt in globalState to archive the chat
         if (firstUserQuery && context) {
             const loggedPrompts = context.globalState.get('repoAsk.loggedPrompts', []);
@@ -89,10 +89,10 @@ module.exports = function createShowLogActionButtonCommand(deps) {
         }
 
         const selectedDocument = selectHighestScoreDocument(firstUserQuery, firstRankedDocUrl, fullAiResponse);
-        
+
         // Show the feedback form with the first user query, first ranked doc URL, and full AI response.
         if (sidebar) {
-            sidebar.showLogActionButton(firstUserQuery, firstRankedDocUrl, fullAiResponse, selectedDocument);
+            sidebar.showLogActionButton(firstUserQuery, firstRankedDocUrl, fullAiResponse, selectedDocument, queryStartTime);
         }
     });
 };

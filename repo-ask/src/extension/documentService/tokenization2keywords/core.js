@@ -1,4 +1,8 @@
 const { STOP_WORDS } = require('./patternMatch');
+const { removeMdSyntax } = require('../md2keywords');
+
+const urlRegexStrict = /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$/i;
+const numRegexStrict = /^-?\d+(\.\d+)?$/;
 
 function tokenize(text) {
     const rawText = String(text || '');
@@ -6,80 +10,31 @@ function tokenize(text) {
 
     let tokens = [];
 
-    // First pass: extract markdown title, italic, and bold
-    const titleMatch = rawText.match(/^#\s+(.+)$/m);
-    if (titleMatch) {
-        const titleText = titleMatch[1].trim();
-        const titleWords = titleText.split(/\s+/);
-        for (const word of titleWords) {
-            const cleanWord = word.toLowerCase()
-                .replace(/^-+|-+$/g, '');
-            if (cleanWord.length > 2 && !STOP_WORDS.has(cleanWord)) {
-                tokens.push(cleanWord, cleanWord, cleanWord);
-                // Split at , ; and " to create additional tokens
-                const splitTokens = cleanWord.split(/[,;"\s]+/).filter(t => t.length > 2 && !STOP_WORDS.has(t));
-                splitTokens.forEach(token => tokens.push(token));
-            }
-        }
-    }
+    // Remove markdown syntax: headers, bold, italic, inline code
+    let processedText = removeMdSyntax(rawText);
 
-    const boldMatches = rawText.match(/(?:\*\*|__)([^\*_]+)(?:\*\*|__)/g);
-    if (boldMatches) {
-        for (const match of boldMatches) {
-            const boldText = match.replace(/(?:\*\*|__)/g, '').trim();
-            const boldWords = boldText.split(/\s+/);
-            for (const word of boldWords) {
-                const cleanWord = word.toLowerCase()
-                    .replace(/^-+|-+$/g, '');
-                if (cleanWord.length > 2 && !STOP_WORDS.has(cleanWord)) {
-                    tokens.push(cleanWord, cleanWord);
-                    // Split at , ; and " to create additional tokens
-                    const splitTokens = cleanWord.split(/[,;"\s]+/).filter(t => t.length > 2 && !STOP_WORDS.has(t));
-                    splitTokens.forEach(token => tokens.push(token));
-                }
-            }
-        }
-    }
+    // Split into words by spaces
+    const words = processedText.split(/\s+/);
 
-    const italicMatches = rawText.match(/(?:\*|_)([^\*_]+)(?:\*|_)/g);
-    if (italicMatches) {
-        for (const match of italicMatches) {
-            const italicText = match.replace(/(?:\*|_)/g, '').trim();
-            const italicWords = italicText.split(/\s+/);
-            for (const word of italicWords) {
-                const cleanWord = word.toLowerCase()
-                    .replace(/^-+|-+$/g, '');
-                if (cleanWord.length > 2 && !STOP_WORDS.has(cleanWord)) {
-                    tokens.push(cleanWord);
-                    // Split at , ; and " to create additional tokens
-                    const splitTokens = cleanWord.split(/[,;"\s]+/).filter(t => t.length > 2 && !STOP_WORDS.has(t));
-                    splitTokens.forEach(token => tokens.push(token));
-                }
-            }
-        }
-    }
+    for (let word of words) {
+        let cleanWord = word;
+        // Strip leading/trailing punctuation typically wrapping words
+        let strippedWord = cleanWord.replace(/^[.,;:"'(\[<]+|[.,;:"')\]>!?-]+$/g, '');
+        
+        let tokenCandidate = strippedWord || cleanWord;
+        tokenCandidate = tokenCandidate.toLowerCase();
 
-    const sentences = rawText.split(/(?:[.!?\n]+)/).filter(s => s.trim().length > 0);
-    for (const sentence of sentences) {
-        const words = sentence.trim().split(/\s+/);
-        for (let i = 0; i < words.length; i++) {
-            let word = words[i];
-            const cleanWord = word.toLowerCase()
-                .replace(/^-+|-+$/g, '');
-            if (cleanWord.length <= 2 || STOP_WORDS.has(cleanWord)) continue;
+        if (tokenCandidate.length <= 2 || STOP_WORDS.has(tokenCandidate)) continue;
 
-            tokens.push(cleanWord);
-
-            // Split at , ; " and hyphens to create additional tokens
-            const splitTokens = cleanWord.split(/[,;"\s-]+/).filter(t => t.length > 2 && !STOP_WORDS.has(t));
-            splitTokens.forEach(token => tokens.push(token));
-
-            // Add extra weight for words with hyphens or punctuation
-            if (cleanWord.includes('-') || /[,;"@#$%^&*(){}[\]\\:;"'=+_]/.test(cleanWord)) {
-                tokens.push(cleanWord, cleanWord);
-            }
-            if (cleanWord.length > 8) {
-                tokens.push(cleanWord);
+        if (urlRegexStrict.test(tokenCandidate) || numRegexStrict.test(tokenCandidate)) {
+            tokens.push(tokenCandidate);
+        } else {
+            tokens.push(tokenCandidate);
+            
+            // Sub-words split
+            const subWords = tokenCandidate.split(/[,;"\s-]+/).filter(t => t.length > 2 && !STOP_WORDS.has(t));
+            if (subWords.length > 1) {
+                subWords.forEach(t => tokens.push(t));
             }
         }
     }

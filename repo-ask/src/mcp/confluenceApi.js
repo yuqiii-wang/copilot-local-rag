@@ -1,6 +1,6 @@
-const axios = require('axios');
 const vscode = require('vscode');
 const { confluenceApiMap } = require('./apiMap');
+const { httpManager, getAuthHeaders } = require('./httpManager');
 
 const REQUEST_TIMEOUT_MS = 5000;
 
@@ -22,20 +22,6 @@ function getConfluenceConfig() {
     };
 }
 
-function getHeaders(securityToken) {
-    const headers = {};
-    if (securityToken) {
-        if (securityToken.startsWith('Bearer ') || securityToken.startsWith('Basic ')) {
-            headers['Authorization'] = securityToken;
-        } else if (securityToken.includes(':')) {
-            headers['Authorization'] = `Basic ${Buffer.from(securityToken).toString('base64')}`;
-        } else {
-            headers['Authorization'] = `Bearer ${securityToken}`;
-        }
-    }
-    return headers;
-}
-
 function extractConfluencePageIdFromArg(pageArg) {
     const raw = String(pageArg || '').trim();
     if (!raw) {
@@ -48,57 +34,40 @@ function extractConfluencePageIdFromArg(pageArg) {
     return '';
 }
 
-function buildResolveCandidates(pageArg) {
-    const raw = String(pageArg || '').trim();
-    if (!raw) {
-        return [];
-    }
-    const id = extractConfluencePageIdFromArg(raw);
-    if (id) {
-        return [id, raw];
-    }
-    return [raw];
-}
-
 async function fetchConfluencePage(pageArg) {
     let { url: base, securityToken } = getConfluenceConfig();
     
-    // If pageArg is a URL, use its origin
     if (String(pageArg).startsWith('http')) {
         base = new URL(pageArg).origin;
     } else if (!base) {
         throw new Error('Confluence base URL not configured. Please set the repoAsk.confluence.url setting.');
     }
     
-    const headers = getHeaders(securityToken);
-    
-    // Try the direct page ID first if available
+    const headers = getAuthHeaders(securityToken);
     const pageId = extractConfluencePageIdFromArg(pageArg);
+    
     if (pageId) {
         try {
             const storageUrl = confluenceApiMap.contentStorage(base, pageId);
-            const response = await axios.get(storageUrl, {
+            return await httpManager.request({
+                method: 'GET',
+                url: storageUrl,
                 timeout: REQUEST_TIMEOUT_MS,
-                headers,
-                maxContentLength: Infinity,
-                maxBodyLength: Infinity
+                headers
             });
-            return response.data;
         } catch (error) {
             // Continue to try other methods
         }
     }
     
-    // Try with the original pageArg
     try {
         const storageUrl = confluenceApiMap.contentStorage(base, pageArg);
-        const response = await axios.get(storageUrl, {
+        return await httpManager.request({
+            method: 'GET',
+            url: storageUrl,
             timeout: REQUEST_TIMEOUT_MS,
-            headers,
-            maxContentLength: Infinity,
-            maxBodyLength: Infinity
+            headers
         });
-        return response.data;
     } catch (error) {
         throw error || new Error('Failed to fetch Confluence page with provided argument.');
     }
@@ -111,36 +80,33 @@ async function fetchAllConfluencePages() {
         throw new Error('Confluence base URL not configured. Please set the repoAsk.confluence.url setting.');
     }
     
-    const headers = getHeaders(securityToken);
+    const headers = getAuthHeaders(securityToken);
     
-    const response = await axios.get(confluenceApiMap.contentAll(base), {
+    return await httpManager.request({
+        method: 'GET',
+        url: confluenceApiMap.contentAll(base),
         timeout: REQUEST_TIMEOUT_MS,
-        headers,
-        maxContentLength: Infinity,
-        maxBodyLength: Infinity
+        headers
     });
-    return response.data;
 }
 
 async function fetchConfluencePageChildren(pageId) {
     let { url: base, securityToken } = getConfluenceConfig();
     
-    // If pageId is a URL, use its origin
     if (String(pageId).startsWith('http')) {
         base = new URL(pageId).origin;
     } else if (!base) {
         throw new Error('Confluence base URL not configured. Please set the repoAsk.confluence.url setting.');
     }
     
-    const headers = getHeaders(securityToken);
+    const headers = getAuthHeaders(securityToken);
     
-    const response = await axios.get(confluenceApiMap.contentChildren(base, pageId), {
+    return await httpManager.request({
+        method: 'GET',
+        url: confluenceApiMap.contentChildren(base, pageId),
         timeout: REQUEST_TIMEOUT_MS,
-        headers,
-        maxContentLength: Infinity,
-        maxBodyLength: Infinity
+        headers
     });
-    return response.data;
 }
 
 function escapeHtml(value) {
@@ -156,7 +122,8 @@ function normalizeFeedbackPayload(feedbackPayload) {
     const payload = feedbackPayload && typeof feedbackPayload === 'object' ? feedbackPayload : {};
     return {
         datetime: String(payload.datetime || new Date().toISOString().slice(0, 16)).trim(),
-        submittedBy: String(payload.submittedBy || 'RepoAsk User').trim(),
+        username: String(payload.username || 'anonymous').trim(),
+        elapsedTime: String(payload.elapsedTime || '').trim(),
         sourceQuery: String(payload.sourceQuery || '').trim(),
         conversationSummary: String(payload.conversationSummary || '').trim(),
         confluenceLink: String(payload.confluenceLink || '').trim(),
@@ -206,7 +173,8 @@ function buildFeedbackRowHtml(feedbackPayload) {
     return [
         '<tr>',
         `<td>${escapeHtml(normalized.datetime)}</td>`,
-        `<td>${escapeHtml(normalized.submittedBy)}</td>`,
+        `<td>${escapeHtml(normalized.username)}</td>`,
+        `<td>${escapeHtml(normalized.elapsedTime)}</td>`,
         `<td><ul>${details.join('')}</ul></td>`,
         '</tr>'
     ].join('');
@@ -214,7 +182,12 @@ function buildFeedbackRowHtml(feedbackPayload) {
 
 function appendFeedbackToStorageValue(currentContent, feedbackPayload) {
     const rowHtml = buildFeedbackRowHtml(feedbackPayload);
-    const content = String(currentContent || '');
+    let content = String(currentContent || '');
+
+    // Upgrade existing table headers if they don't have the new columns
+    if (content.includes('<th>Date</th><th>User</th><th>Feedback</th>')) {
+        content = content.replace('<th>Date</th><th>User</th><th>Feedback</th>', '<th>Date</th><th>Username</th><th>Elapsed Time (s)</th><th>Feedback</th>');
+    }
 
     if (/<tbody[^>]*>/i.test(content)) {
         return content.replace(/<\/tbody>/i, `${rowHtml}</tbody>`);
@@ -226,7 +199,7 @@ function appendFeedbackToStorageValue(currentContent, feedbackPayload) {
 
     const feedbackTable = [
         '<table>',
-        '<tbody><tr><th>Date</th><th>User</th><th>Feedback</th></tr>',
+        '<tbody><tr><th>Date</th><th>Username</th><th>Elapsed Time (s)</th><th>Feedback</th></tr>',
         `${rowHtml}</tbody>`,
         '</table>'
     ].join('');
@@ -242,28 +215,21 @@ async function updateConfluencePage(pageId, feedbackPayload) {
     let { url: base, securityToken } = getConfluenceConfig();
     let pageIdForApi = pageId;
     
-    // If pageId is a URL, use its origin
     if (String(pageId).startsWith('http')) {
         const url = new URL(pageId);
         base = url.origin;
-        // Extract just the page ID from the URL for the API endpoint
         pageIdForApi = extractConfluencePageIdFromArg(pageId) || pageId;
     } else if (!base) {
         throw new Error('Confluence base URL not configured. Please set the repoAsk.confluence.url setting.');
     }
     
-    const headers = getHeaders(securityToken);
+    const headers = getAuthHeaders(securityToken);
     headers['Content-Type'] = 'application/json';
     
-    // First, get the current page content
     const currentPage = await fetchConfluencePage(pageId);
-    
-    // Extract current content and append the new feedback row in table format.
     let currentContent = currentPage.body?.storage?.value || '';
-
     const updatedContent = appendFeedbackToStorageValue(currentContent, feedbackPayload);
     
-    // Prepare the update request payload
     const payload = {
         id: extractConfluencePageIdFromArg(pageId) || pageId,
         type: 'page',
@@ -279,15 +245,13 @@ async function updateConfluencePage(pageId, feedbackPayload) {
         }
     };
     
-    // Send the update request
-    const response = await axios.put(confluenceApiMap.contentUpdate(base, pageIdForApi), payload, {
+    return await httpManager.request({
+        method: 'PUT',
+        url: confluenceApiMap.contentUpdate(base, pageIdForApi),
         timeout: REQUEST_TIMEOUT_MS,
         headers,
-        maxContentLength: Infinity,
-        maxBodyLength: Infinity
+        data: payload
     });
-    
-    return response.data;
 }
 
 async function createConfluencePage(title, content) {
@@ -297,10 +261,9 @@ async function createConfluencePage(title, content) {
         throw new Error('Confluence base URL not configured. Please set the repoAsk.confluence.url setting.');
     }
     
-    const headers = getHeaders(securityToken);
+    const headers = getAuthHeaders(securityToken);
     headers['Content-Type'] = 'application/json';
     
-    // Prepare the create request payload
     const payload = {
         type: 'page',
         title: title,
@@ -315,15 +278,13 @@ async function createConfluencePage(title, content) {
         }
     };
     
-    // Send the create request
-    const response = await axios.post(confluenceApiMap.contentCreate(base), payload, {
+    return await httpManager.request({
+        method: 'POST',
+        url: confluenceApiMap.contentCreate(base),
         timeout: REQUEST_TIMEOUT_MS,
         headers,
-        maxContentLength: Infinity,
-        maxBodyLength: Infinity
+        data: payload
     });
-    
-    return response.data;
 }
 
 module.exports = {
