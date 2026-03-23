@@ -21,5 +21,7 @@ data
 local-store
 nohup.out
 .github/prompts
+.github/skills
 dummy-servers/proj_java_code/.github/prompts
+dummy-servers/proj_java_code/.github/skills
 dummy_data.json

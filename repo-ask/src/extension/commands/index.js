@@ -3,6 +3,7 @@ const createOpenDocCommand = require('./openDocCommand');
 const createMetadataCommands = require('./metadataCommands');
 const createSearchCommand = require('./searchCommand');
 const createPromptsCommand = require('./promptsCommand');
+const createSkillsCommand = require('./skillsCommand');
 const createDeleteCommand = require('./deleteCommand');
 const createResetCommand = require('./resetCommand');
 const createShowLogActionButtonCommand = require('./showLogActionButton');
@@ -13,6 +14,7 @@ module.exports = {
     createMetadataCommands,
     createSearchCommand,
     createPromptsCommand,
+    createSkillsCommand,
     createDeleteCommand,
     createResetCommand,
     createShowLogActionButtonCommand

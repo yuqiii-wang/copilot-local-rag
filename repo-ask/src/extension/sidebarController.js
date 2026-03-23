@@ -3,7 +3,7 @@ const path = require('path');
 const vscode = require('vscode');
 const { updateConfluencePage } = require('../mcp/confluenceApi');
 const { mapFeedbackError } = require('./errMap');
-const { createOpenDocCommand, createMetadataCommands, createSearchCommand, createPromptsCommand, createDeleteCommand, createResetCommand } = require('./commands');
+const { createOpenDocCommand, createMetadataCommands, createSearchCommand, createPromptsCommand, createSkillsCommand, createDeleteCommand, createResetCommand } = require('./commands');
 
 
 function createSidebarController(deps) {
@@ -22,6 +22,7 @@ function createSidebarController(deps) {
     const { generateMetadata, saveMetadata } = createMetadataCommands(deps);
     const searchDocs = createSearchCommand(deps);
     const addToPrompts = createPromptsCommand(deps);
+    const addToSkills = createSkillsCommand(deps);
     const deleteDoc = createDeleteCommand(deps);
     const resetToDefaultDocs = createResetCommand(deps);
 
@@ -85,6 +86,10 @@ function createSidebarController(deps) {
 
                     if (message?.command === 'addToPrompts') {
                         await addToPrompts(message, docsWebviewView);
+                    }
+
+                    if (message?.command === 'addToSkills') {
+                        await addToSkills(message, docsWebviewView);
                     }
 
                     if (message?.command === 'deleteDoc') {

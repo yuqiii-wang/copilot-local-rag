@@ -34,6 +34,23 @@ function writeDocumentPromptFile(metadata, content) {
   return filePath;
 }
 
+function writeDocumentSkillFile(metadata, content) {
+  const workspaceRoot = getWorkspaceRootPath();
+  const skillsDir = path.join(workspaceRoot, '.github', 'skills');
+
+  if (!fs.existsSync(skillsDir)) {
+    fs.mkdirSync(skillsDir, { recursive: true });
+  }
+
+  const safeTitle = sanitizeFileSegment(metadata.title || 'document');
+  const safeId = sanitizeFileSegment(metadata.id || 'unknown');
+  const fileName = `${safeTitle}-${safeId}.skill.md`;
+  const filePath = path.join(skillsDir, fileName);
+  const skillText = [`# ${metadata.title || 'Untitled'}`, '', `Source ID: ${metadata.id || ''}`, `Author: ${metadata.author || 'Unknown'}`, `Last Updated: ${metadata.last_updated || ''}`, `Parent Topic: ${metadata.parent_confluence_topic || ''}`, '', '## Skill Instructions', 'Use the following document content as a reference skill or knowledge base for completing tasks.', '', '## Content', content].join('\n');
+  fs.writeFileSync(filePath, skillText, 'utf8');
+  return filePath;
+}
+
 
 
 function getPageHtml(page) {
@@ -179,6 +196,7 @@ function getWorkspaceRootPath() {
 
   return {
     writeDocumentPromptFile,
+    writeDocumentSkillFile,
     getStoredMetadataById,
     generateStoredMetadataById,
     updateStoredMetadataById,

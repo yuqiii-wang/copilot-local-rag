@@ -26,7 +26,10 @@
             <section class="content-pane">
                 <div class="viewer-header">
                     <h2 class="viewer-title">Content</h2>
-                    <button id="add-to-prompts-btn" class="action-btn" type="button" disabled>Add to Prompts</button>
+                    <div class="header-actions">
+                        <button id="add-to-prompts-btn" class="action-btn" type="button" disabled>Add to Prompts</button>
+                        <button id="add-to-skills-btn" class="action-btn" type="button" disabled>Add to Skills</button>
+                    </div>
                 </div>
                 <div id="doc-content" class="doc-content">Select a document to view local content.</div>
             </section>
@@ -42,6 +45,7 @@
         
         const docContentEl = document.getElementById('doc-content');
         const addToPromptsBtnEl = document.getElementById('add-to-prompts-btn');
+        const addToSkillsBtnEl = document.getElementById('add-to-skills-btn');
         const containerEl = document.querySelector('.container');
         const headerEl = document.querySelector('.header');
         const mainSplitterEl = document.getElementById('main-splitter');
@@ -138,6 +142,11 @@
         addToPromptsBtnEl.addEventListener('click', () => {
             if (!selectedDocId) return;
             vscode.postMessage({ command: 'addToPrompts', docId: selectedDocId });
+        });
+
+        addToSkillsBtnEl.addEventListener('click', () => {
+            if (!selectedDocId) return;
+            vscode.postMessage({ command: 'addToSkills', docId: selectedDocId });
         });
 
         const openRefreshPopupBtn = document.getElementById('open-refresh-popup-btn');

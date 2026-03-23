@@ -103,6 +103,7 @@
                     const docId = buttonEl.getAttribute('data-doc-id');
                     selectedDocId = docId;
                     if(addToPromptsBtnEl) addToPromptsBtnEl.disabled = !selectedDocId;
+                    if(addToSkillsBtnEl) addToSkillsBtnEl.disabled = !selectedDocId;
                     render();
                     vscode.postMessage({ command: 'openDoc', docId });
                 });
@@ -177,6 +178,7 @@
                 if (!incomingId) return;
                 selectedDocId = incomingId;
                 if(addToPromptsBtnEl) addToPromptsBtnEl.disabled = !selectedDocId;
+                if(addToSkillsBtnEl) addToSkillsBtnEl.disabled = !selectedDocId;
                 if(docContentEl) docContentEl.innerHTML = payload.contentHtml || escapeHtml(payload.content || 'No local markdown content found.');
                 if(typeof renderMetadata === 'function') renderMetadata(payload.metadata || null);
                 render();
@@ -187,6 +189,8 @@
             if (message?.command === 'syncSuccess') renderSuccessMessage(message.payload || '');
             if (message?.command === 'addToPromptsSuccess') renderSuccessMessage(`Added to prompts: ${message.payload}`);
             if (message?.command === 'addToPromptsError') renderSyncError(`${message.payload}`);
+            if (message?.command === 'addToSkillsSuccess') renderSuccessMessage(`Added to skills: ${message.payload}`);
+            if (message?.command === 'addToSkillsError') renderSyncError(`${message.payload}`);
 
             if (message?.command === 'docDeleted') {
                 const deletedId = String(message.payload?.id || '').trim();
@@ -201,6 +205,7 @@
                             renderMetadata(null);
                         }
                         if(addToPromptsBtnEl) addToPromptsBtnEl.disabled = true;
+                        if(addToSkillsBtnEl) addToSkillsBtnEl.disabled = true;
                         if(docContentEl) docContentEl.textContent = 'Select a document to view local content.';
                     }
                     render();

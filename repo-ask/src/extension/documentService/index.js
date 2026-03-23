@@ -60,7 +60,8 @@ function createDocumentService(deps) {
     generateStoredMetadataById: _utils.generateStoredMetadataById,
     updateStoredMetadataById: _utils.updateStoredMetadataById,
     removeDocumentFromIndicesById: _utils.removeDocumentFromIndicesById,
-    writeDocumentPromptFile: _utils.writeDocumentPromptFile
+    writeDocumentPromptFile: _utils.writeDocumentPromptFile,
+    writeDocumentSkillFile: _utils.writeDocumentSkillFile
   };
 }
 
