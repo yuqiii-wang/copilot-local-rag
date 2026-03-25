@@ -369,12 +369,16 @@ module.exports = function createRefreshCommand(deps) {
             
             // Trigger full index refresh if requested
             if (fullIndexRefresh) {
-                sidebar.setSidebarSyncStatus('Refreshing document index...');
+                sidebar.setSidebarSyncStatus('Refreshing document index (BM25)...');
+                console.log('Starting full BM25 index refresh');
                 // Rebuild indexes
                 const metadataList = readAllMetadata(storagePath);
                 if (metadataList.length > 0) {
-                    // This will rebuild the keywords index from metadata
+                    // This will rebuild the BM25 keywords for all documents
+                    await documentService.finalizeBm25KeywordsForDocuments(metadataList.map(m => m.id));
+                    // Also call rankLocalDocuments to ensure any other indexes are refreshed
                     documentService.rankLocalDocuments('');
+                    console.log('Full BM25 index refresh completed successfully');
                 }
                 sidebar.setSidebarSyncStatus('Document index refreshed successfully');
                 await Promise.race([new Promise(resolve => setTimeout(resolve, 1000)), cancelPromise]); // Brief delay to show status

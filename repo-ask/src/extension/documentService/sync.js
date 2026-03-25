@@ -3,6 +3,16 @@ module.exports = function(context) {
     fetchJiraIssue, truncate, tokenize, htmlToMarkdown, jiraTextToMarkdown, generateSynonyms, readAllMetadata, writeDocumentFiles, 
     readDocumentContent, localizeMarkdownImageLinks, getKeywordConfig, cleanKeywords, mergeKeywordsPreservingSignals, getStoredMetadataById,
      getPageHtml, isLikelyHtml, extractHtmlTagData, resolveSourceUrl, tokenization2bm25 } = context;
+  const { extractMdKeywords } = require('./md2keywords');
+  const { tokenize: tokenizeKeywords } = require('./tokenization2keywords');
+
+  // Builds structural keywords from document content + title.
+  // Used by both processDocument/processJiraIssue (initial sync) and finalizeBm25KeywordsForDocuments (BM25 refresh).
+  function buildStructuralKeywords(docText, title) {
+    const mdKeywords = extractMdKeywords(String(docText || ''));
+    const titleKeywords = tokenizeKeywords(String(title || ''));
+    return [...titleKeywords, ...mdKeywords];
+  }
 
 async function refreshDocument(pageArg, options = {}) {
   const page = await fetchConfluencePage(pageArg);
@@ -55,7 +65,6 @@ async function refreshJiraIssue(issueArg, options = {}) {
   }
   const issue = await fetchJiraIssue(issueArg);
   const metadata = await processJiraIssue(issue);
-  await finalizeBm25KeywordsForDocuments([metadata.id]);
   notifyDocumentProcessed(options, metadata, 1, 1);
 }
 
@@ -81,6 +90,18 @@ async function processDocument(page) {
   const sourceUrl = resolveSourceUrl(page);
   const markdownBaseContent = isHtmlContent ? htmlToMarkdown(rawContent) : String(rawContent || '').trim();
   const markdownContent = await localizeMarkdownImageLinks(markdownBaseContent, page.id, sourceUrl);
+  
+  const keywordConfig = getKeywordConfig();
+  const title = htmlTagData.title || page.title;
+  const titleKeywords = tokenizeKeywords(title);
+  const mdKeywords = extractMdKeywords(markdownContent);
+  const lexicalKeywords = tokenizeKeywords(markdownContent);
+  const mergedKeywords = mergeKeywordsPreservingSignals({
+    structuralKeywords: [...titleKeywords, ...mdKeywords],
+    lexicalKeywords: lexicalKeywords,
+    limit: keywordConfig.DEFAULT_KEYWORD_LIMIT
+  });
+  
   const baseMetadata = {
     id: page.id,
     title: htmlTagData.title || page.title,
@@ -89,23 +110,16 @@ async function processDocument(page) {
     parent_confluence_topic: page.parent_confluence_topic || page.space || 'General',
     url: sourceUrl,
     type: 'confluence',
-    keywords: [],
-    synonyms: [],
+    keywords: mergedKeywords,
+    synonyms: cleanKeywords(generateSynonyms(mergedKeywords), 80),
     summary: '',
     tags: Array.isArray(existingMetadata.tags) ? existingMetadata.tags : [],
     feedback: String(existingMetadata.feedback || '').trim(),
     referencedQueries: Array.isArray(existingMetadata.referencedQueries) ? existingMetadata.referencedQueries : []
   };
-  const tokenizationKeywords = cleanKeywords(tokenize(markdownContent), getKeywordConfig().TOKENIZATION_KEYWORD_LIMIT);
-  const mergedKeywords = mergeKeywordsPreservingSignals({
-    structuralKeywords: tokenizationKeywords,
-    limit: getKeywordConfig().DEFAULT_KEYWORD_LIMIT
-  });
   const metadata = {
     ...existingMetadata,
     ...baseMetadata,
-    keywords: mergedKeywords,
-    synonyms: cleanKeywords(generateSynonyms(mergedKeywords), 80),
     summary: String(existingMetadata.summary || '').trim()
   };
   writeDocumentFiles(storagePath, page.id, markdownContent, metadata);
@@ -136,6 +150,17 @@ async function processJiraIssue(issue) {
   const title = htmlTitle || (issueKey && summary ? `${issueKey}: ${summary}` : issueKey || summary || `Issue ${issue?.id || ''}`.trim());
   const contentSections = [`# ${title}`, '', `Issue Key: ${issueKey || '-'}`, `Issue ID: ${issue?.id || '-'}`, `Project: ${projectKey}`, `Type: ${fields?.issuetype?.name || '-'}`, `Status: ${fields?.status?.name || '-'}`, `Priority: ${fields?.priority?.name || '-'}`, `Reporter: ${reporter}`, `Assignee: ${fields?.assignee?.displayName || '-'}`, `Updated: ${fields?.updated || '-'}`, '', '## Description', description || 'No description provided.'];
   const markdownContent = await localizeMarkdownImageLinks(contentSections.join('\n'), issue?.id, resolveSourceUrl(issue));
+  
+  const keywordConfig = getKeywordConfig();
+  const titleKeywords = tokenizeKeywords(title);
+  const mdKeywords = extractMdKeywords(markdownContent);
+  const lexicalKeywords = tokenizeKeywords(markdownContent);
+  const mergedKeywords = mergeKeywordsPreservingSignals({
+    structuralKeywords: [...titleKeywords, ...mdKeywords],
+    lexicalKeywords: lexicalKeywords,
+    limit: keywordConfig.DEFAULT_KEYWORD_LIMIT
+  });
+  
   const baseMetadata = {
     id: issue?.id,
     title,
@@ -144,23 +169,16 @@ async function processJiraIssue(issue) {
     parent_confluence_topic: `Jira ${projectKey}`,
     url: resolveSourceUrl(issue),
     type: 'jira',
-    keywords: [],
-    synonyms: [],
+    keywords: mergedKeywords,
+    synonyms: cleanKeywords(generateSynonyms(mergedKeywords), 80),
     summary: '',
     tags: Array.isArray(existingMetadata.tags) ? existingMetadata.tags : [],
     feedback: String(existingMetadata.feedback || '').trim(),
     referencedQueries: Array.isArray(existingMetadata.referencedQueries) ? existingMetadata.referencedQueries : []
   };
-  const tokenizationKeywords = cleanKeywords(tokenize(markdownContent), getKeywordConfig().TOKENIZATION_KEYWORD_LIMIT);
-  const mergedKeywords = mergeKeywordsPreservingSignals({
-    structuralKeywords: tokenizationKeywords,
-    limit: getKeywordConfig().DEFAULT_KEYWORD_LIMIT
-  });
   const metadata = {
     ...existingMetadata,
     ...baseMetadata,
-    keywords: mergedKeywords,
-    synonyms: cleanKeywords(generateSynonyms(mergedKeywords), 80),
     summary: String(existingMetadata.summary || '').trim()
   };
   writeDocumentFiles(storagePath, issue?.id, markdownContent, metadata);
@@ -178,7 +196,7 @@ async function finalizeBm25KeywordsForDocuments(docIds = []) {
     return;
   }
 
-  // 1. Gather all documents and calculate IDF
+  // 1. Gather all documents and calculate IDF using ALL split content including ngrams
   const N = metadataList.length;
   const dfMap = new Map();
   const docTokensMap = new Map();
@@ -218,6 +236,7 @@ async function finalizeBm25KeywordsForDocuments(docIds = []) {
   // 2. Score tokens and update metadata for target documents
   for (const docId of targetIdSet) {
     const tokens = docTokensMap.get(docId);
+    const docText = readDocumentContent(storagePath, docId) || '';
     if (!tokens) continue;
 
     const docLen = docLengthMap.get(docId);
@@ -234,20 +253,25 @@ async function finalizeBm25KeywordsForDocuments(docIds = []) {
     }
 
     scores.sort((a, b) => b.score - a.score);
-    const topKeywords = scores.slice(0, topN).map(x => x.token);
+    const bm25Keywords = scores.slice(0, topN).map(x => x.token);
 
-    // Update metadata with new keywords
+    // 3. Find the metadata for this doc first
     const metaIndex = metadataList.findIndex(m => m.id === docId);
     if (metaIndex >= 0) {
       const meta = metadataList[metaIndex];
-      // Merge new BM25 keywords with existing ones
+      
+      // 4. On top of BM25 keywords, generate markdown syntax keywords and also extract title keywords
+      const mdKeywords = extractMdKeywords(docText);
+      const titleKeywords = tokenizeKeywords(meta.title);
+
+      // 5. Merge BM25 keywords (primary) with title + markdown keywords (secondary)
       meta.keywords = mergeKeywordsPreservingSignals({
-        structuralKeywords: meta.keywords, 
-        lexicalKeywords: topKeywords,
+        structuralKeywords: [...titleKeywords, ...mdKeywords], 
+        modelKeywords: bm25Keywords,
         limit: keywordConfig.DEFAULT_KEYWORD_LIMIT
       });
-      // Assuming writeDocumentFiles updates the document metadata
-      const docText = readDocumentContent(storagePath, meta.id) || '';
+      // Generate synonyms from the merged keywords (unchanged)
+      meta.synonyms = cleanKeywords(generateSynonyms(meta.keywords), 80);
       writeDocumentFiles(storagePath, meta.id, docText, meta);
     }
   }
@@ -260,7 +284,6 @@ async function finalizeBm25KeywordsForDocuments(docIds = []) {
     }
 
     const defaultDocFolders = fs.readdirSync(defaultDocsSrcDir).filter(f => fs.statSync(path.join(defaultDocsSrcDir, f)).isDirectory());
-    let addedAny = false;
     for (const folder of defaultDocFolders) {
       if (!fs.existsSync(path.join(storagePath, folder))) {
         const srcFolder = path.join(defaultDocsSrcDir, folder);
@@ -272,15 +295,11 @@ async function finalizeBm25KeywordsForDocuments(docIds = []) {
             const mdContent = fs.readFileSync(mdPath, 'utf8');
             const metadata = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
             writeDocumentFiles(storagePath, folder, mdContent, metadata);
-            addedAny = true;
           } catch (e) {
             console.error(`Failed to sync default doc ${folder}:`, e);
           }
         }
       }
-    }
-    if (addedAny) {
-      finalizeBm25KeywordsForDocuments(readAllMetadata(storagePath).map(m => m.id));
     }
   }
 

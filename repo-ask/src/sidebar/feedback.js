@@ -48,6 +48,8 @@ function initFeedbackForm() {
     const cancelBtn = document.getElementById('cancel-feedback-btn');
     const generateSummaryBtn = document.getElementById('generate-summary-btn');
     const datetimeInput = document.getElementById('datetime');
+    const addSecondaryUrlBtn = document.getElementById('add-secondary-url-btn');
+    const secondaryUrlsContainer = document.getElementById('secondary-urls-container');
     
     // Set default datetime to current time
         const now = new Date();
@@ -139,6 +141,39 @@ function initFeedbackForm() {
         if (jiraIdInput) {
             jiraIdInput.addEventListener('input', syncIdAndLink);
         }
+        
+        // Secondary URLs functionality
+        function addSecondaryUrlItem() {
+            const newItem = document.createElement('div');
+            newItem.className = 'secondary-url-item';
+            newItem.innerHTML = `
+                <input type="text" class="form-input secondary-url-input" placeholder="Enter secondary URL or ID">
+                <button type="button" class="remove-secondary-url-btn">Remove</button>
+            `;
+            secondaryUrlsContainer.appendChild(newItem);
+            
+            // Add event listener to the new remove button
+            const removeBtn = newItem.querySelector('.remove-secondary-url-btn');
+            removeBtn.addEventListener('click', function() {
+                newItem.remove();
+            });
+        }
+        
+        // Add event listener for add secondary URL button
+        if (addSecondaryUrlBtn) {
+            addSecondaryUrlBtn.addEventListener('click', addSecondaryUrlItem);
+        }
+        
+        // Add event listeners to existing remove buttons
+        const existingRemoveBtns = document.querySelectorAll('.remove-secondary-url-btn');
+        existingRemoveBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const item = this.closest('.secondary-url-item');
+                if (item) {
+                    item.remove();
+                }
+            });
+        })
     
     // Submit button handler
     if (submitBtn) {
@@ -155,6 +190,12 @@ function initFeedbackForm() {
             const elapsedTimeRaw = document.getElementById('elapsed-time')?.value || '';
             const datetimeRaw = document.getElementById('datetime')?.value || '';
             const tagsRaw = document.getElementById('tags')?.value || '';
+
+            // Collect secondary URLs/IDs
+            const secondaryUrlInputs = document.querySelectorAll('.secondary-url-input');
+            const secondaryUrls = Array.from(secondaryUrlInputs)
+                .map(input => input.value.trim())
+                .filter(url => url);
 
             const sourceQuery = sourceQueryRaw.trim();
             const conversationSummary = conversationSummaryRaw.trim();
@@ -217,7 +258,9 @@ function initFeedbackForm() {
                 username: usernameRaw,
                 elapsedTime: elapsedTimeRaw,
                 datetime: datetimeRaw,
-                tags: tagsRaw
+                tags: tagsRaw,
+                secondaryUrls: secondaryUrls.length > 0 ? secondaryUrls : ['none'],
+                knowledge_graph: {}
             };
             
             try {
@@ -396,6 +439,24 @@ window.addEventListener('message', (event) => {
             document.getElementById('jira-id').value = '';
             document.getElementById('datetime').value = new Date().toISOString().slice(0, 16);
             document.getElementById('tags').value = '';
+            
+            // Reset secondary URLs section
+            const secondaryUrlsContainer = document.getElementById('secondary-urls-container');
+            if (secondaryUrlsContainer) {
+                // Clear all existing items except the first one
+                const items = secondaryUrlsContainer.querySelectorAll('.secondary-url-item');
+                items.forEach((item, index) => {
+                    if (index > 0) {
+                        item.remove();
+                    } else {
+                        // Clear the first item's input
+                        const input = item.querySelector('.secondary-url-input');
+                        if (input) {
+                            input.value = '';
+                        }
+                    }
+                });
+            }
 
             settleSubmitState(submitBtn, true, 'Submit');
 

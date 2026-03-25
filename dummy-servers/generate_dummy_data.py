@@ -28,6 +28,9 @@ def generate_dummy_data():
         'type': 'page',
         'status': 'current',
         'title': 'PROJ: Project Documentation',
+        'version': {
+            'number': 1
+        },
         'body': {
             'storage': {
                 'value': '<div><h1>PROJ Project Documentation</h1><p>Welcome to the PROJ project documentation. This page serves as the parent page for all project-related documentation.</p><ul><li>Overview</li><li>Architecture</li><li>Components</li><li>API Documentation</li><li>Deployment Guide</li></ul></div>',
@@ -36,6 +39,27 @@ def generate_dummy_data():
         },
         '_links': {
             'webui': "/spaces/PROJ/pages/77778881/Project+Documentation"
+        }
+    }
+
+    # Add Feedback Logs Page
+    feedback_logs_id = "77778800"
+    confluence_pages[feedback_logs_id] = {
+        'id': feedback_logs_id,
+        'type': 'page',
+        'status': 'current',
+        'title': 'Feedback Logs',
+        'version': {
+            'number': 1
+        },
+        'body': {
+            'storage': {
+                'value': '<div><h1>Feedback Logs</h1></div>',
+                'representation': 'storage'
+            }
+        },
+        '_links': {
+            'webui': "/spaces/PROJ/pages/77778800/Feedback+Logs"
         }
     }
 
@@ -49,6 +73,9 @@ def generate_dummy_data():
             'type': 'page',
             'status': 'current',
             'title': f'PROJ: {title}',
+            'version': {
+                'number': 1
+            },
             'body': {
                 'storage': {
                     'value': f'<div><h1>{title}</h1><p>{desc}</p><ul><li>Architecture Overview</li><li>API Endpoints</li></ul></div>',

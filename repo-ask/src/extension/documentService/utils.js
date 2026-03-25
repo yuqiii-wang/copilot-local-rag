@@ -150,7 +150,8 @@ function updateStoredMetadataById(docId, patch = {}) {
   if (!content) {
     throw new Error(`No local content found for document ${docId}.`);
   }
-  const tokenizationKeywords = cleanKeywords(tokenize(content), getKeywordConfig().TOKENIZATION_KEYWORD_LIMIT);
+  const tokenizationSource = [metadata.title || '', content || ''].filter(Boolean).join('\n');
+  const tokenizationKeywords = cleanKeywords(tokenize(tokenizationSource), getKeywordConfig().TOKENIZATION_KEYWORD_LIMIT);
   const manualKeywords = cleanKeywords(patch.keywords, getKeywordConfig().DEFAULT_KEYWORD_LIMIT);
   const nextKeywords = mergeKeywordsPreservingSignals({
     structuralKeywords: tokenizationKeywords,

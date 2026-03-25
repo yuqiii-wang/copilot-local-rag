@@ -13,7 +13,7 @@ npm run compile
 # npx vsce package
 
 # Start servers (on ports 8091 and 8092)
-cd ../dummy-servers
+cd dummy-servers
 python -m pip install -r requirements.txt
 nohup python confluence_server.py &
 nohup python jira_server.py &

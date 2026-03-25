@@ -9,10 +9,6 @@ function rankLocalDocuments(query, limit = 20) {
     return [];
   }
 
-  const metadataById = Object.fromEntries(metadataList.map(item => [String(item.id), item]));
-
-  let rankedByContent = [];
-
   const combinedScores = new Map();
 
   const configuredWeights = vscode.workspace.getConfiguration('repoAsk').get('searchWeights') || {};
@@ -36,6 +32,41 @@ function rankLocalDocuments(query, limit = 20) {
       queryNGrams = allTokens.filter(t => typeof t === 'string' && t.includes(' '));
   }
 
+  // Load Jira regex patterns from settings
+  const jiraProfile = vscode.workspace.getConfiguration('repoAsk').get('jira');
+  const jiraRegexPatterns = (jiraProfile && typeof jiraProfile === 'object' && Array.isArray(jiraProfile.regex)) ? jiraProfile.regex : [];
+  
+  // Extract Jira IDs from query
+  let jiraIds = [];
+  for (const pattern of jiraRegexPatterns) {
+    try {
+      const regex = new RegExp(pattern, 'g');
+      const matches = (query || '').match(regex);
+      if (matches) {
+        jiraIds = [...jiraIds, ...matches];
+      }
+    } catch (e) {
+      console.warn('Invalid Jira regex pattern:', pattern, e);
+    }
+  }
+  
+  // Fallback to default Jira pattern if no custom patterns are configured
+  if (jiraIds.length === 0) {
+    const defaultJiraPattern = /[A-Z]+-\d+/g;
+    const defaultMatches = (query || '').match(defaultJiraPattern);
+    if (defaultMatches) {
+      jiraIds = defaultMatches;
+    }
+  }
+  
+  // Remove duplicates
+  jiraIds = [...new Set(jiraIds)];
+  
+  // Extract Confluence IDs and titles from comma-separated values
+  const confluenceParts = (query || '').split(',').map(part => part.trim()).filter(part => part.length > 0);
+  const confluenceIds = confluenceParts.filter(part => !isNaN(part) && part.length > 0);
+  const confluenceTitles = confluenceParts.filter(part => isNaN(part) && part.length > 0);
+
   for (const metadata of metadataList) {
     let exactHitScore = 1;
     let hasMatch = false;
@@ -47,6 +78,35 @@ function rankLocalDocuments(query, limit = 20) {
     const mTags = Array.isArray(metadata.tags) ? metadata.tags.map(t => String(t).toLowerCase()) : [];
     const mType = String(metadata.type || '').toLowerCase();
     const mReferencedQueries = Array.isArray(metadata.referencedQueries) ? metadata.referencedQueries.map(q => String(q).toLowerCase()) : [];
+    const mUrl = String(metadata.url || '').toLowerCase();
+
+    // Check for Jira ID matches
+    for (const jiraId of jiraIds) {
+      const jiraIdLower = jiraId.toLowerCase();
+      if (mId.includes(jiraIdLower) || mTitle.includes(jiraIdLower) || mSummary.includes(jiraIdLower) || 
+          mContent.includes(jiraIdLower) || mKeywords.some(k => k.includes(jiraIdLower)) ||
+          mUrl.includes(jiraIdLower)) {
+        exactHitScore *= 2.0; // High weight for Jira matches
+        hasMatch = true;
+      }
+    }
+
+    // Check for Confluence ID exact matches
+    for (const confluenceId of confluenceIds) {
+      if (String(metadata.id) === confluenceId) {
+        exactHitScore *= 3.0; // Very high weight for exact Confluence ID matches
+        hasMatch = true;
+      }
+    }
+
+    // Check for Confluence title exact matches
+    for (const confluenceTitle of confluenceTitles) {
+      const confluenceTitleLower = confluenceTitle.toLowerCase();
+      if (mTitle === confluenceTitleLower) {
+        exactHitScore *= 2.5; // High weight for exact Confluence title matches
+        hasMatch = true;
+      }
+    }
 
     if (lowerQueryStr) {
       if (mId.includes(lowerQueryStr)) { exactHitScore *= WHOLE_QUERY_WEIGHTS.id; hasMatch = true; }
@@ -79,9 +139,18 @@ function rankLocalDocuments(query, limit = 20) {
     if (queryNGrams.length > 0) {
       for (const ngram of queryNGrams) {
         const nGramLength = ngram.split(/\s+/).length || 1;
+        const nGramKey = `${nGramLength}gram`;
+        const bm25Weight = BM25_NGRAM_WEIGHTS[nGramKey] || 1.0;
+        
         if (mTitle.includes(ngram)) { exactHitScore *= (NGRAM_WEIGHTS.title * nGramLength); hasMatch = true; }
         if (mSummary.includes(ngram)) { exactHitScore *= (NGRAM_WEIGHTS.summary * nGramLength); hasMatch = true; }
         if (mContent.includes(ngram)) { exactHitScore *= (NGRAM_WEIGHTS.content * nGramLength); hasMatch = true; }
+        
+        // Exact ngram keywords matching with BM25 weights
+        if (mKeywords.some(keyword => keyword === ngram)) {
+          exactHitScore *= (bm25Weight * 1.5); // Higher weight for exact keyword ngram matches
+          hasMatch = true;
+        }
       }
     }
 

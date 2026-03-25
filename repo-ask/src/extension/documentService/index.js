@@ -56,6 +56,7 @@ function createDocumentService(deps) {
     refreshJiraIssue: _sync.refreshJiraIssue,
     annotateDocumentByArg: _annotation.annotateDocumentByArg,
     annotateAllDocuments: _annotation.annotateAllDocuments,
+    finalizeBm25KeywordsForDocuments: _sync.finalizeBm25KeywordsForDocuments,
     getStoredMetadataById: _utils.getStoredMetadataById,
     generateStoredMetadataById: _utils.generateStoredMetadataById,
     updateStoredMetadataById: _utils.updateStoredMetadataById,

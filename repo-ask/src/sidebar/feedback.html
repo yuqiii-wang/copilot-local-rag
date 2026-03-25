@@ -40,6 +40,16 @@
             <label for="tags">Tags</label>
             <input type="text" id="tags" class="form-input" placeholder="Enter comma-separated tags">
         </div>
+        <div class="form-group">
+            <label for="secondary-urls">Secondary URLs/IDs</label>
+            <div id="secondary-urls-container">
+                <div class="secondary-url-item">
+                    <input type="text" class="form-input secondary-url-input" placeholder="Enter secondary URL or ID">
+                    <button type="button" class="remove-secondary-url-btn">Remove</button>
+                </div>
+            </div>
+            <button type="button" id="add-secondary-url-btn" class="action-btn">Add Secondary URL/ID</button>
+        </div>
         <div class="form-actions">
             <button id="submit-feedback-btn" class="action-btn primary">Submit</button>
             <button id="cancel-feedback-btn" class="action-btn">Cancel</button>

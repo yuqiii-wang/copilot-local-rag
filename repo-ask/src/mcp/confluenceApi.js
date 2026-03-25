@@ -129,7 +129,9 @@ function normalizeFeedbackPayload(feedbackPayload) {
         confluenceLink: String(payload.confluenceLink || '').trim(),
         confluencePageId: String(payload.confluencePageId || '').trim(),
         jiraId: String(payload.jiraId || '').trim(),
-        tags: String(payload.tags || '').trim()
+        tags: String(payload.tags || '').trim(),
+        secondaryUrls: Array.isArray(payload.secondaryUrls) ? payload.secondaryUrls.map(String).filter(Boolean) : [],
+        knowledge_graph: payload.knowledge_graph && typeof payload.knowledge_graph === 'object' ? payload.knowledge_graph : {}
     };
 }
 
@@ -164,6 +166,21 @@ function buildFeedbackRowHtml(feedbackPayload) {
 
     if (normalized.tags) {
         details.push(`<li><strong>Tags:</strong> ${escapeHtml(normalized.tags)}</li>`);
+    }
+
+    if (normalized.secondaryUrls && normalized.secondaryUrls.length > 0) {
+        const secondaryUrlsHtml = normalized.secondaryUrls.map(url => {
+            const safeUrl = escapeHtml(url);
+            const isHttpLink = /^https?:\/\//i.test(url);
+            return isHttpLink ? `<a href="${safeUrl}">${safeUrl}</a>` : safeUrl;
+        }).join('<br>');
+        details.push(`<li><strong>Secondary URLs/IDs:</strong><br>${secondaryUrlsHtml}</li>`);
+    }
+
+    if (normalized.knowledge_graph && (normalized.knowledge_graph.nodes || normalized.knowledge_graph.edges)) {
+        const nodesCount = Array.isArray(normalized.knowledge_graph.nodes) ? normalized.knowledge_graph.nodes.length : 0;
+        const edgesCount = Array.isArray(normalized.knowledge_graph.edges) ? normalized.knowledge_graph.edges.length : 0;
+        details.push(`<li><strong>Knowledge Graph:</strong> ${nodesCount} nodes, ${edgesCount} edges</li>`);
     }
 
     if (details.length === 0) {

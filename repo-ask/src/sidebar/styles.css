@@ -525,6 +525,39 @@ body.is-resizing {
     color: var(--vscode-button-secondaryForeground);
 }
 
+/* Secondary URLs */
+.secondary-url-item {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.secondary-url-item .form-input {
+    flex: 1;
+}
+
+.remove-secondary-url-btn {
+    border: 1px solid var(--vscode-editorWidget-border);
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 12px;
+    background: transparent;
+    color: var(--vscode-foreground);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.remove-secondary-url-btn:hover:enabled {
+    background: var(--vscode-list-hoverBackground);
+    border-color: var(--vscode-focusBorder);
+}
+
+#add-secondary-url-btn {
+    margin-top: 4px;
+    align-self: flex-start;
+}
+
 .spinner {
     width: 14px;
     height: 14px;

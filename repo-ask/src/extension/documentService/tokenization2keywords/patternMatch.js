@@ -15,6 +15,14 @@ const PATTERN_QUANTITY = /^[$]?[0-9]{1,3}(?:,?[0-9]{3})*(?:\.[0-9]+)?[kKmMbB]?$/
 const PATTERN_ALL_CAPS = /^[A-Z][A-Z0-9_]+$/;
 const PATTERN_DATE_COMPACT = /^\d{8}$/;
 const PATTERN_DIGIT_CAPS = /^\d+[.,\-/%]*[A-Z]+$/;
+const PATTERN_URL_STRICT = /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$/i;
+const PATTERN_NUM_STRICT = /^-?\d+(\.\d+)?$/;
+const PATTERN_URL = /https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/g;
+const PATTERN_PHONE = /\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/g;
+const PATTERN_CAMEL_CASE = /[A-Z][a-z]+(?:[A-Z][a-z]+)+/g;
+const PATTERN_SNAKE_CASE = /[a-z0-9]+(?:_[a-z0-9]+)+/g;
+const PATTERN_CAPITAL_SEQUENCES = /(?:^|[\s\[({>'"\-])([A-Z][\w]*(?:[\s\-]+[A-Z][\w]*)+)/g;
+const PATTERN_ALL_CAPS_SINGLE = /(?:^|[\s\[({>'"\-])([A-Z0-9_]{2,})(?=$|[\s\])}<'".,?!\-])/g;
 
 const STRUCTURAL_SEPARATORS = ['-', '_', '+', '=', '$', '/'];
 
@@ -57,27 +65,19 @@ const PATTERNS = [
     ['QUANTITY', PATTERN_QUANTITY],
     ['TICKER', PATTERN_TICKER],
     ['ALL_CAPS', PATTERN_ALL_CAPS],
-    ['DIGIT_CAPS', PATTERN_DIGIT_CAPS]
+    ['DIGIT_CAPS', PATTERN_DIGIT_CAPS],
+    ['URL_STRICT', PATTERN_URL_STRICT],
+    ['NUM_STRICT', PATTERN_NUM_STRICT]
 ];
 
 function patternTokenizer(text) {
     const rawText = String(text || '');
     if (!rawText.trim()) return [];
 
+    // Note: camelCase and snake_case identifiers are handled with proper part-splitting
+    // in tokenizeText (index.js). patternTokenizer covers all other structured patterns.
     const tokens = [];
-
-    const camelCaseRegex = /[A-Z][a-z]+(?:[A-Z][a-z]+)+/g;
     let match;
-    while ((match = camelCaseRegex.exec(rawText)) !== null) {
-        const camelCaseTerm = match[0];
-        tokens.push(camelCaseTerm);
-    }
-
-    const snakeCaseRegex = /[a-z0-9]+(?:_[a-z0-9]+)+/g;
-    while ((match = snakeCaseRegex.exec(rawText.toLowerCase())) !== null) {
-        const snakeCaseTerm = match[0];
-        tokens.push(snakeCaseTerm);
-    }
 
     for (const [name, pattern] of PATTERNS) {
         const regex = new RegExp(pattern.source, 'g');
@@ -87,13 +87,11 @@ function patternTokenizer(text) {
         }
     }
 
-    const urlRegex = /https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/g;
-    while ((match = urlRegex.exec(rawText)) !== null) {
+    while ((match = PATTERN_URL.exec(rawText)) !== null) {
         tokens.push(match[0]);
     }
 
-    const phoneRegex = /\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/g;
-    while ((match = phoneRegex.exec(rawText)) !== null) {
+    while ((match = PATTERN_PHONE.exec(rawText)) !== null) {
         tokens.push(match[0]);
     }
 
@@ -103,17 +101,12 @@ function patternTokenizer(text) {
 function extract_capital_sequences(text) {
     const sequences = [];
     
-    // Pattern to match 2 or more Capitalized words separated by space or hyphen
-    // Allows preceding characters like [, (, {, -, etc.
-    const pattern = /(?:^|[\s\[({>'"\-])([A-Z][\w]*(?:[\s\-]+[A-Z][\w]*)+)/g;
     let match;
-    while ((match = pattern.exec(text)) !== null) {
+    while ((match = PATTERN_CAPITAL_SEQUENCES.exec(text)) !== null) {
         sequences.push(match[1].trim());
     }
     
-    // Match ALL CAPS single words or phrases (2 or more characters)
-    const allCapsPattern = /(?:^|[\s\[({>'"\-])([A-Z0-9_]{2,})(?=$|[\s\])}<'".,?!\-])/g;
-    while ((match = allCapsPattern.exec(text)) !== null) {
+    while ((match = PATTERN_ALL_CAPS_SINGLE.exec(text)) !== null) {
         sequences.push(match[1].trim());
     }
     
@@ -176,6 +169,8 @@ function generate_structural_regex(text) {
 
 module.exports = {
     PATTERNS,
+    PATTERN_URL_STRICT,
+    PATTERN_NUM_STRICT,
     patternTokenizer,
     extract_capital_sequences,
     generate_structural_regex,

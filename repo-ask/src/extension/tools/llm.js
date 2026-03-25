@@ -57,94 +57,6 @@ async function withTimeout(promise, timeoutMs, timeoutValue = null) {
     }
 }
 
-async function selectToolAndArg(vscode, prompt, options = {}) {
-    if (!prompt || String(prompt).trim().length === 0) {
-        return { tool: 'none' };
-    }
-
-    const workspacePromptContext = String(options.workspacePromptContext || '').trim();
-    const boundedPromptContext = workspacePromptContext.slice(0, 12000);
-
-    if (vscode.lm && vscode.LanguageModelChatMessage) {
-        try {
-            const shared = require('../chat/shared');
-            const model = await shared.selectDefaultChatModel(vscode, options);
-            if (model) {
-                const instruction = [
-                    'You are a helper that chooses which local repoask tool to run based on a user query.',
-                    'Return only valid JSON with shape: {"tool":"refresh|annotate|rank|check|none","arg":"..."}.',
-                    'Choose `refresh` when the user asks to refresh, sync, download, pull, fetch, import, or update docs/issues from Confluence or Jira.',
-                    'For `refresh`, extract a Jira issue key/id/link or a Confluence page id/title/link into `arg` when present.',
-                    boundedPromptContext
-                        ? `Workspace prompt context:\n${boundedPromptContext}`
-                        : 'Workspace prompt context: (none)',
-                    'Analyze the user text and decide which tool is most appropriate. If uncertain, choose `check` and put the user query into `arg`.',
-                    `User query: ${prompt}`
-                ].join('\n');
-
-                const response = await withTimeout(model.sendRequest([
-                    vscode.LanguageModelChatMessage.User(instruction)
-                ]), LLM_TIMEOUT_MS, null);
-                if (!response || !response.text) {
-                    return { tool: 'check', arg: prompt };
-                }
-
-                let responseText = '';
-                for await (const fragment of response.text) {
-                    responseText += fragment;
-                }
-
-                const parsed = extractJsonObject(responseText);
-                if (parsed && parsed.tool) {
-                    return { tool: parsed.tool, arg: parsed.arg || '' };
-                }
-            }
-        } catch {
-            // fallthrough to heuristics
-        }
-    }
-
-    const lowered = String(prompt).toLowerCase();
-    const urlMatch = prompt.match(/https?:\/\/[\w\-./?=&%]+/i);
-    const pageIdMatch = prompt.match(/pageid=(\d+)|\b(\d{1,6})\b/i);
-    const jiraRegexes = getJiraExtractionRegexes(vscode);
-    const jiraMatch = jiraRegexes
-        .map(regex => prompt.match(regex))
-        .find(match => match && match[0]);
-
-    if (
-        lowered.includes('refresh') ||
-        lowered.includes('sync') ||
-        lowered.includes('download') ||
-        lowered.includes('fetch') ||
-        lowered.includes('pull') ||
-        lowered.includes('import') ||
-        lowered.includes('update') ||
-        lowered.includes('confluence') ||
-        lowered.includes('jira') ||
-        urlMatch ||
-        pageIdMatch ||
-        jiraMatch
-    ) {
-        return {
-            tool: 'refresh',
-            arg: jiraMatch
-                ? jiraMatch[0]
-                : (urlMatch ? urlMatch[0] : (pageIdMatch ? (pageIdMatch[1] || pageIdMatch[2]) : prompt))
-        };
-    }
-
-    if (lowered.includes('annotate')) {
-        return { tool: 'annotate', arg: '' };
-    }
-
-    if (lowered.includes('rank') || lowered.includes('search')) {
-        return { tool: 'rank', arg: prompt };
-    }
-
-    return { tool: 'check', arg: prompt };
-}
-
 async function parseRefreshArg(vscode, sourceInput, options = {}) {
     const raw = String(sourceInput || '').trim();
     if (!raw) {
@@ -239,8 +151,68 @@ async function extractConfluenceIdentifierWithLlm(vscode, rawInput, options = {}
     }
 }
 
+async function generateKnowledgeGraph(vscode, referenceQueries, secondaryUrls, contentMap, options = {}) {
+    if (!vscode.lm || !vscode.LanguageModelChatMessage) {
+        return {};
+    }
+
+    try {
+        const shared = require('../chat/shared');
+        const model = await shared.selectDefaultChatModel(vscode, options);
+        if (!model) {
+            return {};
+        }
+
+        // Prepare content from secondary URLs
+        const secondaryContent = secondaryUrls.map(url => {
+            const content = contentMap[url] || 'No content available';
+            return `URL: ${url}\nContent: ${content.slice(0, 1000)}...`; // Truncate to avoid token limits
+        }).join('\n\n');
+
+        const instruction = [
+            'You are a knowledge graph builder.',
+            'Your task is to construct a structured knowledge graph from the provided reference queries and secondary content.',
+            'Extract relevant entities and their relationships from the content.',
+            'Organize the information into a graph structure with nodes and edges.',
+            'Nodes should represent entities (e.g., systems, processes, concepts).',
+            'Edges should represent relationships between entities (e.g., "uses", "depends on", "is part of").',
+            'Return a JSON object with the following structure:',
+            '{',
+            '  "nodes": [',
+            '    { "id": "unique-id", "label": "Entity Name", "type": "entity-type" }',
+            '  ],',
+            '  "edges": [',
+            '    { "source": "source-node-id", "target": "target-node-id", "label": "relationship-type" }',
+            '  ]',
+            '}',
+            '\nReference Queries:',
+            referenceQueries.join('\n'),
+            '\nSecondary Content:',
+            secondaryContent
+        ].join('\n');
+
+        const response = await withTimeout(model.sendRequest([
+            vscode.LanguageModelChatMessage.User(instruction)
+        ]), LLM_TIMEOUT_MS, null);
+        if (!response || !response.text) {
+            return {};
+        }
+
+        let responseText = '';
+        for await (const fragment of response.text) {
+            responseText += fragment;
+        }
+
+        const parsed = extractJsonObject(responseText);
+        return parsed || {};
+    } catch (error) {
+        console.error('Error generating knowledge graph:', error);
+        return {};
+    }
+}
+
 module.exports = {
     extractJsonObject,
-    selectToolAndArg,
-    parseRefreshArg
+    parseRefreshArg,
+    generateKnowledgeGraph
 };

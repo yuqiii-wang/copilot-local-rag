@@ -25,8 +25,6 @@ async function answerGeneralPromptQuestion(vscodeApi, prompt, workspacePromptCon
         return;
     }
 
-    const contextText = String(workspacePromptContext || '').trim();
-
     let initialRankedContext = 'No initial documents found.';
     let topDocFromSearch = null;
     if (documentService && typeof documentService.rankLocalDocuments === 'function') {

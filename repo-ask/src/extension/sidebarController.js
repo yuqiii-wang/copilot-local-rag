@@ -4,6 +4,7 @@ const vscode = require('vscode');
 const { updateConfluencePage } = require('../mcp/confluenceApi');
 const { mapFeedbackError } = require('./errMap');
 const { createOpenDocCommand, createMetadataCommands, createSearchCommand, createPromptsCommand, createSkillsCommand, createDeleteCommand, createResetCommand } = require('./commands');
+const { generateKnowledgeGraph } = require('./tools/llm');
 
 
 function createSidebarController(deps) {
@@ -340,9 +341,10 @@ function createSidebarController(deps) {
             }
 
             // Extract data points from feedback submission
-            const { sourceQuery, confluencePageId, jiraId, confluenceLink } = feedbackPayload;
+            const { sourceQuery, confluencePageId, jiraId, confluenceLink, secondaryUrls } = feedbackPayload;
 
             // Implement mapping system: associate Source Query with reference queries
+            let referenceQueries = [];
             if (sourceQuery && (confluencePageId || jiraId || confluenceLink)) {
                 try {
                     const allMetadata = readAllMetadata(storagePath);
@@ -394,6 +396,7 @@ function createSidebarController(deps) {
                         } else {
                             console.log('[handleSubmitFeedback] Source query already in reference queries for document:', targetDocument.id);
                         }
+                        referenceQueries = Array.isArray(targetDocument.referencedQueries) ? targetDocument.referencedQueries : [];
                     } else {
                         vscode.window.showErrorMessage('No document found for mapping source query: ' + sourceQuery);
                         console.log('[handleSubmitFeedback] No document found for mapping source query:', sourceQuery);
@@ -402,6 +405,48 @@ function createSidebarController(deps) {
                     const { errorMessage, detailedError } = mapFeedbackError(mappingError);
                     vscode.window.showErrorMessage(errorMessage);
                     console.error('[handleSubmitFeedback] Error mapping source query to reference queries:', detailedError);
+                }
+            }
+
+            // Generate knowledge graph if secondary URLs are provided
+            if (secondaryUrls && Array.isArray(secondaryUrls) && secondaryUrls.length > 0 && secondaryUrls[0] !== 'none') {
+                try {
+                    // Collect content for secondary URLs
+                    const contentMap = {};
+                    const allMetadata = readAllMetadata(storagePath);
+                    
+                    for (const url of secondaryUrls) {
+                        // Try to find document by URL or ID
+                        let docContent = '';
+                        
+                        // Check if URL contains a page ID
+                        try {
+                            const urlObj = new URL(url);
+                            const pageIdMatch = urlObj.search.match(/pageId=(\d+)/);
+                            if (pageIdMatch && pageIdMatch[1]) {
+                                const doc = allMetadata.find(d => String(d.id) === String(pageIdMatch[1]));
+                                if (doc) {
+                                    docContent = readDocumentContent(storagePath, doc.id) || '';
+                                }
+                            }
+                        } catch (urlError) {
+                            // Not a valid URL, try as ID
+                            const doc = allMetadata.find(d => String(d.id) === String(url));
+                            if (doc) {
+                                docContent = readDocumentContent(storagePath, doc.id) || '';
+                            }
+                        }
+                        
+                        contentMap[url] = docContent;
+                    }
+                    
+                    // Generate knowledge graph
+                    const knowledgeGraph = await generateKnowledgeGraph(vscode, referenceQueries, secondaryUrls, contentMap);
+                    feedbackPayload.knowledge_graph = knowledgeGraph;
+                    console.log('[handleSubmitFeedback] Generated knowledge graph:', knowledgeGraph);
+                } catch (kgError) {
+                    console.error('[handleSubmitFeedback] Error generating knowledge graph:', kgError);
+                    // Continue with submission even if knowledge graph generation fails
                 }
             }
 
@@ -464,13 +509,21 @@ function createSidebarController(deps) {
                             vscode.LanguageModelChatMessage.User(instruction)
                         ]);
 
-                        if (response && response.text) {
-                            let responseText = '';
-                            for await (const fragment of response.text) {
-                                responseText += fragment;
+                        let responseText = '';
+                        if (response) {
+                            if (response.stream) {
+                                for await (const chunk of response.stream) {
+                                    if (chunk instanceof vscode.LanguageModelTextPart) {
+                                        responseText += chunk.value;
+                                    }
+                                }
+                            } else if (response.text) {
+                                for await (const fragment of response.text) {
+                                    responseText += fragment;
+                                }
                             }
-                            summary = responseText.trim();
                         }
+                        summary = responseText.trim();
                     }
                 } catch (llmError) {
                     console.error('LLM error:', llmError);

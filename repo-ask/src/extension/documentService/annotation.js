@@ -46,7 +46,8 @@ async function annotateAllDocuments() {
 
 async function generateAnnotationWithLlm(metadata, content) {
   const originalKeywords = cleanKeywords(metadata?.keywords);
-  const fallbackKeywords = tokenize(content);
+  const tokenizationSource = [metadata?.title || '', content || ''].filter(Boolean).join('\n');
+  const fallbackKeywords = tokenize(tokenizationSource);
   const fallbackSummary = generateSummary(content);
   function appendSynonymKeywords(baseKeywords, maxSynonyms = 6) {
     const orderedBase = cleanKeywords(baseKeywords);
@@ -86,11 +87,21 @@ async function generateAnnotationWithLlm(metadata, content) {
       `Existing Feedback: ${metadata.feedback || ''}`,
       'Document markdown content:',
       truncate(content, 100000)
-    ].join('\\n');
+    ].join('\n');
     const response = await model.sendRequest([vscode.LanguageModelChatMessage.User(prompt)]);
     let responseText = '';
-    for await (const fragment of response.text) {
-      responseText += fragment;
+    if (response) {
+      if (response.stream) {
+        for await (const chunk of response.stream) {
+          if (chunk instanceof vscode.LanguageModelTextPart) {
+            responseText += chunk.value;
+          }
+        }
+      } else if (response.text) {
+        for await (const fragment of response.text) {
+          responseText += fragment;
+        }
+      }
     }
     const parsed = extractJsonObject(responseText) || {};
     const llmKeywords = cleanKeywords(parsed.keywords);
