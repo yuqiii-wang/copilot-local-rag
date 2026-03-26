@@ -13,15 +13,15 @@
   ],
   "activationEvents": [
     "onView:repo-ask-documents",
-    "onChatParticipant:repoaskDoc",
+    "onChatParticipant:repoask",
     "onLanguageModelTool:repoask_doc_check"
   ],
   "main": "index.js",
   "contributes": {
     "chatParticipants": [
       {
-        "id": "repoaskDoc",
-        "name": "repoaskDoc",
+        "id": "repoask",
+        "name": "repoask",
         "description": "RepoAsk chat for general questions from the document store"
       }
     ],
@@ -33,7 +33,7 @@
           "relevance",
           "qa"
         ],
-        "toolReferenceName": "repoaskDocCheck",
+        "toolReferenceName": "repoaskCheck",
         "displayName": "RepoAsk Doc Check",
         "modelDescription": "Find relevant local documents for a question using metadata relevance and include local content references.",
         "userDescription": "Check local docs for relevant references.",
@@ -100,6 +100,10 @@
       {
         "command": "repo-ask.showLogActionButton",
         "title": "RepoAsk: Show Log Action Button"
+      },
+      {
+        "command": "repo-ask.checkCodeLogic",
+        "title": "RepoAsk: Check Code Logic"
       }
     ],
     "configuration": {
@@ -109,6 +113,11 @@
           "type": "number",
           "default": 50,
           "description": "Init Keyword Num"
+        },
+        "repoAsk.maxSearchResults": {
+          "type": "number",
+          "default": 5,
+          "description": "Maximum number of documents to return from a ranked search. Acts as the hard cap after scoring, cutoff, and knowledge graph traversal."
         },
         "repoAsk.logActionConfluenceUrl": {
           "type": "string",
@@ -150,6 +159,11 @@
               "2gram": 1.5,
               "3gram": 2.0,
               "4gram": 2.5
+            },
+            "KNOWLEDGE_GRAPH_WEIGHTS": {
+              "entityTraversalBoost": 0.25,
+              "sharedTopicBoost": 0.15,
+              "maxHops": 1
             }
           },
           "description": "Ranking search weights for local documents."

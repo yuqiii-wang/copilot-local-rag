@@ -35,7 +35,7 @@ Found in the `Doc Store` sidebar context menu or detail window, "Add to Prompts"
 
 The extension provides one chat participant in GitHub Copilot Chat:
 
-### `@repoaskDoc`
+### `@repoask`
 Use this for general questions about your documentation. It can automatically:
 - Recognize when you want to `refresh` by analyzing your prompt structure.
 - Answer queries using local documentation contexts directly.

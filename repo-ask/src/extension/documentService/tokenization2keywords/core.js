@@ -1,6 +1,6 @@
 const { STOP_WORDS, PATTERN_URL_STRICT, PATTERN_NUM_STRICT } = require('./patternMatch');
 
-const STRUCTURAL_SEP_REGEX = /[-_+=$\/]/;
+const STRUCTURAL_SEP_REGEX = /[-_+=$//]/;
 
 /**
  * Returns compound phrases formed by structural-separator words.
@@ -16,7 +16,7 @@ function extractStructuralCompounds(text) {
         if (!STRUCTURAL_SEP_REGEX.test(rawWord)) continue;
         const stripped = rawWord.replace(/^[^\w]+|[^\w]+$/g, '');
         if (!stripped) continue;
-        const allParts = stripped.toLowerCase().split(/[-_+=$\/]+/).filter(p => p.length > 0);
+        const allParts = stripped.toLowerCase().split(/[-_+=$//]+/).filter(p => p.length > 0);
         if (allParts.length > 1) compounds.push(stripped.toLowerCase());
     }
     return [...new Set(compounds)];
@@ -31,7 +31,7 @@ function tokenize(text) {
     // Replace punctuations/symbols with space, but keep dashes so compounds
     // like "lst-1234-5678" survive as single tokens.
     // Underscore (_) is \w so snake_case identifiers survive as-is.
-    const sanitizedText = rawText.replace(/[^\w\s\-]/g, ' ');
+    const sanitizedText = rawText.replace(/[^\w\s-]/g, ' ');
 
     // Split into words by spaces
     const words = sanitizedText.split(/\s+/);
@@ -47,7 +47,7 @@ function tokenize(text) {
             tokens.push(tokenCandidate);
 
             // Sub-words: split on remaining separators (dashes, commas, etc.)
-            const subWords = tokenCandidate.split(/[,;"\s\-]+/).filter(t => t.length >= 2 && !STOP_WORDS.has(t));
+            const subWords = tokenCandidate.split(/[,;"\\s-]+/).filter(t => t.length >= 2 && !STOP_WORDS.has(t));
             if (subWords.length > 1) {
                 subWords.forEach(t => tokens.push(t));
             }

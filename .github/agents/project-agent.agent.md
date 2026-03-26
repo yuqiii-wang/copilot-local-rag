@@ -95,7 +95,7 @@ Current behavior snapshot:
 - Sidebar search uses `rankLocalDocuments` (BM25 first, IDF fallback); selecting a doc updates embedded preview + metadata panel; metadata can be generated/saved; delete removes local doc-directory and legacy files; Add to Prompts writes `.github/prompts/*.prompt.md`; feedback logging is available.
 - General prompt Q&A ranks metadata for context selection and streams explicit "Thinking" progress messages before returning model output.
 - Command definitions are organized in `repo-ask/src/extension/commands/` directory for better maintainability.
-- Chat participants: `@repoaskDoc` helps users with general doc questions using the `local-store` by directly using local ranking (`documentService.rankLocalDocuments`) and `repoask_doc_check` in a first LLM round, followed by a second LLM round for synthesizing the final answer. `@repoaskCode` aids with codebase features/bugs.
+- Chat participants: `@repoask` helps users with general doc questions using the `local-store` by directly using local ranking (`documentService.rankLocalDocuments`) and `repoask_doc_check` in a first LLM round, followed by a second LLM round for synthesizing the final answer. `@repoaskCode` aids with codebase features/bugs.
 
 Risks and notes:
 - LLM responses can be noisy: always use `extractJsonObject` and validate outputs before executing commands.

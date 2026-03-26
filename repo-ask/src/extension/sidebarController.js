@@ -601,7 +601,7 @@ function createSidebarController(deps) {
         }
     }
 
-    async function buildKnowledgeGraphForForm({ sourceQuery, confluencePageId, jiraId, confluenceLink, secondaryUrls }) {
+    async function buildKnowledgeGraphForForm({ sourceQuery, confluencePageId, jiraId, confluenceLink, secondaryUrls, existingKnowledgeGraph: passedKG }) {
         const urls = Array.isArray(secondaryUrls) ? secondaryUrls.filter(u => u && u !== 'none') : [];
         const allMetadata = readAllMetadata(storagePath);
 
@@ -636,11 +636,14 @@ function createSidebarController(deps) {
         }
 
         let primaryContent = '';
-        let existingKnowledgeGraph = '';
+        // Use the KG passed from the form (user may have edited it), or fall back to primary doc's stored KG
+        let existingKnowledgeGraph = String(passedKG || '').trim();
         let referenceQueries = [];
         if (primaryDoc) {
             primaryContent = readDocumentContent(storagePath, primaryDoc.id) || '';
-            existingKnowledgeGraph = String(primaryDoc.knowledgeGraph || '').trim();
+            if (!existingKnowledgeGraph) {
+                existingKnowledgeGraph = String(primaryDoc.knowledgeGraph || '').trim();
+            }
             referenceQueries = Array.isArray(primaryDoc.referencedQueries) ? primaryDoc.referencedQueries : [];
         }
         if (sourceQuery && !referenceQueries.includes(sourceQuery)) {

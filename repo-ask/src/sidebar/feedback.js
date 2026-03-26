@@ -390,13 +390,17 @@ function initFeedbackForm() {
 
             setButtonLoadingState(generateKgBtn, true, 'Generate Knowledge Graph');
 
+            // Get the existing knowledge graph so the AI can edit it based on primary and secondary doc contents
+            const existingKnowledgeGraph = document.getElementById('knowledge-graph-raw')?.value?.trim() || '';
+
             vscode.postMessage({
                 command: 'generateKnowledgeGraph',
                 sourceQuery: document.getElementById('source-query')?.value || '',
                 confluencePageId,
                 jiraId,
                 confluenceLink: document.getElementById('confluence-link')?.value || '',
-                secondaryUrls
+                secondaryUrls,
+                existingKnowledgeGraph
             });
         });
     }
@@ -511,6 +515,18 @@ function showFeedbackForm(firstUserQuery, selectedDocumentOrUrl, fullAiResponse,
         const summaryField = document.getElementById('conversation-summary');
         if (summaryField) {
             summaryField.value = fullAiResponse;
+        }
+    }
+    
+    // Load the stored knowledge graph from the selected primary document
+    if (selectedDocument && selectedDocument.knowledgeGraph) {
+        const kgRawField = document.getElementById('knowledge-graph-raw');
+        if (kgRawField) {
+            kgRawField.value = selectedDocument.knowledgeGraph;
+        }
+        const viewKgBtn = document.getElementById('view-kg-btn');
+        if (viewKgBtn) {
+            viewKgBtn.style.display = 'inline-block';
         }
     }
     

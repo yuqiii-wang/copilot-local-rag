@@ -30,7 +30,7 @@ const { parseRefreshArg } = require('./extension/tools/llm');
 const { createDocumentService } = require('./extension/documentService');
 const { createSidebarController } = require('./extension/sidebarController');
 const { createLanguageModelTools } = require('./extension/tools/lmTools');
-const { createRefreshCommand, createShowLogActionButtonCommand } = require('./extension/commands');
+const { createRefreshCommand, createShowLogActionButtonCommand, createCheckCodeLogicCommand } = require('./extension/commands');
 const { answerGeneralPromptQuestion } = require('./extension/chat/generalAnswer');
 
 const EMPTY_STORE_HINT = 'No local documents found. Use the sidebar popup to sync to Confluence Cloud.';
@@ -114,11 +114,11 @@ function setupExtension(context) {
         httpManager
     });
 
-    let repoAskDocParticipant;
+    let repoaskParticipant;
     if (vscode.chat && typeof vscode.chat.createChatParticipant === 'function') {
-        repoAskDocParticipant = vscode.chat.createChatParticipant('repoaskDoc', async (request, chatContext, response) => {
+        repoaskParticipant = vscode.chat.createChatParticipant('repoask', async (request, chatContext, response) => {
             const prompt = request.prompt?.trim() || '';
-            // Don't load workspace prompt context for repoaskDoc
+            // Don't load workspace prompt context for repoask
 
             if (!prompt) {
                 response.markdown('Ask a question.');
@@ -173,7 +173,7 @@ function setupExtension(context) {
             }
         });
 
-        repoAskDocParticipant.iconPath = vscode.Uri.joinPath(context.extensionUri, 'media', 'icon.svg');
+        repoaskParticipant.iconPath = vscode.Uri.joinPath(context.extensionUri, 'media', 'icon.svg');
 
 
     }
@@ -188,15 +188,19 @@ function setupExtension(context) {
         storagePath
     });
 
+    // Register check code logic command
+    const checkCodeLogicCommandDisposable = createCheckCodeLogicCommand({ vscode });
+
     const baseSubscriptions = [
         webviewProviderDisposable,
         ...lmToolDisposables,
         refreshCommandDisposable,
-        showLogActionButtonCommandDisposable
+        showLogActionButtonCommandDisposable,
+        checkCodeLogicCommandDisposable
     ];
 
-    if (repoAskDocParticipant) {
-        baseSubscriptions.push(repoAskDocParticipant);
+    if (repoaskParticipant) {
+        baseSubscriptions.push(repoaskParticipant);
     }
 
     context.subscriptions.push(...baseSubscriptions);

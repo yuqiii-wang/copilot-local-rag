@@ -56,7 +56,8 @@ module.exports = function registerDocCheckTool(deps) {
                                 last_updated: m.last_updated,
                                 parent_confluence_topic: m.parent_confluence_topic,
                                 keywords: m.keywords,
-                                summary: m.summary
+                                summary: m.summary,
+                                knowledgeGraph: m.knowledgeGraph
                             };
                             summaryLines.push(`- [${m.id}] ${m.title}`);
                             if (fullUrl) summaryLines.push(`  URL: ${fullUrl}`);
@@ -65,6 +66,7 @@ module.exports = function registerDocCheckTool(deps) {
                             if (m.parent_confluence_topic) summaryLines.push(`  Parent Topic: ${m.parent_confluence_topic}`);
                             if (m.keywords) summaryLines.push(`  Keywords: ${Array.isArray(m.keywords) ? m.keywords.join(', ') : m.keywords}`);
                             if (m.summary) summaryLines.push(`  Summary: ${m.summary}`);
+                            if (m.knowledgeGraph) summaryLines.push(`  Knowledge Graph:\n${m.knowledgeGraph}`);
                             summaryLines.push('');
                         } else if (mode === 'metadata.summary') {
                             result.metadata = { summary: m.summary };

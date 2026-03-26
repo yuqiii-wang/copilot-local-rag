@@ -7,6 +7,7 @@ const createSkillsCommand = require('./skillsCommand');
 const createDeleteCommand = require('./deleteCommand');
 const createResetCommand = require('./resetCommand');
 const createShowLogActionButtonCommand = require('./showLogActionButton');
+const createCheckCodeLogicCommand = require('./checkCodeLogicCommand');
 
 module.exports = {
     createRefreshCommand,
@@ -17,6 +18,7 @@ module.exports = {
     createSkillsCommand,
     createDeleteCommand,
     createResetCommand,
-    createShowLogActionButtonCommand
+    createShowLogActionButtonCommand,
+    createCheckCodeLogicCommand
 };
 

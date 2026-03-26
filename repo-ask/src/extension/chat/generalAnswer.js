@@ -173,6 +173,11 @@ async function answerGeneralPromptQuestion(vscodeApi, prompt, workspacePromptCon
             title: 'Log Action',
             arguments: [prompt, firstRankedDocUrl || '[NO_URL]', finalAnswer, queryStartTime]
         });
+        response.button({
+            command: 'repo-ask.checkCodeLogic',
+            title: 'Check Code Logic',
+            arguments: [prompt, finalAnswer]
+        });
     }
 
 }
