@@ -180,6 +180,7 @@ module.exports = function createRefreshCommand(deps) {
                             let confluencePageId = '';
                             let jiraId = '';
                             let confluenceLink = '';
+                            const rowSecondaryUrls = [];
                             
                             // Extract data from each row
                             $(row).find('li').each((i, li) => {
@@ -192,6 +193,16 @@ module.exports = function createRefreshCommand(deps) {
                                     jiraId = text.replace('Jira ID:', '').trim();
                                 } else if (text.includes('Confluence/Jira Link:')) {
                                     confluenceLink = text.replace('Confluence/Jira Link:', '').trim();
+                                } else if (text.includes('Secondary URLs/IDs:')) {
+                                    $(li).contents().each((_, node) => {
+                                        if (node.type === 'tag' && node.tagName === 'a') {
+                                            const href = ($(node).attr('href') || $(node).text()).trim();
+                                            if (href) rowSecondaryUrls.push(href);
+                                        } else if (node.type === 'text') {
+                                            const val = (node.data || '').trim();
+                                            if (val) rowSecondaryUrls.push(val);
+                                        }
+                                    });
                                 }
                             });
                             
@@ -203,6 +214,18 @@ module.exports = function createRefreshCommand(deps) {
                                     const currentQueries = sourceQueriesByTarget.get(refreshTarget) || new Set();
                                     currentQueries.add(sourceQuery);
                                     sourceQueriesByTarget.set(refreshTarget, currentQueries);
+                                }
+                            }
+
+                            // Register secondary docs with the same source query
+                            for (const secondaryTarget of rowSecondaryUrls) {
+                                const target = secondaryTarget.trim();
+                                if (!target) continue;
+                                referenceQueries.add(target);
+                                if (sourceQuery) {
+                                    const currentQueries = sourceQueriesByTarget.get(target) || new Set();
+                                    currentQueries.add(sourceQuery);
+                                    sourceQueriesByTarget.set(target, currentQueries);
                                 }
                             }
                         });

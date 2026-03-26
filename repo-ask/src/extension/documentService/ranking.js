@@ -10,6 +10,7 @@ function rankLocalDocuments(query, limit = 20) {
   }
 
   const combinedScores = new Map();
+  const explicitMatchIds = new Set();
 
   const configuredWeights = vscode.workspace.getConfiguration('repoAsk').get('searchWeights') || {};
   
@@ -62,9 +63,10 @@ function rankLocalDocuments(query, limit = 20) {
   // Remove duplicates
   jiraIds = [...new Set(jiraIds)];
   
-  // Extract Confluence IDs and titles from comma-separated values
+  // Extract Confluence IDs from query (handles both space and comma separated)
+  const confluenceIds = [...new Set((query || '').split(/[\s,]+/).filter(part => /^\d+$/.test(part)))];
+  // Extract Confluence titles from comma-separated non-numeric values
   const confluenceParts = (query || '').split(',').map(part => part.trim()).filter(part => part.length > 0);
-  const confluenceIds = confluenceParts.filter(part => !isNaN(part) && part.length > 0);
   const confluenceTitles = confluenceParts.filter(part => isNaN(part) && part.length > 0);
 
   for (const metadata of metadataList) {
@@ -88,6 +90,7 @@ function rankLocalDocuments(query, limit = 20) {
           mUrl.includes(jiraIdLower)) {
         exactHitScore *= 2.0; // High weight for Jira matches
         hasMatch = true;
+        explicitMatchIds.add(String(metadata.id));
       }
     }
 
@@ -96,6 +99,7 @@ function rankLocalDocuments(query, limit = 20) {
       if (String(metadata.id) === confluenceId) {
         exactHitScore *= 3.0; // Very high weight for exact Confluence ID matches
         hasMatch = true;
+        explicitMatchIds.add(String(metadata.id));
       }
     }
 
@@ -105,6 +109,7 @@ function rankLocalDocuments(query, limit = 20) {
       if (mTitle === confluenceTitleLower) {
         exactHitScore *= 2.5; // High weight for exact Confluence title matches
         hasMatch = true;
+        explicitMatchIds.add(String(metadata.id));
       }
     }
 
@@ -169,7 +174,17 @@ function rankLocalDocuments(query, limit = 20) {
   // Group related documents and ensure logical flow
   combinedRanked = groupRelatedDocuments(combinedRanked).slice(0, limit);
   combinedRanked = applyTopScoreCutoff(combinedRanked, TOP_SCORE_THRESHOLD_RATIO);
-  
+
+  // Always include docs matched by explicit Confluence ID or Jira ID, even if filtered by cutoff
+  if (explicitMatchIds.size > 0) {
+    const presentIds = new Set(combinedRanked.map(d => String(d.id)));
+    for (const eid of explicitMatchIds) {
+      if (!presentIds.has(eid) && combinedScores.has(eid)) {
+        combinedRanked.push(combinedScores.get(eid));
+      }
+    }
+  }
+
   return combinedRanked;
 }
 

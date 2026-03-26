@@ -8,6 +8,7 @@
         const tagsInputEl = document.getElementById('tags-input');
         const referencedQueriesListEl = document.getElementById('referenced-queries-list');
         const typeInputEl = document.getElementById('type-input');
+        const knowledgeGraphInputEl = document.getElementById('knowledge-graph-input');
         const metadataPaneEl = document.querySelector('.metadata-pane');
         
         let selectedMetadata = null;
@@ -19,7 +20,7 @@
                 return [];
             }
             return Object.entries(metadata)
-                .filter(([key]) => key !== 'summary' && key !== 'keywords' && key !== 'tags' && key !== 'referencedQueries' && key !== 'synonyms' && key !== 'type')
+                .filter(([key]) => key !== 'summary' && key !== 'keywords' && key !== 'tags' && key !== 'referencedQueries' && key !== 'synonyms' && key !== 'type' && key !== 'knowledgeGraph')
                 .map(([key, value]) => {
                     if (Array.isArray(value)) return { key, value: value.join(', ') };
                     if (value && typeof value === 'object') return { key, value: JSON.stringify(value) };
@@ -74,6 +75,11 @@
             if(keywordsInputEl) keywordsInputEl.value = keywordValues.join(', ');
             const tagValues = selectedMetadata && Array.isArray(selectedMetadata.tags) ? selectedMetadata.tags : [];
             if(tagsInputEl) tagsInputEl.value = tagValues.join(', ');
+            
+            // Render knowledge graph mermaid diagram (read-only)
+            if (knowledgeGraphInputEl) {
+                knowledgeGraphInputEl.value = selectedMetadata ? String(selectedMetadata.knowledgeGraph || '') : '';
+            }
             
             // Render referenced queries as a read-only list
             if(referencedQueriesListEl) {

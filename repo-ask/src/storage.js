@@ -147,7 +147,8 @@ function normalizeStoredMetadataSchema(docId, metadata) {
         tags: Array.isArray(base.tags) ? base.tags : [],
         referencedQueries: normalizedReferencedQueries,
         summary: typeof base.summary === 'string' ? base.summary : '',
-        feedback: typeof base.feedback === 'string' ? base.feedback : ''
+        feedback: typeof base.feedback === 'string' ? base.feedback : '',
+        knowledgeGraph: typeof base.knowledgeGraph === 'string' ? base.knowledgeGraph : ''
     };
 }
 

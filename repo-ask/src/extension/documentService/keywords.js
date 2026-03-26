@@ -1,6 +1,7 @@
 module.exports = function(context) {
   const { vscode } = context;
   const { generateSynonyms } = require('./tokenization2keywords');
+  const { extractMermaidKeywords } = require('../tools/llm');
 
 function getKeywordConfig() {
   const initKeywordNum = vscode.workspace.getConfiguration('repoAsk').get('initKeywordNum') || 40;
@@ -40,7 +41,18 @@ function cleanKeywords(values, limit = getKeywordConfig().DEFAULT_KEYWORD_LIMIT)
     return [];
   }
   const safeLimit = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : getKeywordConfig().DEFAULT_KEYWORD_LIMIT;
-  return [...new Set(keywordValues.map(value => String(value || '').trim()).filter(value => value.length >= 2))].slice(0, safeLimit);
+  return [...new Set(
+    keywordValues
+      .map(value => String(value || '').trim())
+      .filter(value => {
+        if (value.length < 2) return false;
+        // Remove single words longer than 30 characters (e.g. auto-generated hashes or garbage tokens)
+        if (!value.includes(' ') && value.length > 30) return false;
+        // Remove n-grams with more than 10 words
+        if (value.includes(' ') && value.split(/\s+/).length > 10) return false;
+        return true;
+      })
+  )].slice(0, safeLimit);
 }
 
 function normalizeMetadataKeywordFields(metadata = {}) {
@@ -83,12 +95,23 @@ function normalizeMetadataKeywordFields(metadata = {}) {
       ? [...new Set(base.referencedQueries.split(',').map(value => value.trim()).filter(Boolean))]
       : [];
 
+  // Extract and append keywords from knowledge graph mermaid diagram
+  const knowledgeGraph = typeof base.knowledgeGraph === 'string' ? base.knowledgeGraph : '';
+  const mermaidKws = extractMermaidKeywords(knowledgeGraph);
+  const keywordsWithMermaid = [...keywords];
+  for (const mkw of mermaidKws) {
+    if (!keywordsWithMermaid.includes(mkw)) {
+      keywordsWithMermaid.push(mkw);
+    }
+  }
+  const finalKeywords = cleanKeywords(keywordsWithMermaid, getKeywordConfig().DEFAULT_KEYWORD_LIMIT);
+
   // Synonyms: generated synonyms only — n-grams now live in keywords themselves
   const extended = cleanKeywords(generateSynonyms(allKeywords), Infinity);
 
   return {
     ...base,
-    keywords,
+    keywords: finalKeywords,
     tags,
     referencedQueries,
     synonyms: extended
@@ -175,6 +198,7 @@ function appendKeywordsToExisting(existingKeywords = [], addedKeywords = [], lim
     cleanKeywords,
     normalizeMetadataKeywordFields,
     mergeKeywordsPreservingSignals,
-    appendKeywordsToExisting
+    appendKeywordsToExisting,
+    extractMermaidKeywords
   };
 };

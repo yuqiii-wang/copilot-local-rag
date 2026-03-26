@@ -51,6 +51,13 @@ function initFeedbackForm() {
     const addSecondaryUrlBtn = document.getElementById('add-secondary-url-btn');
     const secondaryUrlsContainer = document.getElementById('secondary-urls-container');
     
+    // Function to re-enable submit button on form changes
+    function enableSubmitButton() {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+        }
+    }
+    
     // Set default datetime to current time
         const now = new Date();
         const formattedDate = now.toISOString().slice(0, 16);
@@ -79,7 +86,8 @@ function initFeedbackForm() {
                 if (jiraIdGroup) jiraIdGroup.style.display = 'none';
                 if (jiraIdInput) jiraIdInput.value = '';
                 
-                // Try to get link from local store via message to extension
+                // Clear KG while loading, then fetch doc (KG will be populated via documentFound)
+                if (typeof populateKnowledgeGraph === 'function') populateKnowledgeGraph('');
                 vscode.postMessage({ 
                     command: 'getDocumentByID', 
                     id: confluenceId 
@@ -90,7 +98,8 @@ function initFeedbackForm() {
                 if (confluencePageIdGroup) confluencePageIdGroup.style.display = 'none';
                 if (confluencePageIdInput) confluencePageIdInput.value = '';
                 
-                // Try to get link from local store via message to extension
+                // Clear KG while loading, then fetch doc (KG will be populated via documentFound)
+                if (typeof populateKnowledgeGraph === 'function') populateKnowledgeGraph('');
                 vscode.postMessage({ 
                     command: 'getDocumentByID', 
                     id: jiraId 
@@ -105,6 +114,8 @@ function initFeedbackForm() {
                     if (jiraIdGroup) jiraIdGroup.style.display = 'none';
                     if (confluencePageIdInput) confluencePageIdInput.value = confluenceMatch[1];
                     if (jiraIdInput) jiraIdInput.value = '';
+                    if (typeof populateKnowledgeGraph === 'function') populateKnowledgeGraph('');
+                    vscode.postMessage({ command: 'getDocumentByID', id: confluenceMatch[1] });
                     return;
                 }
 
@@ -116,30 +127,43 @@ function initFeedbackForm() {
                     if (confluencePageIdGroup) confluencePageIdGroup.style.display = 'none';
                     if (jiraIdInput) jiraIdInput.value = jiraMatch[0].toUpperCase();
                     if (confluencePageIdInput) confluencePageIdInput.value = '';
+                    if (typeof populateKnowledgeGraph === 'function') populateKnowledgeGraph('');
+                    vscode.postMessage({ command: 'getDocumentByID', id: jiraMatch[0].toUpperCase() });
                     return;
                 }
 
-                // If no ID found, show both fields
+                // If no ID found, show both fields and clear KG
                 if (confluencePageIdGroup) confluencePageIdGroup.style.display = 'block';
                 if (jiraIdGroup) jiraIdGroup.style.display = 'block';
+                if (typeof populateKnowledgeGraph === 'function') populateKnowledgeGraph('');
             } else {
-                // No values, show both fields
+                // No values, show both fields and clear KG
                 if (confluencePageIdGroup) confluencePageIdGroup.style.display = 'block';
                 if (jiraIdGroup) jiraIdGroup.style.display = 'block';
+                if (typeof populateKnowledgeGraph === 'function') populateKnowledgeGraph('');
             }
         }
         
         // Add event listeners
         if (confluenceLinkInput) {
             confluenceLinkInput.addEventListener('input', syncIdAndLink);
+            confluenceLinkInput.addEventListener('input', enableSubmitButton);
         }
         
         if (confluencePageIdInput) {
             confluencePageIdInput.addEventListener('input', syncIdAndLink);
+            confluencePageIdInput.addEventListener('input', enableSubmitButton);
         }
         
         if (jiraIdInput) {
             jiraIdInput.addEventListener('input', syncIdAndLink);
+            jiraIdInput.addEventListener('input', enableSubmitButton);
+        }
+        
+        // Add listener for source query
+        const sourceQueryInput = document.getElementById('source-query');
+        if (sourceQueryInput) {
+            sourceQueryInput.addEventListener('input', enableSubmitButton);
         }
         
         // Secondary URLs functionality
@@ -152,10 +176,17 @@ function initFeedbackForm() {
             `;
             secondaryUrlsContainer.appendChild(newItem);
             
+            // Add event listener to the new input field
+            const newInput = newItem.querySelector('.secondary-url-input');
+            if (newInput) {
+                newInput.addEventListener('input', enableSubmitButton);
+            }
+            
             // Add event listener to the new remove button
             const removeBtn = newItem.querySelector('.remove-secondary-url-btn');
             removeBtn.addEventListener('click', function() {
                 newItem.remove();
+                enableSubmitButton();
             });
         }
         
@@ -164,16 +195,22 @@ function initFeedbackForm() {
             addSecondaryUrlBtn.addEventListener('click', addSecondaryUrlItem);
         }
         
-        // Add event listeners to existing remove buttons
+        // Add event listeners to existing remove buttons and inputs
         const existingRemoveBtns = document.querySelectorAll('.remove-secondary-url-btn');
         existingRemoveBtns.forEach(btn => {
             btn.addEventListener('click', function() {
                 const item = this.closest('.secondary-url-item');
                 if (item) {
                     item.remove();
+                    enableSubmitButton();
                 }
             });
-        })
+        });
+        
+        const existingSecondaryInputs = document.querySelectorAll('.secondary-url-input');
+        existingSecondaryInputs.forEach(input => {
+            input.addEventListener('input', enableSubmitButton);
+        });
     
     // Submit button handler
     if (submitBtn) {
@@ -260,7 +297,7 @@ function initFeedbackForm() {
                 datetime: datetimeRaw,
                 tags: tagsRaw,
                 secondaryUrls: secondaryUrls.length > 0 ? secondaryUrls : ['none'],
-                knowledge_graph: {}
+                knowledge_graph: document.getElementById('knowledge-graph-raw')?.value?.trim() || ''
             };
             
             try {
@@ -312,14 +349,113 @@ function initFeedbackForm() {
             if (submitBtn) {
                 submitBtn.disabled = true;
             }
+
+            // Also disable KG button while summary is generating
+            const kgBtn = document.getElementById('generate-kg-btn');
+            if (kgBtn) kgBtn.disabled = true;
+
+            // Collect form context so the extension can also build the knowledge graph
+            const secondaryUrlInputs = document.querySelectorAll('.secondary-url-input');
+            const secondaryUrls = Array.from(secondaryUrlInputs).map(i => i.value.trim()).filter(u => u);
             
-            // Send request to generate summary
+            // Send request to generate summary (with form context for KG generation)
             vscode.postMessage({ 
                 command: 'generateSummary', 
-                conversationSummary 
+                conversationSummary,
+                sourceQuery: document.getElementById('source-query')?.value || '',
+                confluencePageId: document.getElementById('confluence-page-id')?.value || '',
+                jiraId: document.getElementById('jira-id')?.value || '',
+                confluenceLink: document.getElementById('confluence-link')?.value || '',
+                secondaryUrls
             });
         });
     }
+
+    // Generate Knowledge Graph button handler
+    const generateKgBtn = document.getElementById('generate-kg-btn');
+    if (generateKgBtn) {
+        generateKgBtn.addEventListener('click', () => {
+            if (typeof renderSuccessMessage === 'function') renderSuccessMessage('');
+            if (typeof renderSyncError === 'function') renderSyncError('');
+
+            const confluencePageId = document.getElementById('confluence-page-id')?.value?.trim() || '';
+            const jiraId = document.getElementById('jira-id')?.value?.trim() || '';
+            if (!confluencePageId && !jiraId) {
+                if (typeof renderSyncError === 'function') renderSyncError('Please provide a Confluence Page ID or Jira ID before generating the knowledge graph.');
+                return;
+            }
+
+            const secondaryUrlInputs = document.querySelectorAll('.secondary-url-input');
+            const secondaryUrls = Array.from(secondaryUrlInputs).map(i => i.value.trim()).filter(u => u);
+
+            setButtonLoadingState(generateKgBtn, true, 'Generate Knowledge Graph');
+
+            vscode.postMessage({
+                command: 'generateKnowledgeGraph',
+                sourceQuery: document.getElementById('source-query')?.value || '',
+                confluencePageId,
+                jiraId,
+                confluenceLink: document.getElementById('confluence-link')?.value || '',
+                secondaryUrls
+            });
+        });
+    }
+
+    // View Diagram button handler
+    const viewKgBtn = document.getElementById('view-kg-btn');
+    if (viewKgBtn) {
+        viewKgBtn.addEventListener('click', () => {
+            const mermaidText = document.getElementById('knowledge-graph-raw')?.value?.trim() || '';
+            if (mermaidText) {
+                vscode.postMessage({ command: 'viewKnowledgeGraph', mermaidText });
+            }
+        });
+    }
+}
+
+function escapeRegExp(value) {
+    return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function sanitizeSourceQuery(rawQuery, selectedDocument, fallbackUrl) {
+    let query = String(rawQuery || '');
+    if (!query.trim()) {
+        return '';
+    }
+
+    const urlsToRemove = new Set();
+    const selectedUrl = String(selectedDocument?.url || '').trim();
+    const fallback = String(fallbackUrl || '').trim();
+    if (selectedUrl) {
+        urlsToRemove.add(selectedUrl);
+    }
+    if (fallback && fallback !== '[NO_URL]') {
+        urlsToRemove.add(fallback);
+    }
+
+    for (const url of urlsToRemove) {
+        query = query.replace(new RegExp(escapeRegExp(url), 'gi'), ' ');
+    }
+
+    const confluenceId = String(selectedDocument?.confluencePageId || '').trim();
+    const jiraId = String(selectedDocument?.jiraId || '').trim();
+
+    if (confluenceId) {
+        query = query.replace(new RegExp(`\\bpageId\\s*=\\s*${escapeRegExp(confluenceId)}\\b`, 'gi'), ' ');
+        query = query.replace(new RegExp(`\\b${escapeRegExp(confluenceId)}\\b`, 'g'), ' ');
+    }
+    if (jiraId) {
+        query = query.replace(new RegExp(`\\b${escapeRegExp(jiraId)}\\b`, 'gi'), ' ');
+    }
+
+    // Strip any URL tokens that may still be present in the copied query.
+    query = query.replace(/\bhttps?:\/\/[^\s<>"'`]+/gi, ' ');
+
+    // Drop any structured top-doc tags if they appear in the copied query.
+    query = query.replace(/\[TOP_DOC_URL:[^\]]*\]/gi, ' ');
+    query = query.replace(/\[TOP_DOC_ID:[^\]]*\]/gi, ' ');
+
+    return query.replace(/\s{2,}/g, ' ').trim();
 }
 
 // Function to show the feedback form
@@ -352,7 +488,7 @@ function showFeedbackForm(firstUserQuery, selectedDocumentOrUrl, fullAiResponse,
     if (firstUserQuery) {
         const sourceQueryField = document.getElementById('source-query');
         if (sourceQueryField) {
-            sourceQueryField.value = firstUserQuery;
+            sourceQueryField.value = sanitizeSourceQuery(firstUserQuery, selectedDocument, fallbackUrl);
         }
     }
     
@@ -399,6 +535,12 @@ function populateSummary(summary) {
     if (generateSummaryBtn) {
         setButtonLoadingState(generateSummaryBtn, false, 'Generate AI Summary');
     }
+
+    // Re-enable KG button
+    const generateKgBtn = document.getElementById('generate-kg-btn');
+    if (generateKgBtn) {
+        generateKgBtn.disabled = false;
+    }
     
     // Re-enable submit button
     const submitBtn = document.getElementById('submit-feedback-btn');
@@ -407,10 +549,28 @@ function populateSummary(summary) {
     }
 }
 
+// Function to populate the knowledge graph field
+function populateKnowledgeGraph(mermaid) {
+    const rawField = document.getElementById('knowledge-graph-raw');
+    if (rawField) {
+        rawField.value = mermaid || '';
+    }
+    const viewKgBtn = document.getElementById('view-kg-btn');
+    if (viewKgBtn) {
+        viewKgBtn.style.display = mermaid ? 'inline-block' : 'none';
+    }
+    // Re-enable KG generate button
+    const generateKgBtn = document.getElementById('generate-kg-btn');
+    if (generateKgBtn) {
+        setButtonLoadingState(generateKgBtn, false, 'Generate Knowledge Graph');
+    }
+}
+
 // Expose functions to global scope
 window.initFeedbackForm = initFeedbackForm;
 window.showFeedbackForm = showFeedbackForm;
 window.populateSummary = populateSummary;
+window.populateKnowledgeGraph = populateKnowledgeGraph;
 
 // Handle messages from extension
 window.addEventListener('message', (event) => {
@@ -458,6 +618,12 @@ window.addEventListener('message', (event) => {
                 });
             }
 
+            // Reset knowledge graph section
+            const kgRawField = document.getElementById('knowledge-graph-raw');
+            if (kgRawField) kgRawField.value = '';
+            const viewKgBtnEl = document.getElementById('view-kg-btn');
+            if (viewKgBtnEl) viewKgBtnEl.style.display = 'none';
+
             settleSubmitState(submitBtn, true, 'Submit');
 
             // Hide feedback section and restore original content after a short delay
@@ -485,11 +651,18 @@ window.addEventListener('message', (event) => {
             settleSubmitState(submitBtn, false, 'Submit');
         }
     }
+    if (message?.command === 'populateKnowledgeGraph') {
+        populateKnowledgeGraph(String(message.mermaid || ''));
+    }
     if (message?.command === 'documentFound') {
         // Update link field with document URL if found
         const confluenceLinkInput = document.getElementById('confluence-link');
         if (confluenceLinkInput && message.document && message.document.source) {
             confluenceLinkInput.value = message.document.source;
+        }
+        // Load the stored knowledge graph for the selected primary doc
+        if (typeof populateKnowledgeGraph === 'function') {
+            populateKnowledgeGraph(String(message.document?.knowledgeGraph || ''));
         }
     }
 });

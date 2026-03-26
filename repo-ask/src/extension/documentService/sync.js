@@ -3,6 +3,7 @@ module.exports = function(context) {
     fetchJiraIssue, truncate, tokenize, htmlToMarkdown, jiraTextToMarkdown, generateSynonyms, readAllMetadata, writeDocumentFiles, 
     readDocumentContent, localizeMarkdownImageLinks, getKeywordConfig, cleanKeywords, mergeKeywordsPreservingSignals, getStoredMetadataById,
      getPageHtml, isLikelyHtml, extractHtmlTagData, resolveSourceUrl, tokenization2bm25 } = context;
+  const { extractMermaidKeywords } = require('../tools/llm');
   const { extractMdKeywords } = require('./md2keywords');
   const { tokenize: tokenizeKeywords } = require('./tokenization2keywords');
 
@@ -115,7 +116,8 @@ async function processDocument(page) {
     summary: '',
     tags: Array.isArray(existingMetadata.tags) ? existingMetadata.tags : [],
     feedback: String(existingMetadata.feedback || '').trim(),
-    referencedQueries: Array.isArray(existingMetadata.referencedQueries) ? existingMetadata.referencedQueries : []
+    referencedQueries: Array.isArray(existingMetadata.referencedQueries) ? existingMetadata.referencedQueries : [],
+    knowledgeGraph: typeof existingMetadata.knowledgeGraph === 'string' ? existingMetadata.knowledgeGraph : ''
   };
   const metadata = {
     ...existingMetadata,
@@ -174,7 +176,8 @@ async function processJiraIssue(issue) {
     summary: '',
     tags: Array.isArray(existingMetadata.tags) ? existingMetadata.tags : [],
     feedback: String(existingMetadata.feedback || '').trim(),
-    referencedQueries: Array.isArray(existingMetadata.referencedQueries) ? existingMetadata.referencedQueries : []
+    referencedQueries: Array.isArray(existingMetadata.referencedQueries) ? existingMetadata.referencedQueries : [],
+    knowledgeGraph: typeof existingMetadata.knowledgeGraph === 'string' ? existingMetadata.knowledgeGraph : ''
   };
   const metadata = {
     ...existingMetadata,
@@ -270,6 +273,18 @@ async function finalizeBm25KeywordsForDocuments(docIds = []) {
         modelKeywords: bm25Keywords,
         limit: keywordConfig.DEFAULT_KEYWORD_LIMIT
       });
+
+      // 5b. Merge knowledge graph entity keywords if present
+      const kgMermaid = typeof meta.knowledgeGraph === 'string' ? meta.knowledgeGraph : '';
+      if (kgMermaid) {
+        const mermaidKws = extractMermaidKeywords(kgMermaid);
+        for (const mkw of mermaidKws) {
+          if (!meta.keywords.includes(mkw)) {
+            meta.keywords.push(mkw);
+          }
+        }
+      }
+
       // Generate synonyms from the merged keywords (unchanged)
       meta.synonyms = cleanKeywords(generateSynonyms(meta.keywords), 80);
       writeDocumentFiles(storagePath, meta.id, docText, meta);

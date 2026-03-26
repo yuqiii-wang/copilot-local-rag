@@ -4,7 +4,7 @@ const vscode = require('vscode');
 const { updateConfluencePage } = require('../mcp/confluenceApi');
 const { mapFeedbackError } = require('./errMap');
 const { createOpenDocCommand, createMetadataCommands, createSearchCommand, createPromptsCommand, createSkillsCommand, createDeleteCommand, createResetCommand } = require('./commands');
-const { generateKnowledgeGraph } = require('./tools/llm');
+const { generateKnowledgeGraph, extractMermaidKeywords } = require('./tools/llm');
 
 
 function createSidebarController(deps) {
@@ -110,7 +110,16 @@ function createSidebarController(deps) {
                     }
 
                     if (message?.command === 'generateSummary' && message.conversationSummary) {
-                        await handleGenerateSummary(message.conversationSummary);
+                        await handleGenerateSummary(message);
+                    }
+
+                    if (message?.command === 'generateKnowledgeGraph') {
+                        await handleGenerateKnowledgeGraph(message);
+                    }
+
+                    if (message?.command === 'viewKnowledgeGraph' && message.mermaidText) {
+                        const encoded = Buffer.from(message.mermaidText, 'utf8').toString('base64');
+                        vscode.env.openExternal(vscode.Uri.parse(`https://mermaid.live/edit#base64:${encoded}`));
                     }
 
                     if (message?.command === 'getDocumentByID' && message.id) {
@@ -408,45 +417,44 @@ function createSidebarController(deps) {
                 }
             }
 
-            // Generate knowledge graph if secondary URLs are provided
-            if (secondaryUrls && Array.isArray(secondaryUrls) && secondaryUrls.length > 0 && secondaryUrls[0] !== 'none') {
+            // Use the knowledge_graph already generated and shown in the feedback UI.
+            // Do NOT re-generate on submit — the user has already previewed it.
+            const knowledgeGraphFromUi = typeof feedbackPayload.knowledge_graph === 'string'
+                ? feedbackPayload.knowledge_graph.trim()
+                : '';
+
+            // Save the mermaid knowledge graph to the primary document metadata
+            if (knowledgeGraphFromUi && (confluencePageId || jiraId || confluenceLink)) {
                 try {
-                    // Collect content for secondary URLs
-                    const contentMap = {};
                     const allMetadata = readAllMetadata(storagePath);
-                    
-                    for (const url of secondaryUrls) {
-                        // Try to find document by URL or ID
-                        let docContent = '';
-                        
-                        // Check if URL contains a page ID
+                    let primaryDoc = null;
+                    if (confluencePageId) primaryDoc = allMetadata.find(d => String(d.id) === String(confluencePageId));
+                    if (!primaryDoc && jiraId) primaryDoc = allMetadata.find(d => String(d.id) === String(jiraId));
+                    if (!primaryDoc && confluenceLink) {
                         try {
-                            const urlObj = new URL(url);
-                            const pageIdMatch = urlObj.search.match(/pageId=(\d+)/);
-                            if (pageIdMatch && pageIdMatch[1]) {
-                                const doc = allMetadata.find(d => String(d.id) === String(pageIdMatch[1]));
-                                if (doc) {
-                                    docContent = readDocumentContent(storagePath, doc.id) || '';
-                                }
+                            const linkUrl = new URL(confluenceLink);
+                            const linkPageIdMatch = linkUrl.search.match(/pageId=(\d+)/);
+                            if (linkPageIdMatch && linkPageIdMatch[1]) {
+                                primaryDoc = allMetadata.find(d => String(d.id) === String(linkPageIdMatch[1]));
                             }
-                        } catch (urlError) {
-                            // Not a valid URL, try as ID
-                            const doc = allMetadata.find(d => String(d.id) === String(url));
-                            if (doc) {
-                                docContent = readDocumentContent(storagePath, doc.id) || '';
-                            }
-                        }
-                        
-                        contentMap[url] = docContent;
+                        } catch (_) {}
                     }
-                    
-                    // Generate knowledge graph
-                    const knowledgeGraph = await generateKnowledgeGraph(vscode, referenceQueries, secondaryUrls, contentMap);
-                    feedbackPayload.knowledge_graph = knowledgeGraph;
-                    console.log('[handleSubmitFeedback] Generated knowledge graph:', knowledgeGraph);
-                } catch (kgError) {
-                    console.error('[handleSubmitFeedback] Error generating knowledge graph:', kgError);
-                    // Continue with submission even if knowledge graph generation fails
+                    if (primaryDoc) {
+                        const content = readDocumentContent(storagePath, primaryDoc.id);
+                        if (content) {
+                            const mermaidKeywords = extractMermaidKeywords(knowledgeGraphFromUi);
+                            const existingKeywords = Array.isArray(primaryDoc.keywords) ? primaryDoc.keywords : [];
+                            const mergedKeywords = [...existingKeywords];
+                            for (const kw of mermaidKeywords) {
+                                if (!mergedKeywords.includes(kw)) mergedKeywords.push(kw);
+                            }
+                            const updatedMeta = { ...primaryDoc, knowledgeGraph: knowledgeGraphFromUi, keywords: mergedKeywords };
+                            writeDocumentFiles(storagePath, primaryDoc.id, content, updatedMeta);
+                            console.log('[handleSubmitFeedback] Saved knowledge graph to primary doc:', primaryDoc.id);
+                        }
+                    }
+                } catch (saveError) {
+                    console.error('[handleSubmitFeedback] Error saving knowledge graph to primary doc:', saveError);
                 }
             }
 
@@ -475,7 +483,11 @@ function createSidebarController(deps) {
         }
     }
 
-    async function handleGenerateSummary(conversationSummary) {
+    async function handleGenerateSummary(messageOrText) {
+        const conversationSummary = typeof messageOrText === 'string'
+            ? messageOrText
+            : String(messageOrText?.conversationSummary || '');
+        const formContext = typeof messageOrText === 'object' && messageOrText !== null ? messageOrText : {};
         try {
             let summary = '';
             const inputText = String(conversationSummary || '').trim();
@@ -497,9 +509,9 @@ function createSidebarController(deps) {
                     if (model) {
                         const instruction = [
                             'You are a helpful assistant that rewrites conversation summaries.',
-                            'Rewrite the following conversation summary into a clear, polished, and complete summary.',
-                            'Keep all key details, decisions, and action items. Do not truncate important points.',
-                            'Return only the rewritten summary text.',
+                            'Rewrite the following conversation summary into a clear, concise, and complete summary.',
+                            'Keep all key details, decisions, and action items. Remove filler, redundancy, and unnecessary preamble.',
+                            'Aim for the shortest version that preserves all essential information. Return only the rewritten summary text.',
                             '',
                             'Conversation Summary:',
                             inputText
@@ -545,6 +557,21 @@ function createSidebarController(deps) {
                     summary 
                 });
             }
+
+            // After summary is sent, also build knowledge graph if form context includes a document ID
+            if (formContext.confluencePageId || formContext.jiraId || formContext.confluenceLink) {
+                try {
+                    const mermaid = await buildKnowledgeGraphForForm(formContext);
+                    if (docsWebviewView) {
+                        docsWebviewView.webview.postMessage({ command: 'populateKnowledgeGraph', mermaid: mermaid || '' });
+                    }
+                } catch (kgErr) {
+                    console.error('[handleGenerateSummary] KG generation error:', kgErr);
+                    if (docsWebviewView) {
+                        docsWebviewView.webview.postMessage({ command: 'populateKnowledgeGraph', mermaid: '' });
+                    }
+                }
+            }
         } catch (error) {
             console.error('Error generating summary:', error);
             vscode.window.showErrorMessage('Failed to generate summary. Please try again.');
@@ -553,10 +580,77 @@ function createSidebarController(deps) {
             if (docsWebviewView) {
                 docsWebviewView.webview.postMessage({ 
                     command: 'populateSummary', 
-                    summary: String(conversationSummary || '')
+                    summary: conversationSummary
                 });
+                docsWebviewView.webview.postMessage({ command: 'populateKnowledgeGraph', mermaid: '' });
             }
         }
+    }
+
+    async function handleGenerateKnowledgeGraph(formContext) {
+        try {
+            const mermaid = await buildKnowledgeGraphForForm(formContext);
+            if (docsWebviewView) {
+                docsWebviewView.webview.postMessage({ command: 'populateKnowledgeGraph', mermaid: mermaid || '' });
+            }
+        } catch (error) {
+            console.error('[handleGenerateKnowledgeGraph] Error:', error);
+            if (docsWebviewView) {
+                docsWebviewView.webview.postMessage({ command: 'populateKnowledgeGraph', mermaid: '' });
+            }
+        }
+    }
+
+    async function buildKnowledgeGraphForForm({ sourceQuery, confluencePageId, jiraId, confluenceLink, secondaryUrls }) {
+        const urls = Array.isArray(secondaryUrls) ? secondaryUrls.filter(u => u && u !== 'none') : [];
+        const allMetadata = readAllMetadata(storagePath);
+
+        // Collect secondary URL content
+        const contentMap = {};
+        for (const url of urls) {
+            let docContent = '';
+            try {
+                const urlObj = new URL(url);
+                const pageIdMatch = urlObj.search.match(/pageId=(\d+)/);
+                if (pageIdMatch && pageIdMatch[1]) {
+                    const doc = allMetadata.find(d => String(d.id) === String(pageIdMatch[1]));
+                    if (doc) docContent = readDocumentContent(storagePath, doc.id) || '';
+                }
+            } catch (_) {
+                const doc = allMetadata.find(d => String(d.id) === String(url));
+                if (doc) docContent = readDocumentContent(storagePath, doc.id) || '';
+            }
+            contentMap[url] = docContent;
+        }
+
+        // Resolve primary document
+        let primaryDoc = null;
+        if (confluencePageId) primaryDoc = allMetadata.find(d => String(d.id) === String(confluencePageId));
+        if (!primaryDoc && jiraId) primaryDoc = allMetadata.find(d => String(d.id) === String(jiraId));
+        if (!primaryDoc && confluenceLink) {
+            try {
+                const linkUrl = new URL(confluenceLink);
+                const m = linkUrl.search.match(/pageId=(\d+)/);
+                if (m && m[1]) primaryDoc = allMetadata.find(d => String(d.id) === String(m[1]));
+            } catch (_) {}
+        }
+
+        let primaryContent = '';
+        let existingKnowledgeGraph = '';
+        let referenceQueries = [];
+        if (primaryDoc) {
+            primaryContent = readDocumentContent(storagePath, primaryDoc.id) || '';
+            existingKnowledgeGraph = String(primaryDoc.knowledgeGraph || '').trim();
+            referenceQueries = Array.isArray(primaryDoc.referencedQueries) ? primaryDoc.referencedQueries : [];
+        }
+        if (sourceQuery && !referenceQueries.includes(sourceQuery)) {
+            referenceQueries = [...referenceQueries, sourceQuery];
+        }
+
+        return await generateKnowledgeGraph(vscode, referenceQueries, urls, contentMap, {
+            primaryContent,
+            existingKnowledgeGraph
+        });
     }
 
 async function getVSCodeUsername() {

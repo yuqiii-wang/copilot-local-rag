@@ -126,8 +126,38 @@ function setupExtension(context) {
             }
 
             try {
+                // Build context from any files or pinned code the user has attached
+                let attachedContext = '';
+                if (request.references && request.references.length > 0) {
+                    const contextParts = [];
+                    for (const ref of request.references) {
+                        try {
+                            if (ref.value instanceof vscode.Uri) {
+                                const bytes = await vscode.workspace.fs.readFile(ref.value);
+                                const text = new TextDecoder().decode(bytes);
+                                contextParts.push(`### File: ${ref.value.fsPath}\n\`\`\`\n${truncate(text, 8000)}\n\`\`\``);
+                            } else if (ref.value && typeof ref.value === 'object' && ref.value.uri && ref.value.range) {
+                                const bytes = await vscode.workspace.fs.readFile(ref.value.uri);
+                                const lines = new TextDecoder().decode(bytes).split('\n');
+                                const start = ref.value.range.start.line;
+                                const end = ref.value.range.end.line;
+                                const snippet = lines.slice(start, end + 1).join('\n');
+                                const label = ref.name || 'Pinned code';
+                                contextParts.push(`### ${label} (${ref.value.uri.fsPath}, lines ${start + 1}-${end + 1})\n\`\`\`\n${snippet}\n\`\`\``);
+                            } else if (typeof ref.value === 'string' && ref.value.trim()) {
+                                contextParts.push(`### ${ref.name || 'Attached context'}\n${ref.value}`);
+                            }
+                        } catch (_) {
+                            // Skip unreadable references
+                        }
+                    }
+                    if (contextParts.length > 0) {
+                        attachedContext = contextParts.join('\n\n');
+                    }
+                }
+
                 const loggedPrompts = context.globalState.get('repoAsk.loggedPrompts', []);
-                await answerGeneralPromptQuestion(vscode, prompt, '', response, {
+                await answerGeneralPromptQuestion(vscode, prompt, attachedContext, response, {
                     truncate,
                     tokenize: documentService.tokenize,
                     documentService

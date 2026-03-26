@@ -76,7 +76,9 @@ async function answerGeneralPromptQuestion(vscodeApi, prompt, workspacePromptCon
         '- Identify which documents are actually relevant to answering the question.',
         '- Include all relevant document URLs and IDs in your internal analysis.',
         '',
-        'Workspace guidelines: (none)',
+        workspacePromptContext
+            ? `## Attached Files and Code Context (provided by user):\n${workspacePromptContext}`
+            : 'No attached files or pinned code.',
         `Initial Ranked Documents Context:\n${initialRankedContext}`,
         '',
         `User question: ${prompt}`
@@ -102,6 +104,8 @@ async function answerGeneralPromptQuestion(vscodeApi, prompt, workspacePromptCon
 
     let secondInstruction = [
         'You are an expert technical editor. Your task is to process the raw internal observations generated from a document search and provide a clear, concise final answer to the user.',
+        '- Be as concise as possible. Avoid repeating information, filler phrases, and unnecessary preamble.',
+        '- Prefer bullet points or short paragraphs. Aim for the minimum words needed to fully answer the question.',
         '- Judge which sources from the raw output are actually used and relevant to the user question.',
         '- Remove references or citations to any unused or irrelevant documents.',
         '- Format the final clear answer for the user.',

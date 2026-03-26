@@ -2,18 +2,16 @@ const vscode = require('vscode');
 const { jiraApiMap } = require('./apiMap');
 const { httpManager, getAuthHeaders } = require('./httpManager');
 
-const DEFAULT_JIRA_BASE_URL = 'http://127.0.0.1:8002';
 const REQUEST_TIMEOUT_MS = 15000;
 
 function getJiraConfig() {
     const configuration = vscode.workspace.getConfiguration('repoAsk');
     const profile = configuration.get('jira');
 
-    let url = DEFAULT_JIRA_BASE_URL;
     let securityToken = '';
 
     if (profile && typeof profile === 'object') {
-        url = profile.url || url;
+        url = profile.url;
         securityToken = profile.securityToken || '';
     }
 

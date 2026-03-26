@@ -131,7 +131,7 @@ function normalizeFeedbackPayload(feedbackPayload) {
         jiraId: String(payload.jiraId || '').trim(),
         tags: String(payload.tags || '').trim(),
         secondaryUrls: Array.isArray(payload.secondaryUrls) ? payload.secondaryUrls.map(String).filter(Boolean) : [],
-        knowledge_graph: payload.knowledge_graph && typeof payload.knowledge_graph === 'object' ? payload.knowledge_graph : {}
+        knowledge_graph: typeof payload.knowledge_graph === 'string' ? payload.knowledge_graph.trim() : ''
     };
 }
 
@@ -173,14 +173,14 @@ function buildFeedbackRowHtml(feedbackPayload) {
             const safeUrl = escapeHtml(url);
             const isHttpLink = /^https?:\/\//i.test(url);
             return isHttpLink ? `<a href="${safeUrl}">${safeUrl}</a>` : safeUrl;
-        }).join('<br>');
-        details.push(`<li><strong>Secondary URLs/IDs:</strong><br>${secondaryUrlsHtml}</li>`);
+        }).join('<br/>');
+        details.push(`<li><strong>Secondary URLs/IDs:</strong><br/>${secondaryUrlsHtml}</li>`);
     }
 
-    if (normalized.knowledge_graph && (normalized.knowledge_graph.nodes || normalized.knowledge_graph.edges)) {
-        const nodesCount = Array.isArray(normalized.knowledge_graph.nodes) ? normalized.knowledge_graph.nodes.length : 0;
-        const edgesCount = Array.isArray(normalized.knowledge_graph.edges) ? normalized.knowledge_graph.edges.length : 0;
-        details.push(`<li><strong>Knowledge Graph:</strong> ${nodesCount} nodes, ${edgesCount} edges</li>`);
+    if (normalized.knowledge_graph) {
+        details.push(
+            `<li><strong>Knowledge Graph (Mermaid):</strong><pre style="white-space: pre-wrap; word-break: break-word; margin: 4px 0 0; font-family: monospace; font-size: 0.85em;">${escapeHtml(normalized.knowledge_graph)}</pre></li>`
+        );
     }
 
     if (details.length === 0) {
