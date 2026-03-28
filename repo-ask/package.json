@@ -14,7 +14,8 @@
   "activationEvents": [
     "onView:repo-ask-documents",
     "onChatParticipant:repoask",
-    "onLanguageModelTool:repoask_doc_check"
+    "onLanguageModelTool:repoask_doc_check",
+    "onCommand:repo-ask.advancedDocSearch"
   ],
   "main": "index.js",
   "contributes": {
@@ -53,9 +54,10 @@
                 "metadata",
                 "content_partial",
                 "metadata.summary",
+                "metadata.summary_kg",
                 "metadata.id"
               ],
-              "description": "Operation mode. If mode is content_partial, read partial texts. Instruct LLM to read full mode 'content' to read full content if necessary."
+              "description": "Operation mode. Use metadata.summary_kg to get id/title/summary/knowledgeGraph for all docs. Use content_partial for quick scan, content for full read."
             },
             "ids": {
               "type": "array",
@@ -63,6 +65,13 @@
                 "type": "string"
               },
               "description": "Optional list of document ids to read. Leave empty to read all."
+            },
+            "searchTerms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Optional list of search terms proposed by LLM based on user query and conversation. Used to narrow down documents when no specific ids are given."
             },
             "limit": {
               "type": "number",
@@ -104,6 +113,10 @@
       {
         "command": "repo-ask.checkCodeLogic",
         "title": "RepoAsk: Check Code Logic"
+      },
+      {
+        "command": "repo-ask.advancedDocSearch",
+        "title": "RepoAsk: Advanced Doc Search"
       }
     ],
     "configuration": {
@@ -113,6 +126,11 @@
           "type": "number",
           "default": 50,
           "description": "Init Keyword Num"
+        },
+        "repoAsk.maxAdvancedDocSearch": {
+          "type": "number",
+          "default": 3,
+          "description": "Maximum number of agentic search rounds for Advanced Doc Search. Each round evaluates doc summaries, marks irrelevant docs, and reads promising content."
         },
         "repoAsk.maxSearchResults": {
           "type": "number",

@@ -1,5 +1,6 @@
 module.exports = function(context) {
   const { vscode, storagePath, fetchConfluencePage, truncate, tokenize, generateSynonyms, generateSummary, readAllMetadata, writeDocumentFiles, readDocumentContent, getKeywordConfig, buildKeywordOnlyIndexText, cleanKeywords, normalizeMetadataKeywordFields, appendKeywordsToExisting, extractJsonObject, flattenCategorizedKeywords, mergeSemanticKeywords } = context;
+  const { buildAnnotationPrompt } = require('../chat/prompts');
 
 async function annotateDocumentByArg(pageArg) {
   const allMetadata = readAllMetadata(storagePath);
@@ -72,22 +73,15 @@ async function generateAnnotationWithLlm(metadata, content) {
         summary: fallbackSummary
       };
     }
-    const prompt = [
-      'You are annotating a local Confluence document metadata record.',
-      'Return valid JSON only with shape: {"summary":"...","keywords":"keyword-a, keyword-b"}.',
-      'Summary must be clear, concise, and contain only the most essential information from the source content, in 1-3 sentences maximum. Avoid filler phrases and repetition.',
-      'Keywords must be specific technical terms in one comma-separated string.',
-      'Take existing document keywords (provided below) and filter out non-business-related words or stop words (e.g., "confluence", "jira", "and", "the", "that", etc.).',
-      'Include a few close synonyms or related alternate terms that help retrieval.',
-      `Title: ${metadata.title || ''}`,
-      `Topic: ${metadata.parent_confluence_topic || ''}`,
-      `Author: ${metadata.author || ''}`,
-      `Existing Keywords: ${originalKeywords.join(', ')}`,
-      `Existing Tags: ${metadata.tags ? metadata.tags.join(', ') : ''}`,
-      `Existing Feedback: ${metadata.feedback || ''}`,
-      'Document markdown content:',
-      truncate(content, 100000)
-    ].join('\n');
+    const prompt = buildAnnotationPrompt({
+      title: metadata.title,
+      parentTopic: metadata.parent_confluence_topic,
+      author: metadata.author,
+      keywords: originalKeywords.join(', '),
+      tags: metadata.tags ? metadata.tags.join(', ') : '',
+      feedback: metadata.feedback || '',
+      content: truncate(content, 100000)
+    });
     const response = await model.sendRequest([vscode.LanguageModelChatMessage.User(prompt)]);
     let responseText = '';
     if (response) {

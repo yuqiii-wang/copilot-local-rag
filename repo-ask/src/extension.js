@@ -30,8 +30,9 @@ const { parseRefreshArg } = require('./extension/tools/llm');
 const { createDocumentService } = require('./extension/documentService');
 const { createSidebarController } = require('./extension/sidebarController');
 const { createLanguageModelTools } = require('./extension/tools/lmTools');
-const { createRefreshCommand, createShowLogActionButtonCommand, createCheckCodeLogicCommand } = require('./extension/commands');
+const { createRefreshCommand, createShowLogActionButtonCommand, createCheckCodeLogicCommand, createAdvancedDocSearchCommand } = require('./extension/commands');
 const { answerGeneralPromptQuestion } = require('./extension/chat/generalAnswer');
+const { runAdvancedDocSearch } = require('./extension/chat/advancedDocSearch');
 
 const EMPTY_STORE_HINT = 'No local documents found. Use the sidebar popup to sync to Confluence Cloud.';
 const TOOL_NAMES = {
@@ -117,8 +118,17 @@ function setupExtension(context) {
     let repoaskParticipant;
     if (vscode.chat && typeof vscode.chat.createChatParticipant === 'function') {
         repoaskParticipant = vscode.chat.createChatParticipant('repoask', async (request, chatContext, response) => {
-            const prompt = request.prompt?.trim() || '';
-            // Don't load workspace prompt context for repoask
+            const rawPrompt = request.prompt?.trim() || '';
+
+            if (!rawPrompt) {
+                response.markdown('Ask a question.');
+                return;
+            }
+
+            // Route [ADV] prefix to the advanced agentic doc-search handler
+            const ADV_PREFIX = '[ADV] ';
+            const isAdvanced = rawPrompt.startsWith(ADV_PREFIX);
+            const prompt = isAdvanced ? rawPrompt.slice(ADV_PREFIX.length).trim() : rawPrompt;
 
             if (!prompt) {
                 response.markdown('Ask a question.');
@@ -157,17 +167,28 @@ function setupExtension(context) {
                 }
 
                 const loggedPrompts = context.globalState.get('repoAsk.loggedPrompts', []);
-                await answerGeneralPromptQuestion(vscode, prompt, attachedContext, response, {
-                    truncate,
-                    tokenize: documentService.tokenize,
-                    documentService
-                }, {
-                    metadataList: readAllMetadata(storagePath),
-                    request,
-                    scenario: 'docs',
-                    showLogActionButton: sidebar.showLogActionButton,
-                    loggedPrompts
-                });
+
+                if (isAdvanced) {
+                    await runAdvancedDocSearch(vscode, prompt, response, {
+                        readAllMetadata: () => readAllMetadata(storagePath),
+                        readDocumentContent: (id) => readDocumentContent(storagePath, id),
+                        storagePath,
+                        documentService
+                    }, { request });
+                } else {
+                    await answerGeneralPromptQuestion(vscode, prompt, attachedContext, response, {
+                        truncate,
+                        tokenize: documentService.tokenize,
+                        documentService,
+                        chatContext
+                    }, {
+                        metadataList: readAllMetadata(storagePath),
+                        request,
+                        scenario: 'docs',
+                        showLogActionButton: sidebar.showLogActionButton,
+                        loggedPrompts
+                    });
+                }
             } catch (error) {
                 response.markdown(`Unable to answer with prompt context: ${error.message}`);
             }
@@ -191,12 +212,16 @@ function setupExtension(context) {
     // Register check code logic command
     const checkCodeLogicCommandDisposable = createCheckCodeLogicCommand({ vscode });
 
+    // Register advanced doc search command
+    const advancedDocSearchCommandDisposable = createAdvancedDocSearchCommand({ vscode });
+
     const baseSubscriptions = [
         webviewProviderDisposable,
         ...lmToolDisposables,
         refreshCommandDisposable,
         showLogActionButtonCommandDisposable,
-        checkCodeLogicCommandDisposable
+        checkCodeLogicCommandDisposable,
+        advancedDocSearchCommandDisposable
     ];
 
     if (repoaskParticipant) {

@@ -1,0 +1,196 @@
+{
+  "id": "production-support-skill",
+  "title": "Production Support Skill",
+  "summary": "Comprehensive production support workflow for troubleshooting, incident response, and root cause analysis. Integrates local documentation, recent code changes, and team expertise for rapid problem resolution.",
+  "type": "skill",
+  "author": "Platform Engineering",
+  "tags": [
+    "production-support",
+    "incident-response",
+    "troubleshooting",
+    "runbook",
+    "confluence",
+    "jira",
+    "devops"
+  ],
+  "keywords": {
+    "title": {
+      "1gram": {
+        "production": 1,
+        "support": 1,
+        "skill": 1
+      },
+      "2gram": {
+        "production support": 1
+      },
+      "3gram": {},
+      "4gram": {}
+    },
+    "structural": {
+      "1gram": {
+        "incident": 2,
+        "response": 2,
+        "troubleshooting": 1,
+        "production": 2,
+        "support": 2,
+        "checklist": 1,
+        "escalation": 2,
+        "contacts": 1,
+        "investigation": 1
+      },
+      "2gram": {
+        "incident response": 2,
+        "production support": 2,
+        "on-call rotation": 1,
+        "matter experts": 1,
+        "recent merges": 1,
+        "git repository": 1,
+        "repository discovery": 1,
+        "infrastructure health": 1
+      },
+      "3gram": {
+        "incident response procedures": 1,
+        "production support checklist": 1,
+        "on-call rotation escalation": 1,
+        "specialist matter experts": 1,
+        "recent code changes": 1,
+        "git log analysis": 1,
+        "workspace repository discovery": 1
+      },
+      "4gram": {}
+    },
+    "semantic": {
+      "1gram": {
+        "production": 3,
+        "support": 3,
+        "incident": 3,
+        "response": 2,
+        "root": 1,
+        "cause": 1,
+        "analysis": 1,
+        "troubleshooting": 2,
+        "git": 2,
+        "history": 1,
+        "code": 2,
+        "changes": 2,
+        "team": 2,
+        "expertise": 1,
+        "problem": 1,
+        "resolution": 1,
+        "postmortem": 2,
+        "on-call": 1,
+        "rotation": 1,
+        "escalation": 2,
+        "specialist": 1,
+        "matter": 1,
+        "experts": 1
+      },
+      "2gram": {
+        "production support": 3,
+        "incident response": 3,
+        "root cause": 1,
+        "cause analysis": 1,
+        "git history": 1,
+        "code changes": 2,
+        "team expertise": 1,
+        "problem resolution": 1,
+        "on-call rotation": 1,
+        "specialist experts": 1,
+        "matter experts": 1,
+        "recent merges": 1,
+        "git pulls": 1,
+        "infrastructure health": 1,
+        "health checks": 1,
+        "data integrity": 1,
+        "war room": 1,
+        "knowledge transfer": 1,
+        "team contacts": 1
+      },
+      "3gram": {
+        "production support skill": 1,
+        "incident response procedures": 1,
+        "root cause analysis": 1,
+        "git history analysis": 1,
+        "recent code changes": 1,
+        "specialist matter experts": 1,
+        "on-call escalation path": 1,
+        "production issue troubleshooting": 1,
+        "incident response workflow": 1,
+        "knowledge transfer procedures": 1
+      },
+      "4gram": {
+        "production support skill guide": 1,
+        "incident response and escalation": 1,
+        "recent code change analysis": 1
+      }
+    },
+    "bm25": {
+      "1gram": {},
+      "2gram": {},
+      "3gram": {},
+      "4gram": {}
+    },
+    "kg": {
+      "1gram": {
+        "issue": 1,
+        "search": 1,
+        "docs": 1,
+        "changes": 1,
+        "analyze": 1,
+        "infrastructure": 1,
+        "root": 1,
+        "cause": 1,
+        "severity": 1,
+        "page": 1,
+        "solution": 1,
+        "documentation": 1,
+        "postmortem": 1
+      },
+      "2gram": {
+        "production issue": 1,
+        "root cause": 1,
+        "recent changes": 1,
+        "check infrastructure": 1,
+        "war room": 1
+      },
+      "3gram": {},
+      "4gram": {}
+    },
+    "synonyms": {
+      "1gram": {
+        "debugging": 1,
+        "diagnostics": 1,
+        "remediation": 1,
+        "mitigation": 1,
+        "triage": 1,
+        "pagerduty": 1,
+        "opsgenie": 1,
+        "runbook": 1,
+        "sme": 1,
+        "p1": 1,
+        "p2": 1,
+        "critical": 1,
+        "urgent": 1
+      },
+      "2gram": {
+        "root cause": 1,
+        "post incident": 1,
+        "on call": 1
+      },
+      "3gram": {},
+      "4gram": {}
+    }
+  },
+  "referencedQueries": [
+    "production issue troubleshooting",
+    "incident response procedures",
+    "recent code changes affecting production",
+    "team on-call rotation",
+    "specialist matter experts",
+    "database issues",
+    "api failures",
+    "performance degradation"
+  ],
+  "knowledgeGraph": "graph TD\n  A[Production Issue] --> B{Search Docs}\n  B -->|confluence/jira| C[Local Knowledge]\n  A --> D{Analyze Changes}\n  D -->|git log| E[Recent PRs]\n  A --> F{Check Infrastructure}\n  F --> G[Logs & Metrics]\n  C --> H[Root Cause]\n  E --> H\n  G --> H\n  H --> I{Severity}\n  I -->|P1/P2| J[Page On-Call]\n  I -->|P3/P4| K[Handle with Team]\n  J --> L[War Room]\n  L --> M[Investigation]\n  M --> N[Solution]\n  N --> O[Documentation]\n  O --> P[Postmortem]\n  K --> N",
+  "last_updated": "2026-03-28"
+}

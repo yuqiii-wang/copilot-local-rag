@@ -1,3 +1,5 @@
+const { buildConfluenceIdExtractorPrompt, buildKnowledgeGraphPrompt } = require('../chat/prompts');
+
 function extractJsonObject(rawText) {
     if (!rawText) {
         return null;
@@ -146,16 +148,7 @@ async function extractConfluenceIdentifierWithLlm(vscode, rawInput, options = {}
             return null;
         }
 
-        const instruction = [
-            'You are a parser for Confluence sync arguments.',
-            'From the SOURCE text, extract only one of the following if present: (1) full Confluence HTTP(S) link, (2) numeric Confluence page id, or (3) exact page title phrase.',
-            'If none is present, return an empty string.',
-            'Return valid JSON only with shape: {"arg":"..."}.',
-            boundedPromptContext
-                ? `Workspace prompt context:\n${boundedPromptContext}`
-                : 'Workspace prompt context: (none)',
-            `SOURCE: ${rawInput}`
-        ].join('\n');
+        const instruction = buildConfluenceIdExtractorPrompt({ promptContext: boundedPromptContext, rawInput });
 
         const response = await withTimeout(model.sendRequest([
             vscode.LanguageModelChatMessage.User(instruction)
@@ -199,51 +192,7 @@ async function generateKnowledgeGraph(vscode, referenceQueries, secondaryUrls, c
             ? referenceQueries.join('\n')
             : '(none)';
 
-        const instructionParts = [
-            'You are a knowledge graph builder that outputs Mermaid diagram syntax.',
-            'Your task is to construct a knowledge graph as a Mermaid flowchart from the provided reference queries and document content.',
-            '',
-            '## Process',
-            '1. Read the REFERENCE QUERIES below. Extract key entities from them — these are your starting anchor entities.',
-            '2. Explore relationships between these anchor entities and other entities found in the PRIMARY CONTENT and SECONDARY CONTENT.',
-            '3. Focus on non-lexical, semantic relationships (e.g., "depends on", "triggers", "is part of", "manages", "produces", "consumes") rather than simple keyword co-occurrence.',
-            '4. Each node should represent a meaningful entity (system, process, concept, component, role).',
-            '5. Each edge should represent a named relationship.',
-            ''
-        ];
-
-        if (existingMermaid) {
-            instructionParts.push(
-                '## Existing Knowledge Graph',
-                'An existing Mermaid diagram is provided below. You MUST preserve all existing entities and relationships.',
-                'You are encouraged to ADD new entities and new relationships discovered from the current queries and content.',
-                'Only remove an existing entity if you are absolutely certain it is incorrect or contradicted by the new content.',
-                '',
-                '```mermaid',
-                existingMermaid,
-                '```',
-                ''
-            );
-        }
-
-        instructionParts.push(
-            '## Output Format',
-            'Return ONLY a valid Mermaid flowchart diagram (no wrapping markdown code fences, no explanation).',
-            'Start with "graph TD" or "graph LR".',
-            'Use descriptive node IDs (e.g., FXEngine, TradeProcessor) and quoted labels where needed.',
-            'Use arrow labels for relationships: A -->|relationship| B',
-            '',
-            '## Reference Queries (anchor entities)',
-            queryList,
-            '',
-            '## Primary Content',
-            primaryContent ? primaryContent.slice(0, 3000) : '(none)',
-            '',
-            '## Secondary Content',
-            secondaryContent || '(none)'
-        );
-
-        const instruction = instructionParts.join('\n');
+        const instruction = buildKnowledgeGraphPrompt({ queryList, primaryContent, secondaryContent, existingMermaid });
 
         const response = await withTimeout(model.sendRequest([
             vscode.LanguageModelChatMessage.User(instruction)

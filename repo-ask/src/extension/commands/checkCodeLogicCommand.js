@@ -3,6 +3,8 @@
  * Opens VS Code's chat with the current agent, passing the conversation history as guide.
  */
 
+const { buildCheckCodeLogicQuery } = require('../chat/prompts');
+
 module.exports = function createCheckCodeLogicCommand(deps) {
     const { vscode } = deps;
 
@@ -30,19 +32,7 @@ module.exports = function createCheckCodeLogicCommand(deps) {
             return;
         }
 
-        const chatQuery = [
-            `**Project Directory:** \`${projectContext}\`\n`,
-            'The following is a summarized workflow derived from documentation:',
-            '',
-            `<details><summary>Workflow Summary (Click to expand)</summary>\n\n${workflowSummary}\n\n</details>`,
-            '',
-            '## Task',
-            `Original question that produced the above summary: "${userQuestion}"`,
-            '',
-            'Using the workspace code:',
-            '1. **Fact-check** — Verify whether the workflow described above accurately reflects what the code actually does. Point out any discrepancies.',
-            '2. **Code Logic** — If the description is accurate (or mostly accurate), walk through the actual code logic: identify the relevant files, classes/functions, and execution flow that implement this workflow.',
-        ].join('\n');
+        const chatQuery = buildCheckCodeLogicQuery({ projectContext, workflowSummary, userQuestion });
 
         await vscode.commands.executeCommand('workbench.action.chat.open', {
             query: chatQuery,

@@ -502,17 +502,10 @@ function createSidebarController(deps) {
             if (vscode.lm && vscode.LanguageModelChatMessage) {
                 try {
                     const shared = require('./chat/shared');
+                    const { buildSummaryRewritePrompt } = require('./chat/prompts');
                     const model = await shared.selectDefaultChatModel(vscode);
                     if (model) {
-                        const instruction = [
-                            'You are a helpful assistant that rewrites conversation summaries.',
-                            'Rewrite the following conversation summary into a clear, concise, and complete summary.',
-                            'Keep all key details, decisions, and action items. Remove filler, redundancy, and unnecessary preamble.',
-                            'Aim for the shortest version that preserves all essential information. Return only the rewritten summary text.',
-                            '',
-                            'Conversation Summary:',
-                            inputText
-                        ].join('\n');
+                        const instruction = buildSummaryRewritePrompt({ inputText });
 
                         const response = await model.sendRequest([
                             vscode.LanguageModelChatMessage.User(instruction)

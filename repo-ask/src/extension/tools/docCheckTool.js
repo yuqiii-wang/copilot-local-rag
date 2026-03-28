@@ -1,17 +1,17 @@
 const { toToolResult, buildCheckAllDocsCommandLink } = require('./utils');
+const { DOC_CHECK_TOOL_DESCRIPTION, ALLOWED_MODES, PARTIAL_CONTENT_NOTE } = require('../chat/prompts');
 
 module.exports = function registerDocCheckTool(deps) {
     const { vscode, toolNames, documentService, readAllMetadata, readDocumentContent, emptyStoreHint } = deps;
     return vscode.lm.registerTool(toolNames.docCheck, {
             async invoke(options) {
-                const query = String(options?.input?.query || '').trim();
-                const mode = options?.input?.mode; // content, metadata, content_partial, metadata.summary, metadata.id
+                const mode = options?.input?.mode; // content, metadata, content_partial, metadata.summary, metadata.summary_kg, metadata.id
                 const ids = options?.input?.ids || [];
+                const searchTerms = options?.input?.searchTerms || [];
                 const repAskConfig = vscode.workspace.getConfiguration('repoAsk');
 
-                const allowedModes = ['content', 'metadata', 'content_partial', 'metadata.summary', 'metadata.id'];
-                if (!allowedModes.includes(mode)) {
-                    return toToolResult(`Invalid mode '${mode}'. Allowed modes are: ${allowedModes.join(', ')}`, { references: [] });
+                if (!ALLOWED_MODES.includes(mode)) {
+                    return toToolResult(`Invalid mode '${mode}'. Allowed modes are: ${ALLOWED_MODES.join(', ')}`, { references: [] });
                 }
 
                 const metadataList = readAllMetadata();
@@ -20,6 +20,8 @@ module.exports = function registerDocCheckTool(deps) {
                 }
 
                 let filtered = metadataList;
+
+                // Filter by explicit IDs first
                 if (ids && ids.length > 0) {
                     filtered = metadataList.filter(m => 
                         ids.includes(String(m.id)) || 
@@ -27,6 +29,21 @@ module.exports = function registerDocCheckTool(deps) {
                         ids.includes(m.title) ||
                         ids.some(id => String(m.title).includes(String(id)))
                     );
+                } else if (searchTerms && searchTerms.length > 0) {
+                    // No explicit IDs — filter by LLM-proposed search terms against title/keywords/summary
+                    const lowerTerms = searchTerms.map(t => String(t).toLowerCase().trim()).filter(Boolean);
+                    filtered = metadataList.filter(m => {
+                        const haystack = [
+                            m.title || '',
+                            Array.isArray(m.keywords) ? m.keywords.join(' ') : (m.keywords || ''),
+                            m.summary || ''
+                        ].join(' ').toLowerCase();
+                        return lowerTerms.some(term => haystack.includes(term));
+                    });
+                    // Fallback: if nothing matched, return all (LLM terms may be too specific)
+                    if (filtered.length === 0) {
+                        filtered = metadataList;
+                    }
                 }
 
                 const confProfile = repAskConfig.get('confluence');
@@ -68,6 +85,12 @@ module.exports = function registerDocCheckTool(deps) {
                             if (m.summary) summaryLines.push(`  Summary: ${m.summary}`);
                             if (m.knowledgeGraph) summaryLines.push(`  Knowledge Graph:\n${m.knowledgeGraph}`);
                             summaryLines.push('');
+                        } else if (mode === 'metadata.summary_kg') {
+                            result.metadata = { id: m.id, title: m.title, summary: m.summary, knowledgeGraph: m.knowledgeGraph };
+                            summaryLines.push(`- [${m.id}] ${m.title}`);
+                            if (m.summary) summaryLines.push(`  Summary: ${m.summary}`);
+                            if (m.knowledgeGraph) summaryLines.push(`  KG:\n${m.knowledgeGraph}`);
+                            summaryLines.push('');
                         } else if (mode === 'metadata.summary') {
                             result.metadata = { summary: m.summary, knowledgeGraph: m.knowledgeGraph };
                             summaryLines.push(`- [${m.id}] ${m.title}`);
@@ -88,7 +111,7 @@ module.exports = function registerDocCheckTool(deps) {
                                 const middlePart = content.substring(middleStart, middleStart + chunkSize);
                                 const bottomPart = content.substring(content.length - chunkSize);
                                 
-                                content = `${topPart}\n......\n${middlePart}\n......\n${bottomPart}\n\n[Note]: This is partial content. If the partial content is likely related to user query, MUST read full content. To read full content, instruct LLM to use mode 'content' to read full content.`;
+                                content = `${topPart}\n......\n${middlePart}\n......\n${bottomPart}\n\n${PARTIAL_CONTENT_NOTE}`;
                             }
                             result.content = content;
                             if (m.knowledgeGraph) {

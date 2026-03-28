@@ -8,6 +8,7 @@ const createDeleteCommand = require('./deleteCommand');
 const createResetCommand = require('./resetCommand');
 const createShowLogActionButtonCommand = require('./showLogActionButton');
 const createCheckCodeLogicCommand = require('./checkCodeLogicCommand');
+const createAdvancedDocSearchCommand = require('./advancedDocSearchCommand');
 
 module.exports = {
     createRefreshCommand,
@@ -19,6 +20,7 @@ module.exports = {
     createDeleteCommand,
     createResetCommand,
     createShowLogActionButtonCommand,
-    createCheckCodeLogicCommand
+    createCheckCodeLogicCommand,
+    createAdvancedDocSearchCommand
 };
 

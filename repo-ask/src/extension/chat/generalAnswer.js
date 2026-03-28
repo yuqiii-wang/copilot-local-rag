@@ -1,17 +1,22 @@
-const fs = require('fs');
-const path = require('path');
 const {
     looksLikeNotFoundAnswer,
     selectDefaultChatModel,
-    runModelWithTools
+    runAgentLoop,
+    emitThinking,
+    withTimeout,
+    LLM_RESPONSE_TIMEOUT_MS
 } = require('./shared');
+const { VsCodeChatModel } = require('./vscodeModel');
+const { buildAgentTools } = require('./agentTools');
+const { buildPhase1Template, buildPhase2Prompt } = require('./prompts');
+const { historyToMessages } = require('./memory');
 
 async function answerGeneralPromptQuestion(vscodeApi, prompt, workspacePromptContext, response, deps, options = {}) {
     const queryStartTime = Date.now();
     const {
-        tokenize,
         storagePath,
-        documentService
+        documentService,
+        chatContext
     } = deps;
 
     if (!vscodeApi.lm || !vscodeApi.LanguageModelChatMessage) {
@@ -19,123 +24,101 @@ async function answerGeneralPromptQuestion(vscodeApi, prompt, workspacePromptCon
         return;
     }
 
-    const model = await selectDefaultChatModel(vscodeApi, options);
-    if (!model) {
+    const vsModel = await selectDefaultChatModel(vscodeApi, options);
+    if (!vsModel) {
         response.markdown('No language model is available in this VS Code session.');
         return;
     }
 
+    // ── Phase 0: Rank local docs to prime the agent context ──────────────────
     let initialRankedContext = 'No initial documents found.';
     let topDocFromSearch = null;
+
     if (documentService && typeof documentService.rankLocalDocuments === 'function') {
         const repAskConfig = vscodeApi.workspace.getConfiguration('repoAsk');
         const maxResults = Math.max(Number(repAskConfig.get('maxSearchResults')) || 5, 1);
-        const searchBuffer = Math.max(maxResults * 10, 50);
-        const ranked = documentService.rankLocalDocuments(prompt, searchBuffer);
+        const ranked = documentService.rankLocalDocuments(prompt, Math.max(maxResults * 10, 50));
 
         if (ranked && ranked.length > 0) {
-            const confProfile = repAskConfig.get('confluence');
-            const confUrl = String((confProfile && typeof confProfile === 'object' ? confProfile.url : '') || '').replace(/\/$/, '');
-            const jiraProfile = repAskConfig.get('jira');
-            const jiraUrl = String((jiraProfile && typeof jiraProfile === 'object' ? jiraProfile.url : '') || '').replace(/\/$/, '');
+            const confUrl = String((repAskConfig.get('confluence')?.url) || '').replace(/\/$/, '');
+            const jiraUrl = String((repAskConfig.get('jira')?.url) || '').replace(/\/$/, '');
 
             const results = ranked.map(item => {
                 let fullUrl = item.url || '';
                 if (fullUrl && !fullUrl.startsWith('http')) {
                     const isJira = item.parent_confluence_topic && String(item.parent_confluence_topic).startsWith('Jira');
-                    const baseUrl = isJira ? jiraUrl : confUrl;
-                    fullUrl = `${baseUrl}${fullUrl.startsWith('/') ? '' : '/'}${fullUrl}`;
+                    fullUrl = `${isJira ? jiraUrl : confUrl}${fullUrl.startsWith('/') ? '' : '/'}${fullUrl}`;
                 }
-                return {
-                    id: item.id,
-                    title: item.title || 'Untitled',
-                    url: fullUrl || 'None',
-                    summary: item.summary || '',
-                    keywords: item.keywords || []
-                };
+                return { id: item.id, title: item.title || 'Untitled', url: fullUrl || 'None', summary: item.summary || '', score: item.score };
             });
-            if (results.length > 0) {
-                topDocFromSearch = results[0];
-            }
-            initialRankedContext = 'Found the following relevant documents:\n' + results.map((doc, i) => {
-                const score = typeof ranked[i]?.score === 'number' ? ` | Score: ${Math.round(ranked[i].score * 10) / 10}` : '';
+
+            topDocFromSearch = results[0];
+            initialRankedContext = 'Found the following relevant documents:\n' + results.map(doc => {
+                const score = typeof doc.score === 'number' ? ` | Score: ${Math.round(doc.score * 10) / 10}` : '';
                 return `- ID: ${doc.id} | Title: ${doc.title} | URL: ${doc.url} | Summary: ${doc.summary}${score}`;
             }).join('\n');
-            
-            const lines = results.map((item, i) => {
-                const score = typeof ranked[i]?.score === 'number' ? ` — match score: ${Math.round(ranked[i].score * 10) / 10}` : '';
-                return `- [${item.title}](${item.url})${score}`;
+
+            const refLines = results.map(doc => {
+                const score = typeof doc.score === 'number' ? ` — match score: ${Math.round(doc.score * 10) / 10}` : '';
+                return `- [${doc.title}](${doc.url})${score}`;
             });
-            const internalThinking = `\n\n<details>\n<summary>Used ${results.length} references from ranking</summary>\n\n${lines.join('\n')}\n</details>`;
-            response.markdown(internalThinking + '\n\n');
+            response.markdown(`\n\n<details>\n<summary>Used ${results.length} references from ranking</summary>\n\n${refLines.join('\n')}\n</details>\n\n`);
         }
     }
 
-    let instruction = [
-        'You are RepoAsk Doc Agent. Your goal is to help the user answer general questions from the document store.',
-        'Wait for tool results before explaining the final answer.',
-        '- You MUST rely on the `local-store` via tools to find the answer.',
-        '- Read content with `repoask_doc_check` for the most relevant documents identified in the Initial Ranked Documents Context below.',
-        '- You MUST NOT hallucinate any information that is not explicitly present in the retrieved documents.',
-        '- Do NOT output the final answer to the user yet. This is your internal thinking phase.',
-        '- Gather all relevant information from the checked documents.',
-        '- Identify which documents are actually relevant to answering the question.',
-        '- Include all relevant document URLs and IDs in your internal analysis.',
-        '',
-        workspacePromptContext
-            ? `## Attached Files and Code Context (provided by user):\n${workspacePromptContext}`
-            : 'No attached files or pinned code.',
-        `Initial Ranked Documents Context:\n${initialRankedContext}`,
-        '',
-        `User question: ${prompt}`
-    ].join('\n\n');
-
-    let toolsToUse = (vscodeApi.lm.tools || []).filter(t => t.name.startsWith('repoask_'));
-    toolsToUse = toolsToUse.filter(t => t.name === 'repoask_doc_check');
-    
-    const firstRoundOutput = await runModelWithTools({
+    // ── Phase 1: Tool-calling agent (LangChain) ───────────────────────────────
+    // Build a VS Code LM adapter and bind the registered repoask_ tools for tool calling
+    const vsTools = (vscodeApi.lm.tools || []).filter(t => t.name === 'repoask_doc_check');
+    const agentModel = new VsCodeChatModel({
+        vsModel,
         vscodeApi,
-        model,
-        response,
-        instruction,
-        tools: toolsToUse,
-        options: {
-            ...options,
-            storagePath
-        }
+        cancellationToken: options.request?.token,
+        vsTools
     });
 
-    const { emitThinking } = require('./shared');
-    emitThinking(response, 'Synthesizing final answer...');
+    // LangChain StructuredTool executors (actual invocation via vscode.lm.invokeTool)
+    const lcTools = buildAgentTools({ vscodeApi, options, storagePath, response });
 
-    let secondInstruction = [
-        'You are an expert technical editor. Your task is to process the raw internal observations generated from a document search and provide a clear, concise final answer to the user.',
-        '- Be as concise as possible. Avoid repeating information, filler phrases, and unnecessary preamble.',
-        '- Prefer bullet points or short paragraphs. Aim for the minimum words needed to fully answer the question.',
-        '- Judge which sources from the raw output are actually used and relevant to the user question.',
-        '- Remove references or citations to any unused or irrelevant documents.',
-        '- Format the final clear answer for the user.',
-        '- You MUST include the clickable document link for the most relevant document used in your answer.',
-        '- You MUST output the top doc URL and ID for the most relevant document used in your answer at the very bottom, formatted exactly as: `[TOP_DOC_URL: <url>, TOP_DOC_ID: <id>]`.',
-        '- If no documents were relevant or used, explicitly state that you cannot answer the question based on the available documents, and format the doc reference as `[TOP_DOC_URL: [NO_URL], TOP_DOC_ID: [NO_ID]]`.',
-        '',
-        '--- RAW INTERNAL OBSERVATIONS ---',
-        firstRoundOutput,
-        '--- END RAW INTERNAL OBSERVATIONS ---',
-        '',
-        `User question: ${prompt}`
-    ].join('\n\n');
+    // Hydrate conversation history from VS Code's native chatContext.history
+    const history = historyToMessages(chatContext, vscodeApi);
+
+    // Build phase-1 messages using the shared template (includes MessagesPlaceholder for history)
+    const phase1Messages = await buildPhase1Template().formatMessages({
+        workspacePromptContext: workspacePromptContext || 'None.',
+        initialRankedContext,
+        history,
+        prompt
+    });
+
+    const shortQuery = prompt.length > 60 ? prompt.slice(0, 57) + '…' : prompt;
+    emitThinking(response, `Searching docs for: ${shortQuery}`);
+    const { finalText: firstRoundOutput, messages: agentMessages } = await runAgentLoop({
+        model: agentModel,
+        lcTools,
+        messages: phase1Messages,
+        response,
+        maxIterations: 7
+    });
+
+    // ── Phase 2: Synthesis (stream directly to response.markdown) ────────────
+    emitThinking(response, 'Composing answer from retrieved documents...');
+
+    const rawObservations = firstRoundOutput ||
+        agentMessages.filter(m => typeof m._getType === 'function' && m._getType() === 'ai')
+            .map(m => m.content).join('\n');
+    const phase2Instruction = buildPhase2Prompt(rawObservations, prompt);
 
     let finalAnswer = '';
     try {
-        const secondRoundMessages = [
-            vscodeApi.LanguageModelChatMessage.User(secondInstruction)
-        ];
-        
-        const secondRoundResponse = await model.sendRequest(secondRoundMessages, {}, options.request?.token);
-        
-        if (secondRoundResponse.stream) {
-            for await (const chunk of secondRoundResponse.stream) {
+        const synthMessages = [vscodeApi.LanguageModelChatMessage.User(phase2Instruction)];
+        const synthResponse = await withTimeout(
+            vsModel.sendRequest(synthMessages, {}, options.request?.token),
+            LLM_RESPONSE_TIMEOUT_MS,
+            null
+        );
+
+        if (synthResponse?.stream) {
+            for await (const chunk of synthResponse.stream) {
                 if (chunk instanceof vscodeApi.LanguageModelTextPart) {
                     finalAnswer += chunk.value;
                     response.markdown(chunk.value);
@@ -143,37 +126,41 @@ async function answerGeneralPromptQuestion(vscodeApi, prompt, workspacePromptCon
             }
         }
     } catch (e) {
-        console.error("Second round LLM failed:", e);
-        finalAnswer = firstRoundOutput || "Error synthesizing final answer.";
+        console.error('Phase 2 synthesis failed:', e);
+        finalAnswer = firstRoundOutput || 'Error synthesizing final answer.';
         response.markdown(finalAnswer);
     }
 
-    // Extract the top doc URL and ID from the LLM's output
+    // ── Extract top doc reference from LLM output ─────────────────────────────
     let firstRankedDocUrl = '';
-    let firstRankedDocId = '';
-    const match = finalAnswer.match(/\[TOP_DOC_URL:\s*(.+?),\s*TOP_DOC_ID:\s*(.+?)\]/);
-    if (match && match[1] && match[2]) {
-        firstRankedDocUrl = match[1].trim();
-        firstRankedDocId = match[2].trim();
+    const topDocMatch = finalAnswer.match(/\[TOP_DOC_URL:\s*(.+?),\s*TOP_DOC_ID:\s*(.+?)\]/);
+    if (topDocMatch) {
+        firstRankedDocUrl = topDocMatch[1].trim();
     }
 
-    // fallback when output doesn't contain url
-    const isUrlMatch = finalAnswer.match(/https?:\/\/[^\s\]'"()]+/);
-    if (!isUrlMatch) {
-         if (topDocFromSearch && topDocFromSearch.url && topDocFromSearch.url !== 'None') {
-             response.markdown(`\n\n**Reference:** [${topDocFromSearch.title}](${topDocFromSearch.url})`);
-         } else {
-             response.markdown(`\n\n*No URL*`);
-         }
+    // Fallback URL reference if the synthesis didn't emit a URL
+    if (!/https?:\/\/[^\s\]'"()]+/.test(finalAnswer)) {
+        if (topDocFromSearch?.url && topDocFromSearch.url !== 'None') {
+            response.markdown(`\n\n**Reference:** [${topDocFromSearch.title}](${topDocFromSearch.url})`);
+        } else {
+            response.markdown('\n\n*No URL*');
+        }
     }
 
-    // Check if the answer indicates no relevant docs were found
-    const isNotFoundAnswer = !finalAnswer || looksLikeNotFoundAnswer(finalAnswer);
-
-    // Ensure we always send a response, even if empty
-    if (isNotFoundAnswer) {
-        response.markdown('\n\n*Note: No relevant docs found, you can search from doc store and find the doc id/title or more keywords to help locate the search*');
+    // ── Buttons / not-found note ──────────────────────────────────────────────
+    if (!finalAnswer || looksLikeNotFoundAnswer(finalAnswer)) {
+        response.markdown('\n\n*Note: No relevant docs found. Search the doc store for relevant doc IDs or keywords to refine.*');
+        response.button({
+            command: 'repo-ask.advancedDocSearch',
+            title: 'Advanced Doc Search',
+            arguments: [prompt]
+        });
     } else {
+        response.button({
+            command: 'repo-ask.advancedDocSearch',
+            title: 'Advanced Doc Search',
+            arguments: [prompt]
+        });
         response.button({
             command: 'repo-ask.showLogActionButton',
             title: 'Log Action',
@@ -185,7 +172,6 @@ async function answerGeneralPromptQuestion(vscodeApi, prompt, workspacePromptCon
             arguments: [prompt, finalAnswer]
         });
     }
-
 }
 
 module.exports = {
