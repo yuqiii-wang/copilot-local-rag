@@ -29,6 +29,22 @@ module.exports = function(context) {
   }
 
   // ---------------------------------------------------------------------------
+  // Character-length multiplier
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Returns a score multiplier based on the non-whitespace char length of `token`.
+   * Tokens shorter than 7 chars return 1.0 (no boost).
+   * Each char at or beyond 7 adds 0.1: 7→1.1, 8→1.2, 9→1.3, …
+   * @param {string} token
+   * @returns {number}
+   */
+  function charLengthMultiplier(token) {
+    const len = String(token || '').replace(/\s+/g, '').length;
+    return len >= 7 ? 1.0 + (len - 6) * 0.1 : 1.0;
+  }
+
+  // ---------------------------------------------------------------------------
   // Referenced-query cross-doc boost (stub — extend with neighbour propagation)
   // ---------------------------------------------------------------------------
   function applyReferencedQueryNeighborBoost(scoredDocs) {
@@ -85,6 +101,21 @@ module.exports = function(context) {
     const queryTerms = kwTokenize(queryStr);                                           // 1-grams
     const queryGrams = groupNGramsBySize(kwTokenize(queryStr, { includeNGrams: true })); // 1–4 grams
 
+    // ── 0. Tag-pinned docs — full tag match guarantees inclusion ────────────
+    // A doc is tag-pinned when any of its tags appears in full (case-insensitive)
+    // somewhere inside the query string.
+    const tagPinnedIds = new Set();
+    for (const meta of allMetadata) {
+      const docTags = (Array.isArray(meta.tags) ? meta.tags : [])
+        .map(t => String(t).toLowerCase().trim()).filter(Boolean);
+      if (docTags.some(t => lowerQuery.includes(t))) {
+        tagPinnedIds.add(String(meta.id));
+      }
+    }
+    if (tagPinnedIds.size) {
+      console.log(`[RepoAsk] tag-pinned docs: ${[...tagPinnedIds].join(', ')}`);
+    }
+
     const scoredDocs = [];
 
     for (const meta of allMetadata) {
@@ -121,16 +152,17 @@ module.exports = function(context) {
       // ── 2. TERM_WEIGHTS ────────────────────────────────────────────────────
       for (const term of queryTerms) {
         const t = term.toLowerCase();
-        if (TW.id    && lowerId.includes(t))                    track('TW.id',         TW.id);
-        if (TW.title && lowerTitle.includes(t))                 track('TW.title',      TW.title);
-        if (TW.type  && lowerType.includes(t))                  track('TW.type',       TW.type);
-        if (TW.tags  && tags.some(tag => tag.includes(t)))      track('TW.tags',       TW.tags);
-        if (TW.referenced && refQs.some(rq => rq.includes(t))) track('TW.referenced', TW.referenced);
+        const clm = charLengthMultiplier(t);
+        if (TW.id    && lowerId.includes(t))                    track('TW.id',         TW.id         * clm);
+        if (TW.title && lowerTitle.includes(t))                 track('TW.title',      TW.title      * clm);
+        if (TW.type  && lowerType.includes(t))                  track('TW.type',       TW.type       * clm);
+        if (TW.tags  && tags.some(tag => tag.includes(t)))      track('TW.tags',       TW.tags       * clm);
+        if (TW.referenced && refQs.some(rq => rq.includes(t))) track('TW.referenced', TW.referenced * clm);
         if (TW.keywords) {
           outer: for (const cat of ['title', 'structural', 'semantic', 'bm25', 'kg']) {
             for (const gram of kwGrams) {
               if ((norm[cat][gram] || {})[t] !== undefined) {
-                track('TW.keywords', TW.keywords);
+                track('TW.keywords', TW.keywords * clm);
                 break outer;
               }
             }
@@ -144,13 +176,13 @@ module.exports = function(context) {
         if (!qGrams || !qGrams.length) continue;
         const qSet = new Set(qGrams);   // already lowercased by groupNGramsBySize
 
-        // per keyword category — TF-weighted: score += doc-TF × weight
+        // per keyword category — TF-weighted: score += doc-TF × weight × charLengthMultiplier
         for (const cat of ['title', 'structural', 'semantic', 'bm25', 'kg']) {
           const catWeight = Number((KW[cat] || {})[gramKey] || 0);
           if (!catWeight) continue;
           const catMap = norm[cat][gramKey] || {};
           let tfScore = 0;
-          for (const qg of qSet) tfScore += (catMap[qg] || 0);
+          for (const qg of qSet) tfScore += (catMap[qg] || 0) * charLengthMultiplier(qg);
           track(`KW.${cat}.${gramKey}`, tfScore * catWeight);
         }
 
@@ -162,14 +194,25 @@ module.exports = function(context) {
           const synMap = norm.synonyms[gramKey] || {};
           let tfScore = 0;
           for (const qg of qSet) {
-            tfScore += (synMap[qg] || 0);
-            if (legacySlot.includes(qg)) tfScore += 1;
+            const clm = charLengthMultiplier(qg);
+            tfScore += (synMap[qg] || 0) * clm;
+            if (legacySlot.includes(qg)) tfScore += clm;
           }
           track(`SYN.${gramKey}`, tfScore * synWeight);
         }
       }
 
       if (score > 0) scoredDocs.push({ ...meta, score, _breakdown: breakdown });
+    }
+
+    // ── 3b. Inject tag-pinned docs that did not score at all ─────────────────
+    if (tagPinnedIds.size) {
+      const scoredIds = new Set(scoredDocs.map(d => String(d.id)));
+      for (const meta of allMetadata) {
+        if (tagPinnedIds.has(String(meta.id)) && !scoredIds.has(String(meta.id))) {
+          scoredDocs.push({ ...meta, score: 0, _breakdown: {} });
+        }
+      }
     }
 
     if (!scoredDocs.length) return [];
@@ -191,7 +234,8 @@ module.exports = function(context) {
     if (topScore > 0) {
       const threshold = topScore * topScoreThresholdRatio;
       console.log(`[RepoAsk] ranked ${ranked.length} docs  topScore=${topScore.toFixed(2)}  threshold=${threshold.toFixed(2)}`);
-      ranked = ranked.filter(d => d.score >= threshold);
+      // Tag-pinned docs always pass through the threshold cutoff
+      ranked = ranked.filter(d => d.score >= threshold || tagPinnedIds.has(String(d.id)));
     }
 
     const results = ranked.slice(0, Math.min(limit, maxResults));

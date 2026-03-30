@@ -32,7 +32,7 @@ const STOP_WORDS = new Set([
     'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'shall', 'should', 'can', 
     'get', 'set', 'let', 'make', 'go', 'come', 'see', 'look', 'know', 'think', 'say', 'tell',
     'ask', 'answer', 'help', 'use', 'used', 'using', 'need', 'need', 'want', 'want',
-    'require', 'require', 'include', 'include', 'add', 'added', 
+    'require', 'require', 'include', 'include', 'add', 'added', 'check',
     'could', 'may', 'might', 'must', 'a', 'an', 'the', 'it', 'this', 'that', 'these', 'those',
     'i', 'you', 'he', 'she', 'they', 'we', 'me', 'him', 'her', 'them', 'us', 'my', 'your', 'his', 
     'its', 'our', 'their', 'mine', 'yours', 'hers', 'ours', 'theirs', 'what', 'which', 'who', 'whom', 'whose',
@@ -132,10 +132,8 @@ function generate_structural_regex(text) {
             if (current_type) {
                 if (current_type === 'digit') {
                     regex_parts.push(`\\d${current_count > 1 ? `{${current_count}}` : ''}`);
-                } else if (current_type === 'upper') {
-                    regex_parts.push(`[A-Z]${current_count > 1 ? `{${current_count}}` : ''}`);
-                } else if (current_type === 'lower') {
-                    regex_parts.push(`[a-z]${current_count > 1 ? `{${current_count}}` : ''}`);
+                } else if (current_type === 'upper' || current_type === 'lower') {
+                    regex_parts.push(`[A-Za-z]${current_count > 1 ? `{${current_count}}` : ''}`);
                 } else {
                     const escaped_char = current_symbol_char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                     regex_parts.push(`${escaped_char}${current_count > 1 ? `{${current_count}}` : ''}`);
@@ -150,10 +148,8 @@ function generate_structural_regex(text) {
     if (current_type) {
         if (current_type === 'digit') {
             regex_parts.push(`\\d${current_count > 1 ? `{${current_count}}` : ''}`);
-        } else if (current_type === 'upper') {
-            regex_parts.push(`[A-Z]${current_count > 1 ? `{${current_count}}` : ''}`);
-        } else if (current_type === 'lower') {
-            regex_parts.push(`[a-z]${current_count > 1 ? `{${current_count}}` : ''}`);
+        } else if (current_type === 'upper' || current_type === 'lower') {
+            regex_parts.push(`[A-Za-z]${current_count > 1 ? `{${current_count}}` : ''}`);
         } else {
             const escaped_char = current_symbol_char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             regex_parts.push(`${escaped_char}${current_count > 1 ? `{${current_count}}` : ''}`);

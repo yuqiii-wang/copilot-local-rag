@@ -4,7 +4,6 @@
         const cancelMetadataBtnEl = document.getElementById('cancel-metadata-btn');
         const metadataEditToggleBtnEl = document.getElementById('metadata-edit-toggle-btn');
         const summaryInputEl = document.getElementById('summary-input');
-        const keywordsInputEl = document.getElementById('keywords-input');
         const tagsInputEl = document.getElementById('tags-input');
         const referencedQueriesListEl = document.getElementById('referenced-queries-list');
         const relatedPagesListEl = document.getElementById('related-pages-list');
@@ -29,29 +28,11 @@
                 });
         }
 
-        /**
-         * Extract user-editable semantic keywords from the categorized keywords object.
-         * Falls back to a flat array (legacy) if keywords is still a plain array.
-         */
-        function semanticKeywords(keywords) {
-            if (Array.isArray(keywords)) return keywords;
-            if (!keywords || typeof keywords !== 'object') return [];
-            const slot = keywords.semantic;
-            if (!slot) return [];
-            if (Array.isArray(slot)) return slot;
-            return ['1gram', '2gram', '3gram', '4gram'].flatMap(g => {
-                const gs = slot[g];
-                if (!gs) return [];
-                return Array.isArray(gs) ? gs : Object.keys(gs);
-            });
-        }
-
         function setMetadataEditMode(isEditing) {
             isMetadataEditMode = Boolean(isEditing);
             const canEditDoc = Boolean(selectedDocId);
             const inputsEnabled = canEditDoc && isMetadataEditMode && !isMetadataGenerating;
             summaryInputEl.disabled = !inputsEnabled;
-            keywordsInputEl.disabled = !inputsEnabled;
             if (typeof tagsInputEl !== 'undefined' && tagsInputEl) tagsInputEl.disabled = !inputsEnabled;
             if (typeof typeInputEl !== 'undefined' && typeInputEl) typeInputEl.disabled = !inputsEnabled;
             metadataEditToggleBtnEl.disabled = !canEditDoc || isMetadataGenerating;
@@ -74,7 +55,6 @@
             if(generateMetadataBtnEl) generateMetadataBtnEl.disabled = !hasDoc || isMetadataGenerating;
             if(metadataEditToggleBtnEl) metadataEditToggleBtnEl.disabled = !hasDoc || isMetadataGenerating;
             if(summaryInputEl) summaryInputEl.disabled = !hasDoc || !isMetadataEditMode || isMetadataGenerating;
-            if(keywordsInputEl) keywordsInputEl.disabled = !hasDoc || !isMetadataEditMode || isMetadataGenerating;
             if (typeof tagsInputEl !== 'undefined' && tagsInputEl) tagsInputEl.disabled = !hasDoc || !isMetadataEditMode || isMetadataGenerating;
             if (typeof feedbackInputEl !== 'undefined' && feedbackInputEl) feedbackInputEl.disabled = !hasDoc || !isMetadataEditMode || isMetadataGenerating;
             if (typeof typeInputEl !== 'undefined' && typeInputEl) typeInputEl.disabled = !hasDoc || !isMetadataEditMode || isMetadataGenerating;
@@ -89,9 +69,6 @@
 
             if(summaryInputEl) summaryInputEl.value = selectedMetadata ? String(selectedMetadata.summary || '') : '';
             if (typeof typeInputEl !== 'undefined' && typeInputEl) typeInputEl.value = selectedMetadata ? String(selectedMetadata.type || 'custom') : 'custom';
-            // Show semantic (AI-gen / user-editable) keywords in the editable field
-            const keywordValues = selectedMetadata ? semanticKeywords(selectedMetadata.keywords) : [];
-            if(keywordsInputEl) keywordsInputEl.value = keywordValues.join(', ');
             const tagValues = selectedMetadata && Array.isArray(selectedMetadata.tags) ? selectedMetadata.tags : [];
             if(tagsInputEl) tagsInputEl.value = tagValues.join(', ');
             
@@ -111,10 +88,10 @@
                             <li class="referenced-query-item">${escapeHtml(query)}</li>
                         `).join('');
                     } else {
-                        referencedQueriesListEl.innerHTML = '<li class="referenced-query-item">No referenced queries</li>';
+                        referencedQueriesListEl.innerHTML = '<li class="referenced-query-empty">No referenced queries</li>';
                     }
                 } else {
-                    referencedQueriesListEl.innerHTML = '<li class="referenced-query-item">No referenced queries</li>';
+                    referencedQueriesListEl.innerHTML = '<li class="referenced-query-empty">No referenced queries</li>';
                 }
             }
 
@@ -128,7 +105,7 @@
                         <li class="referenced-query-item">${escapeHtml(page)}</li>
                     `).join('');
                 } else {
-                    relatedPagesListEl.innerHTML = '<li class="referenced-query-item">No related pages</li>';
+                    relatedPagesListEl.innerHTML = '<li class="referenced-query-empty">No related pages</li>';
                 }
             }
 
@@ -166,8 +143,6 @@
                     if(summaryInputEl) summaryInputEl.focus();
                     return;
                 }
-                const keywords = String(keywordsInputEl ? keywordsInputEl.value : '')
-                    .split(',').map(k => k.trim()).filter(k => k.length > 0).join(', ');
                 const tags = String(tagsInputEl ? tagsInputEl.value : '')
                     .split(',').map(t => t.trim()).filter(t => t.length > 0).join(', ');
                 vscode.postMessage({
@@ -175,7 +150,6 @@
                     docId: selectedDocId,
                     type: typeof typeInputEl !== 'undefined' && typeInputEl ? typeInputEl.value : 'custom',
                     summary: summaryInputEl ? summaryInputEl.value : '',
-                    keywords,
                     tags
                 });
                 setMetadataEditMode(false);
@@ -185,7 +159,24 @@
         document.querySelectorAll('.metadata-section-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const group = btn.closest('.metadata-field-group');
-                if (!group) return;
+                if (!group) {
+                    // top-level collapse-all button
+                    const allGroups = document.querySelectorAll('.metadata-field-group');
+                    const anyExpanded = Array.from(allGroups).some(g => !g.classList.contains('contracted'));
+                    allGroups.forEach(g => {
+                        const sectionBtn = g.querySelector('.metadata-section-btn');
+                        if (anyExpanded) {
+                            g.classList.add('contracted');
+                            if (sectionBtn) { sectionBtn.textContent = '\u25B6'; sectionBtn.title = 'Expand'; }
+                        } else {
+                            g.classList.remove('contracted');
+                            if (sectionBtn) { sectionBtn.textContent = '\u25BC'; sectionBtn.title = 'Collapse'; }
+                        }
+                    });
+                    btn.textContent = anyExpanded ? '\u25B6' : '\u25BC';
+                    btn.title = anyExpanded ? 'Expand all' : 'Collapse all';
+                    return;
+                }
                 const isContracted = group.classList.toggle('contracted');
                 btn.textContent = isContracted ? '\u25B6' : '\u25BC';
                 btn.title = isContracted ? 'Expand' : 'Collapse';

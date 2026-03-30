@@ -10,40 +10,35 @@
 const { tool } = require('@langchain/core/tools');
 const { z } = require('zod');
 const path = require('path');
-const { DOC_CHECK_TOOL_DESCRIPTION, ALLOWED_MODES } = require('./prompts');
+const { DOC_CHECK_TOOL_DESCRIPTION } = require('./prompts');
+const { ALLOWED_MODES } = require('../tools/vsCodeTools');
+const { runDocCheck } = require('../tools/docCheckCore');
 
 /**
  * Build LangChain StructuredTool instances for the RepoAsk agent.
  *
  * @param {Object} deps
- * @param {Object} deps.vscodeApi     - The `vscode` module
- * @param {Object} deps.options       - Chat request options (provides toolInvocationToken)
- * @param {string} deps.storagePath   - Local doc store root path (for file references)
- * @param {Object} deps.response      - VS Code chat response stream (for response.reference)
+ * @param {Object} deps.vscodeApi       - The `vscode` module
+ * @param {Object} deps.options         - Chat request options
+ * @param {string} deps.storagePath     - Local doc store root path (for file references)
+ * @param {Object} deps.response        - VS Code chat response stream
+ * @param {Object} deps.documentService - Document service (for rankLocalDocuments)
+ * @param {Function} deps.readAllMetadata
+ * @param {Function} deps.readDocumentMetadata
+ * @param {Function} deps.readDocumentContent
+ * @param {string}  [deps.emptyStoreHint]
  * @returns {Array} Array of LangChain StructuredTool instances
  */
-function buildAgentTools({ vscodeApi, options, storagePath, response }) {
-    /**
-     * repoask_doc_check — reads documents from the local RepoAsk store.
-     * Delegates to the registered VS Code "repoask_doc_check" LM tool.
-     */
+function buildAgentTools({ vscodeApi, options, storagePath, response, documentService, readAllMetadata, readDocumentMetadata, readDocumentContent, emptyStoreHint }) {
     const docCheckTool = tool(
-        async ({ query, mode, ids, searchTerms }) => {
+        async ({ query, mode, ids, searchTerms, limit }) => {
             try {
-                const result = await vscodeApi.lm.invokeTool(
-                    'repoask_doc_check',
-                    {
-                        input: {
-                            query: query || '',
-                            mode: mode || 'content_partial',
-                            ids: ids || [],
-                            searchTerms: searchTerms || []
-                        },
-                        toolInvocationToken: options?.request?.toolInvocationToken
-                    }
+                const text = await runDocCheck(
+                    { query, mode, ids, searchTerms, limit },
+                    { documentService, readAllMetadata, readDocumentMetadata, readDocumentContent, emptyStoreHint }
                 );
 
-                // Emit VS Code file references so Copilot-style UI shows the docs
+                // Emit VS Code file references so the Copilot UI shows the doc links
                 if (storagePath && Array.isArray(ids) && ids.length > 0
                     && typeof response?.reference === 'function') {
                     for (const id of ids) {
@@ -52,11 +47,7 @@ function buildAgentTools({ vscodeApi, options, storagePath, response }) {
                     }
                 }
 
-                return (result.content || [])
-                    .filter(p => p instanceof vscodeApi.LanguageModelTextPart)
-                    .map(p => p.value)
-                    .join('\n')
-                    .trim() || 'No content found.';
+                return text || 'No content found.';
             } catch (err) {
                 return `Tool error: ${err.message}`;
             }
@@ -69,9 +60,9 @@ function buildAgentTools({ vscodeApi, options, storagePath, response }) {
                     'User question or keywords to match against local document metadata and content.'
                 ),
                 mode: z.enum(ALLOWED_MODES)
-                    .default('content_partial')
+                    .default('id_2_title')
                     .describe(
-                        'Read mode. Use metadata.id to list docs, metadata.summary_kg for summaries with KG, content_partial for quick scan, content for full read.'
+                        'Read mode. id_2_title: return titles for provided doc ids. id_2_content_partial: quick snippet scan. id_2_content: full text. id_2_metadata_4_summary: evaluate by summaries. id_2_metadata_4_summary_kg: KG traversal for advanced search.'
                     ),
                 ids: z.array(z.string()).optional().default([])
                     .describe(
@@ -80,7 +71,9 @@ function buildAgentTools({ vscodeApi, options, storagePath, response }) {
                 searchTerms: z.array(z.string()).optional().default([])
                     .describe(
                         'Search terms proposed by LLM based on the user query and conversation history. Used to narrow results when no specific IDs are given.'
-                    )
+                    ),
+                limit: z.number().optional().default(3)
+                    .describe('Max number of results to return for searchTerms mode.')
             })
         }
     );

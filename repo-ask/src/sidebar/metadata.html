@@ -5,6 +5,7 @@
                         <button id="generate-metadata-btn" class="action-btn" type="button" disabled>AI Gen</button>
                         <button id="cancel-metadata-btn" class="action-btn" type="button" style="display: none;">Cancel</button>
                         <button id="metadata-edit-toggle-btn" class="action-btn" type="button" disabled>Edit</button>
+                        <button id="collapse-all-metadata-btn" class="metadata-section-btn" type="button" title="Collapse all">&#9660;</button>
                     </div>
                 </div>
                 <div class="metadata-field-group">
@@ -28,13 +29,6 @@
                 </div>
                 <div class="metadata-field-group">
                     <div class="metadata-field-header">
-                        <label class="metadata-label" for="keywords-input">Keywords (comma separated)</label>
-                        <button class="metadata-section-btn" type="button" title="Collapse">&#9660;</button>
-                    </div>
-                    <textarea id="keywords-input" class="metadata-textarea metadata-textarea-keywords" rows="2" placeholder="keyword-a, keyword-b"></textarea>
-                </div>
-                <div class="metadata-field-group">
-                    <div class="metadata-field-header">
                         <label class="metadata-label" for="tags-input">Tags (comma separated)</label>
                         <button class="metadata-section-btn" type="button" title="Collapse">&#9660;</button>
                     </div>
@@ -46,7 +40,7 @@
                         <button class="metadata-section-btn" type="button" title="Collapse">&#9660;</button>
                     </div>
                     <ul id="referenced-queries-list" class="referenced-queries-list">
-                        <li class="referenced-query-item">No referenced queries</li>
+                        <li class="referenced-query-empty">No referenced queries</li>
                     </ul>
                 </div>
                 <div class="metadata-field-group">
@@ -55,7 +49,7 @@
                         <button class="metadata-section-btn" type="button" title="Collapse">&#9660;</button>
                     </div>
                     <ul id="related-pages-list" class="referenced-queries-list">
-                        <li class="referenced-query-item">No related pages</li>
+                        <li class="referenced-query-empty">No related pages</li>
                     </ul>
                 </div>
                 <div class="metadata-field-group">

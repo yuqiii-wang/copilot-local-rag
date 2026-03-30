@@ -184,14 +184,67 @@ function camelCaseToDashed(camelCase) {
 }
 
 /**
+ * Return true if the string contains regex metacharacters that suggest it is
+ * a regex pattern rather than a plain compound token.
+ * Detects: character classes [...], escape sequences \d \w \s etc., non-capturing
+ * groups (?:, and counted quantifiers {n}.
+ */
+function looksLikeRegex(kw) {
+    return /\[.*\]|\\\w|\(\?|\{\d/.test(kw);
+}
+
+/**
+ * Count occurrences of delimiter characters in kw that sit OUTSIDE a regex
+ * character class [...] and are not preceded by a backslash escape.
+ * This prevents hyphens/slashes that are part of regex syntax (e.g. [A-Z], \/)
+ * from being treated as gram word-boundary delimiters.
+ * @param {string} kw
+ * @param {string[]} delimiters
+ * @returns {number}
+ */
+function countDelimitersOutsideCharClass(kw, delimiters) {
+    const delimSet = new Set(delimiters);
+    let inCharClass = false;
+    let count = 0;
+    for (let i = 0; i < kw.length; i++) {
+        const ch = kw[i];
+        if (ch === '\\') {
+            i++; // skip escaped character — not a delimiter
+            continue;
+        }
+        if (ch === '[') { inCharClass = true; continue; }
+        if (ch === ']' && inCharClass) { inCharClass = false; continue; }
+        if (!inCharClass && delimSet.has(ch)) {
+            count++;
+        }
+    }
+    return count;
+}
+
+/**
  * Count the effective gram size of a synonym string.
  * Space-separated words first; for single-word tokens check compound separators.
- * e.g. "fx-2024-00789" (3 segments) → 3, "risk manager" → 2.
+ * For regex-like strings (e.g. "[A-Z]-\d+"), delimiters inside character classes
+ * or preceded by an escape are NOT counted as gram boundaries.
+ * e.g. "fx-2024-00789" → 3, "risk manager" → 2, "[A-Z]-\d+" → 2.
  */
 function countGrams(kw) {
-    const spaceCount = String(kw || '').trim().split(/\s+/).length;
+    const str = String(kw || '').trim();
+    const spaceCount = str.split(/\s+/).length;
     if (spaceCount > 1) return spaceCount;
-    const segCount = kw.split(/[-_.+/]/).filter(Boolean).length;
+
+    if (looksLikeRegex(str)) {
+        // For regex patterns, only '-' and '/' can be structural gram separators.
+        // '+', '.', '_' are regex metacharacters (quantifier, wildcard) and must not split grams.
+        const delimCount = countDelimitersOutsideCharClass(str, ['-', '/']);
+        return delimCount > 0 ? delimCount + 1 : 1;
+    }
+
+    // Pure decimal number (e.g. 123.456788): single dot between digit groups → 1 gram.
+    // Multiple dots (e.g. 1.2.3) fall through and split normally.
+    if (/^\d+\.\d+$/.test(str)) return 1;
+
+    const segCount = str.split(/[-_.+/]/).filter(Boolean).length;
     return segCount > 1 ? segCount : 1;
 }
 
@@ -210,6 +263,17 @@ function generateSynonyms(keywords) {
         if (textKw.includes(' ')) {
             expanded.add(textKw);
             continue;
+        }
+
+        // Multi-decimal number (e.g. 123.456788): add rounded variants at 1–3 dp and integer part.
+        const decimalMatch = textKw.match(/^(\d+)\.(\d{2,})$/);
+        if (decimalMatch) {
+            const num = parseFloat(textKw);
+            expanded.add(decimalMatch[1]);               // integer part (1gram)
+            const fracLen = decimalMatch[2].length;
+            if (fracLen >= 1) expanded.add(num.toFixed(1));
+            if (fracLen >= 2) expanded.add(num.toFixed(2));
+            if (fracLen >= 3) expanded.add(num.toFixed(3));
         }
 
         const digitCount = (textKw.match(/\d/g) || []).length;

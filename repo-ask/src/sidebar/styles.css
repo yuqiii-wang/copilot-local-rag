@@ -349,6 +349,16 @@ body {
     line-height: 1.3;
 }
 
+.referenced-query-empty {
+    margin: 0;
+    padding: 4px 6px;
+    font-size: 12px;
+    line-height: 1.3;
+    color: var(--vscode-descriptionForeground);
+    background: transparent;
+    font-style: italic;
+}
+
 .referenced-query-item:last-child {
     margin-bottom: 0;
 }

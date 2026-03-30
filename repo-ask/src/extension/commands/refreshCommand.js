@@ -1,3 +1,76 @@
+const { getJiraExtractionRegexes } = require('../../mcp/jiraApi');
+const { buildConfluenceIdExtractorPrompt } = require('../chat/prompts');
+
+const LLM_TIMEOUT_MS = 12000;
+
+function extractJsonObject(rawText) {
+    if (!rawText) return null;
+    const text = String(rawText).trim();
+    try {
+        return JSON.parse(text);
+    } catch {
+        const match = text.match(/\{[\s\S]*\}/);
+        if (!match) return null;
+        try { return JSON.parse(match[0]); } catch { return null; }
+    }
+}
+
+async function extractConfluenceIdentifierWithLlm(vsCodeApi, rawInput, options = {}) {
+    if (!vsCodeApi.lm || !vsCodeApi.LanguageModelChatMessage) return null;
+    const workspacePromptContext = String(options.workspacePromptContext || '').trim().slice(0, 12000);
+    try {
+        const shared = require('../chat/shared');
+        const model = await shared.selectDefaultChatModel(vsCodeApi, options);
+        if (!model) return null;
+        const instruction = buildConfluenceIdExtractorPrompt({ promptContext: workspacePromptContext, rawInput });
+        const response = await shared.withTimeout(
+            model.sendRequest([vsCodeApi.LanguageModelChatMessage.User(instruction)]),
+            LLM_TIMEOUT_MS, null
+        );
+        if (!response) return null;
+        const responseText = await shared.collectResponseText(vsCodeApi, response);
+        const parsed = extractJsonObject(responseText);
+        const arg = String(parsed?.arg || '').trim();
+        return arg.length > 0 ? arg : null;
+    } catch {
+        return null;
+    }
+}
+
+async function parseRefreshArg(vsApi, sourceInput, options = {}) {
+    const vsCodeApi = vsApi;
+    const raw = String(sourceInput || '').trim();
+    if (!raw) return { found: false, arg: '', source: 'empty' };
+
+    const jiraRegexes = getJiraExtractionRegexes(vsCodeApi);
+
+    const urlMatch = raw.match(/https?:\/\/[^\s)]+/i);
+    if (urlMatch && urlMatch[0]) {
+        const urlStr = urlMatch[0];
+        if (urlStr.match(/\/browse\/[A-Za-z0-9\-]+/i)) return { found: true, arg: urlStr, source: 'regex-jira' };
+        for (const regex of jiraRegexes) {
+            if (urlStr.match(regex)) return { found: true, arg: urlStr, source: 'regex-jira' };
+        }
+        return { found: true, arg: urlStr, source: 'regex-url' };
+    }
+
+    const pureNumMatch = raw.match(/^\d{7,}$/);
+    if (pureNumMatch) return { found: true, arg: raw, source: 'regex-id' };
+
+    for (const regex of jiraRegexes) {
+        const jiraMatch = raw.match(regex);
+        if (jiraMatch && jiraMatch[0]) return { found: true, arg: jiraMatch[0], source: 'regex-jira' };
+    }
+
+    const pageIdMatch = raw.match(/(?:pageid=)(\d+)/i) || raw.match(/\b(\d{1,8})\b/i);
+    if (pageIdMatch && pageIdMatch[1]) return { found: true, arg: pageIdMatch[1], source: 'regex-id' };
+
+    const candidateByLlm = await extractConfluenceIdentifierWithLlm(vsCodeApi, raw, options);
+    if (candidateByLlm) return { found: true, arg: candidateByLlm, source: 'llm' };
+
+    return { found: false, arg: '', source: 'none' };
+}
+
 module.exports = function createRefreshCommand(deps) {
     const {
         vscode,
@@ -11,7 +84,6 @@ module.exports = function createRefreshCommand(deps) {
         setRefreshCanceled,
         httpManager
     } = deps;
-    const { parseRefreshArg } = require('../tools/llm');
 
     function normalizeReferencedQueries(value) {
         if (Array.isArray(value)) {

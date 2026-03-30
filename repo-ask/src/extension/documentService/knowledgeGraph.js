@@ -15,6 +15,59 @@
  * document's stored metadata and triggers a BM25 keyword refresh.
  */
 
+const { buildKnowledgeGraphPrompt } = require('../chat/prompts');
+const shared = require('../chat/shared');
+const { getJiraExtractionRegexes } = require('../../mcp/jiraApi');
+
+const LLM_TIMEOUT_MS = 12000;
+
+async function generateKnowledgeGraph(vscodeApi, referenceQueries, secondaryUrls, contentMap, options = {}) {
+    if (!vscodeApi.lm || !vscodeApi.LanguageModelChatMessage) return '';
+    try {
+        const sharedMod = require('../chat/shared');
+        const model = await sharedMod.selectDefaultChatModel(vscodeApi, options);
+        if (!model) return '';
+
+        const primaryContent = String(options.primaryContent || '').trim();
+        const existingMermaid = String(options.existingKnowledgeGraph || '').trim();
+        const conversationSummary = String(options.conversationSummary || '').trim();
+
+        const secondaryContent = (Array.isArray(secondaryUrls) ? secondaryUrls : []).map(url => {
+            const content = (contentMap && contentMap[url]) || 'No content available';
+            return `URL: ${url}\nContent: ${content.slice(0, 2000)}`;
+        }).join('\n\n');
+
+        const queryList = Array.isArray(referenceQueries) && referenceQueries.length > 0
+            ? referenceQueries.join('\n') : '(none)';
+
+        const instruction = buildKnowledgeGraphPrompt({ queryList, primaryContent, secondaryContent, existingMermaid, conversationSummary });
+        const response = await shared.withTimeout(
+            model.sendRequest([vscodeApi.LanguageModelChatMessage.User(instruction)]),
+            LLM_TIMEOUT_MS * 3, null
+        );
+        if (!response) return existingMermaid || '';
+
+        const responseText = await shared.collectResponseText(vscodeApi, response);
+        let mermaid = responseText.trim()
+            .replace(/^```mermaid\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+
+        if (!mermaid.match(/^graph\s+(TD|LR|BT|RL)/i)) {
+            const graphMatch = mermaid.match(/graph\s+(TD|LR|BT|RL)[\s\S]*/i);
+            if (graphMatch) mermaid = graphMatch[0].trim();
+            else return existingMermaid || '';
+        }
+
+        mermaid = mermaid
+            .replace(/(\[|\{|\()"([^"]*)"(\]|\}|\))/g, '$1$2$3')
+            .replace(/\|"([^"]*)"\ *\|/g, '|$1|');
+
+        return mermaid;
+    } catch (error) {
+        console.error('Error generating knowledge graph:', error);
+        return String(options.existingKnowledgeGraph || '');
+    }
+}
+
 module.exports = function (context) {
     const {
         vscode,
@@ -25,8 +78,6 @@ module.exports = function (context) {
         getStoredMetadataById,
         finalizeBm25KeywordsForDocuments
     } = context;
-
-    const { generateKnowledgeGraph: generateKgLlm, getJiraExtractionRegexes } = require('../tools/llm');
 
     // ── Internal helpers ───────────────────────────────────────────────────────
 
@@ -200,7 +251,7 @@ module.exports = function (context) {
         }
 
         // 5. Call LLM
-        return await generateKgLlm(vscode, queries, resolvedUrls, contentMap, {
+        return await generateKnowledgeGraph(vscode, queries, resolvedUrls, contentMap, {
             primaryContent,
             existingKnowledgeGraph: kgToUse,
             conversationSummary: String(conversationSummary || '').trim() || undefined

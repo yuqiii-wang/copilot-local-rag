@@ -72,7 +72,20 @@ async function fetchAllJiraIssues(project) {
     return issues;
 }
 
+function getJiraExtractionRegexes(vsApi) {
+    const configuration = (vsApi || vscode).workspace.getConfiguration('repoAsk');
+    const jiraProfile = configuration.get('jira');
+    const patternList = Array.isArray(jiraProfile?.regex) ? jiraProfile.regex : [];
+    const compiled = [];
+    for (const pattern of patternList) {
+        if (typeof pattern !== 'string' || pattern.trim().length === 0) continue;
+        try { compiled.push(new RegExp(pattern, 'i')); } catch { }
+    }
+    return compiled;
+}
+
 module.exports = {
     fetchJiraIssue,
-    fetchAllJiraIssues
+    fetchAllJiraIssues,
+    getJiraExtractionRegexes
 };

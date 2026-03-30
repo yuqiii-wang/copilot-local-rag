@@ -4,7 +4,7 @@
 
 module.exports = function createShowLogActionButtonCommand(deps) {
     const { vscode, context, sidebar, documentService, readAllMetadata, storagePath } = deps;
-    const { getJiraExtractionRegexes } = require('../tools/llm');
+    const { getJiraExtractionRegexes } = require('../../mcp/jiraApi');
 
     function normalizeUrl(url) {
         return String(url || '').trim().replace(/[)>.,;]+$/, '').replace(/\/$/, '');

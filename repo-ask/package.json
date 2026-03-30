@@ -50,14 +50,14 @@
             "mode": {
               "type": "string",
               "enum": [
-                "content",
-                "metadata",
-                "content_partial",
-                "metadata.summary",
-                "metadata.summary_kg",
-                "metadata.id"
+                "id_2_title",
+                "id_2_content",
+                "id_2_metadata",
+                "id_2_content_partial",
+                "id_2_metadata_4_summary",
+                "id_2_metadata_4_summary_kg"
               ],
-              "description": "Operation mode. Use metadata.summary_kg to get id/title/summary/knowledgeGraph for all docs. Use content_partial for quick scan, content for full read."
+              "description": "Operation mode. 'id_2_title' returns titles for provided doc ids. 'id_2_content' returns content for provided doc ids. 'id_2_metadata' returns metadata for provided doc ids. 'id_2_content_partial' returns content snippets for provided doc ids. 'id_2_metadata_4_summary' returns metadata optimized for summarization. 'id_2_metadata_4_summary_kg' returns metadata optimized for summarization with knowledge graph traversal."
             },
             "ids": {
               "type": "array",
@@ -71,7 +71,7 @@
               "items": {
                 "type": "string"
               },
-              "description": "Optional list of search terms proposed by LLM based on user query and conversation. Used to narrow down documents when no specific ids are given."
+              "description": "Will trigger search and ranking to find relevant documents based on these terms. return doc ids."
             },
             "limit": {
               "type": "number",

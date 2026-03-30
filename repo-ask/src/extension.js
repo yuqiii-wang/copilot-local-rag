@@ -21,15 +21,15 @@ const {
     ensureIndexStoragePath,
     backfillStoredMetadataSchema,
     readAllMetadata,
+    readDocumentMetadata,
     readDocumentContent,
     deleteDocumentFiles,
 
     writeDocumentFiles
 } = require('./storage');
-const { parseRefreshArg } = require('./extension/tools/llm');
+const { createLanguageModelTools } = require('./extension/tools/vsCodeTools');
 const { createDocumentService } = require('./extension/documentService');
 const { createSidebarController } = require('./extension/sidebarController');
-const { createLanguageModelTools } = require('./extension/tools/lmTools');
 const { createRefreshCommand, createShowLogActionButtonCommand, createCheckCodeLogicCommand, createAdvancedDocSearchCommand } = require('./extension/commands');
 const { answerGeneralPromptQuestion } = require('./extension/chat/generalAnswer');
 const { runAdvancedDocSearch } = require('./extension/chat/advancedDocSearch');
@@ -85,13 +85,13 @@ function setupExtension(context) {
         vscode,
         context,
         documentService,
-        parseRefreshArg,
         fetchConfluencePage,
         setSidebarSyncStatus: sidebar.setSidebarSyncStatus,
         setSidebarSyncError: sidebar.setSidebarSyncError,
         refreshSidebarView: sidebar.refreshSidebarView,
         upsertSidebarDocument: sidebar.upsertSidebarDocument,
         readAllMetadata: () => readAllMetadata(storagePath),
+        readDocumentMetadata: (id) => readDocumentMetadata(storagePath, id),
         readDocumentContent: (id) => readDocumentContent(storagePath, id),
         truncate,
         emptyStoreHint: EMPTY_STORE_HINT,
@@ -177,9 +177,8 @@ function setupExtension(context) {
                     }, { request });
                 } else {
                     await answerGeneralPromptQuestion(vscode, prompt, attachedContext, response, {
-                        truncate,
-                        tokenize: documentService.tokenize,
                         documentService,
+                        readDocumentContent: (id) => readDocumentContent(storagePath, id),
                         chatContext
                     }, {
                         metadataList: readAllMetadata(storagePath),

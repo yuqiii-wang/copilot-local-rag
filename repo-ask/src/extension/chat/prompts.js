@@ -6,13 +6,7 @@
  */
 
 const { ChatPromptTemplate, MessagesPlaceholder } = require('@langchain/core/prompts');
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Shared constants — imported by both docCheckTool.js and agentTools.js
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** Allowed mode values for the repoask_doc_check tool. */
-const ALLOWED_MODES = ['content', 'metadata', 'content_partial', 'metadata.summary', 'metadata.summary_kg', 'metadata.id'];
+const { ALLOWED_MODES } = require('../tools/vsCodeTools');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tool description — kept here so agentTools.js (LangChain schema) and
@@ -20,11 +14,13 @@ const ALLOWED_MODES = ['content', 'metadata', 'content_partial', 'metadata.summa
 // ─────────────────────────────────────────────────────────────────────────────
 const DOC_CHECK_TOOL_DESCRIPTION = [
     'Read documents from the local RepoAsk store (synced from Confluence and Jira).',
-    'Use mode "metadata.id" first to list available doc IDs and titles.',
-    'Use mode "content_partial" for initial discovery of relevant docs.',
-    'Escalate to mode "content" to read the full text of a specific doc.',
-    'Prefer docs tagged with "confluence" or "jira" for team knowledge.',
-    'For production support questions, also check docs tagged "production-support" or "incident-response".'
+    'If searchTerms are provided, ranks and returns matching doc IDs and scores.',
+    'Use mode "id_2_content_partial" to scan snippets from specific doc IDs.',
+    'Use mode "id_2_content" to read full content by doc IDs.',
+    'Use mode "id_2_metadata_4_summary" to evaluate relevance from titles and summaries.',
+    'Use mode "id_2_metadata_4_summary_kg" for KG-traversal in advanced search.',
+    'If no ids and no searchTerms, returns all stored metadata.',
+    'If the query contains an explicit Confluence page ID, Jira ticket key, or URL, put it in ids and call mode "id_2_content" directly.'
 ].join(' ');
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -36,10 +32,13 @@ const AGENT_SYSTEM_PROMPT = [
     'Wait for tool results before drawing conclusions.',
     '',
     'RULES:',
-    '- You MUST use the repoask_doc_check tool to retrieve information.',
-    '- First call with mode="metadata.id" to discover available documents.',
-    '- Then call with mode="content_partial" for the most relevant IDs.',
-    '- Escalate to mode="content" if partial content is clearly relevant.',
+    '- The "Initial Ranked Documents" section below already contains pre-ranked doc IDs. Use those IDs directly.',
+    '- FIRST: Check the user query for an explicit Confluence page ID (numeric), Jira ticket key (e.g. PROJ-123), or direct URL.',
+    '  If found, call the tool with mode="id_2_content" and put that ID or key in the ids array immediately.',
+    '- OTHERWISE: Call the tool once with mode="id_2_content_partial" using the IDs from "Initial Ranked Documents".',
+    '- Escalate to mode="id_2_content" only for a specific doc that looks clearly relevant.',
+    '- For advanced navigation, use mode="id_2_metadata_4_summary_kg" to explore summaries and knowledge graph links.',
+    '- If none of the docs are relevant, respond: "No relevant documents found. Try Advanced Doc Search."',
     '- You MUST NOT hallucinate information not present in retrieved documents.',
     '- Identify relevant documents; include their IDs and URLs in your analysis.',
     '',
@@ -100,7 +99,7 @@ function buildPhase2Prompt(rawObservations, userPrompt) {
 // Partial content note — appended when doc content is truncated for scanning
 // ─────────────────────────────────────────────────────────────────────────────
 const PARTIAL_CONTENT_NOTE =
-    "[Note]: This is partial content. If the partial content is likely related to user query, MUST read full content. To read full content, instruct LLM to use mode 'content' to read full content.";
+    "[Note]: This is partial content. If the partial content is likely related to the user query, MUST read full content using mode 'id_2_content' with the same doc ID.";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Confluence ID extractor (llm.js — extractConfluenceIdentifierWithLlm)

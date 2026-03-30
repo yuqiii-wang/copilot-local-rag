@@ -4,7 +4,8 @@ module.exports = function(context) {
     readDocumentContent, localizeMarkdownImageLinks, getKeywordConfig, cleanKeywords, getStoredMetadataById,
     getPageHtml, isLikelyHtml, extractHtmlTagData, resolveSourceUrl, tokenization2bm25,
     buildCategorizedKeywords, normalizeCategorizedKeywords, flattenCategorizedKeywords } = context;
-  const { extractMermaidKeywords, getJiraExtractionRegexes } = require('../tools/llm');
+  const { extractMermaidKeywords } = require('./tokenization2keywords');
+  const { getJiraExtractionRegexes } = require('../../mcp/jiraApi');
   const { extractMdKeywords } = require('./md2keywords');
 
   // Builds structural keywords from document content + title.

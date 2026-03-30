@@ -46,6 +46,10 @@ function wordsFromText(text) {
     while ((m = compoundRe.exec(rawText)) !== null) {
         const compound = m[0];
         words.push(compound.toLowerCase());                 // whole — one token
+        // Pure decimal number (e.g. 123.456788): single dot between digit groups.
+        // Do NOT split into parts — the whole token is the meaningful unit.
+        // Multiple dots (e.g. 1.2.3) still split normally.
+        if (/^\d+\.\d+$/.test(compound)) continue;
         for (const part of compound.split(/[-_.+/]/)) {
             if (!part) continue;
             if (/^\d+$/.test(part)) {
@@ -134,4 +138,73 @@ function tokenize(text, options = {}) {
     return [...new Set(buildNGrams(words, minN, maxN))];
 }
 
-module.exports = { tokenize, generateSynonyms, wordsFromText, buildNGrams };
+/**
+ * Extract meaningful keywords from a Mermaid flowchart diagram string.
+ * @param {string} mermaidText
+ * @returns {string[]}
+ */
+function extractMermaidKeywords(mermaidText) {
+    const text = String(mermaidText || '').trim();
+    if (!text) return [];
+
+    const keywords = new Set();
+    const lines = text.split('\n');
+
+    for (const line of lines) {
+        const trimmed = line.trim();
+        if (/^graph\s+(TD|LR|BT|RL)/i.test(trimmed) || !trimmed) continue;
+
+        const nodeLabelMatches = trimmed.matchAll(/\w+\s*[\[\({"]\s*"?([^"\]\)}"]+)"?\s*[\]\)}"]/g);
+        for (const m of nodeLabelMatches) {
+            if (m[1]) {
+                const label = m[1].trim();
+                if (label.length >= 2) {
+                    keywords.add(label.toLowerCase());
+                    for (const word of label.split(/\s+/)) {
+                        if (word.length >= 2) keywords.add(word.toLowerCase());
+                    }
+                }
+            }
+        }
+
+        const nodeIdMatches = trimmed.matchAll(/\b([A-Z][a-zA-Z0-9]+)\b/g);
+        for (const m of nodeIdMatches) {
+            if (m[1] && m[1].length >= 2) {
+                const parts = m[1].replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase().split(/\s+/);
+                for (const part of parts) { if (part.length >= 2) keywords.add(part); }
+                keywords.add(m[1].toLowerCase());
+            }
+        }
+
+        const relLabelMatches = trimmed.matchAll(/--+>?\|([^|]+)\|/g);
+        for (const m of relLabelMatches) {
+            if (m[1]) {
+                const label = m[1].trim();
+                if (label.length >= 2) {
+                    keywords.add(label.toLowerCase());
+                    for (const word of label.split(/\s+/)) {
+                        if (word.length >= 2) keywords.add(word.toLowerCase());
+                    }
+                }
+            }
+        }
+
+        const quotedRelMatches = trimmed.matchAll(/--\s*"([^"]+)"\s*-->/g);
+        for (const m of quotedRelMatches) {
+            if (m[1]) {
+                const label = m[1].trim();
+                if (label.length >= 2) {
+                    keywords.add(label.toLowerCase());
+                    for (const word of label.split(/\s+/)) {
+                        if (word.length >= 2) keywords.add(word.toLowerCase());
+                    }
+                }
+            }
+        }
+    }
+
+    const noise = new Set(['graph', 'td', 'lr', 'bt', 'rl', 'subgraph', 'end', 'style', 'class', 'click']);
+    return [...keywords].filter(kw => !noise.has(kw));
+}
+
+module.exports = { tokenize, generateSynonyms, wordsFromText, buildNGrams, extractMermaidKeywords };

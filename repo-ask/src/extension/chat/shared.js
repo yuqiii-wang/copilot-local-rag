@@ -75,6 +75,31 @@ exports.withTimeout = async function withTimeout(promise, timeoutMs, timeoutValu
 };
 
 /**
+ * Collects the full text from a VS Code LM response stream.
+ * @param {Object} vsApi - VS Code API object
+ * @param {Object} response - LM response object with stream or text iterator
+ * @returns {Promise<string>}
+ */
+exports.collectResponseText = async function collectResponseText(vsApi, response) {
+    if (!response) return '';
+    let text = '';
+    if (response.stream) {
+        for await (const chunk of response.stream) {
+            if (vsApi.LanguageModelTextPart && chunk instanceof vsApi.LanguageModelTextPart) {
+                text += chunk.value;
+            } else if (typeof chunk === 'string') {
+                text += chunk;
+            } else if (chunk && typeof chunk.value === 'string') {
+                text += chunk.value;
+            }
+        }
+    } else if (response.text) {
+        for await (const fragment of response.text) text += fragment;
+    }
+    return text;
+};
+
+/**
  * Selects the default chat model for this VS Code session.
  * @param {Object} vscodeApi - VS Code API object
  * @param {Object} [options] - Options containing the chat request object

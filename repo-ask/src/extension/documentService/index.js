@@ -2,9 +2,20 @@ const fs = require('fs');
 const path = require('path');
 const cheerio = require('cheerio');
 const axios = require('axios');
-const { extractJsonObject } = require('./../tools/llm');
 const { tokenize: tokenizeFromModule } = require('./tokenization2keywords');
 const { tokenization2bm25 } = require('./tokenization2bm25');
+
+function extractJsonObject(rawText) {
+    if (!rawText) return null;
+    const text = String(rawText).trim();
+    try {
+        return JSON.parse(text);
+    } catch {
+        const match = text.match(/\{[\s\S]*\}/);
+        if (!match) return null;
+        try { return JSON.parse(match[0]); } catch { return null; }
+    }
+}
 
 const ranking = require('./ranking');
 const sync = require('./sync');

@@ -4,7 +4,7 @@ const vscode = require('vscode');
 const { updateConfluencePage } = require('../mcp/confluenceApi');
 const { mapFeedbackError } = require('./errMap');
 const { createOpenDocCommand, createMetadataCommands, createSearchCommand, createPromptsCommand, createSkillsCommand, createDeleteCommand, createResetCommand } = require('./commands');
-const { getJiraExtractionRegexes } = require('./tools/llm');
+const { getJiraExtractionRegexes } = require('../mcp/jiraApi');
 
 
 function createSidebarController(deps) {

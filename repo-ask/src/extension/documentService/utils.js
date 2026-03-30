@@ -133,14 +133,9 @@ async function generateStoredMetadataById(docId) {
     throw new Error(`No local content found for document ${docId}.`);
   }
   const annotation = await generateAnnotationWithLlm(metadata, content);
-  const semanticKeywords = cleanKeywords(annotation.keywords, getKeywordConfig().DEFAULT_KEYWORD_LIMIT);
-  // Append new LLM keywords into the semantic slot; preserve all other categories
-  const mergedKeywords = mergeSemanticKeywords(metadata.keywords, semanticKeywords);
-  // Rebuild synonyms from the full updated keyword set
-  mergedKeywords.synonyms = generateSynonyms(flattenCategorizedKeywords(mergedKeywords));
+  // AI gen only updates summary; keywords are managed by the background sync pipeline
   const updatedMetadata = normalizeMetadataKeywordFields({
     ...metadata,
-    keywords: mergedKeywords,
     summary: String(annotation.summary || '').trim()
   });
   writeDocumentFiles(storagePath, metadata.id, content, updatedMetadata);
@@ -156,13 +151,14 @@ function updateStoredMetadataById(docId, patch = {}) {
   if (!content) {
     throw new Error(`No local content found for document ${docId}.`);
   }
-  // Preserve all existing keyword categories (title, structural, bm25, kg)
+  // Preserve all existing keyword categories; only update semantic slot if explicitly provided in patch
   const existingKws = normalizeCategorizedKeywords(metadata.keywords);
-  // Replace semantic slot with user-edited keywords from the patch
-  const manualKeywords = cleanKeywords(patch.keywords, getKeywordConfig().DEFAULT_KEYWORD_LIMIT);
-  const updatedKws = mergeSemanticKeywords(existingKws, manualKeywords);
-  // Rebuild synonyms from the updated full keyword set
-  updatedKws.synonyms = generateSynonyms(flattenCategorizedKeywords(updatedKws));
+  let updatedKws = existingKws;
+  if (patch.keywords !== undefined && patch.keywords !== null) {
+    const manualKeywords = cleanKeywords(patch.keywords, getKeywordConfig().DEFAULT_KEYWORD_LIMIT);
+    updatedKws = mergeSemanticKeywords(existingKws, manualKeywords);
+    updatedKws.synonyms = generateSynonyms(flattenCategorizedKeywords(updatedKws));
+  }
 
   const nextSummary = String(patch.summary || '').trim();
   const nextType = patch.type !== undefined ? String(patch.type || '').trim() : metadata.type;

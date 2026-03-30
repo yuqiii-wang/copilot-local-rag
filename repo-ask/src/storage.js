@@ -174,6 +174,18 @@ function writeDocumentFiles(storagePath, pageId, markdownContent, metadata) {
     fs.writeFileSync(metadataPath, JSON.stringify(normalizedMetadata, null, 2), 'utf8');
 }
 
+function readDocumentMetadata(storagePath, docId) {
+    const metadataPath = getDocumentMetadataPath(storagePath, docId);
+    if (!fs.existsSync(metadataPath)) {
+        return null;
+    }
+    try {
+        return JSON.parse(fs.readFileSync(metadataPath, 'utf8')) || null;
+    } catch {
+        return null;
+    }
+}
+
 function readDocumentContent(storagePath, docId) {
     const markdownPath = getDocumentContentPath(storagePath, docId);
     if (fs.existsSync(markdownPath)) {
@@ -247,6 +259,7 @@ module.exports = {
     getDocumentDirectory,
     getDocumentImagesDirectory,
     readAllMetadata,
+    readDocumentMetadata,
     writeDocumentFiles,
     readDocumentContent,
     deleteDocumentFiles
