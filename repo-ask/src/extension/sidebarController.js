@@ -4,7 +4,7 @@ const vscode = require('vscode');
 const { updateConfluencePage } = require('../mcp/confluenceApi');
 const { mapFeedbackError } = require('./errMap');
 const { createOpenDocCommand, createMetadataCommands, createSearchCommand, createPromptsCommand, createSkillsCommand, createDeleteCommand, createResetCommand } = require('./commands');
-const { generateKnowledgeGraph } = require('./tools/llm');
+const { getJiraExtractionRegexes } = require('./tools/llm');
 
 
 function createSidebarController(deps) {
@@ -117,10 +117,6 @@ function createSidebarController(deps) {
                         await handleGenerateKnowledgeGraph(message);
                     }
 
-                    if (message?.command === 'viewKnowledgeGraph' && message.mermaidText) {
-                        const encoded = Buffer.from(message.mermaidText, 'utf8').toString('base64');
-                        vscode.env.openExternal(vscode.Uri.parse(`https://mermaid.live/edit#base64:${encoded}`));
-                    }
 
                     if (message?.command === 'getDocumentByID' && message.id) {
                         // Find document by ID and return its source URL
@@ -424,8 +420,8 @@ function createSidebarController(deps) {
                 ? feedbackPayload.knowledge_graph.trim()
                 : '';
 
-            // Save the mermaid knowledge graph to the primary document metadata
-            if (knowledgeGraphFromUi && (confluencePageId || jiraId || confluenceLink)) {
+            // Save knowledge graph + relatedPages to the primary document metadata
+            if (confluencePageId || jiraId || confluenceLink) {
                 try {
                     const allMetadata = readAllMetadata(storagePath);
                     let primaryDoc = null;
@@ -444,14 +440,24 @@ function createSidebarController(deps) {
                         const content = readDocumentContent(storagePath, primaryDoc.id);
                         if (content) {
                             const normalizedMeta = documentService.getStoredMetadataById(primaryDoc.id) || primaryDoc;
-                            const updatedMeta = { ...normalizedMeta, knowledgeGraph: knowledgeGraphFromUi };
+                            // Merge secondary URLs into relatedPages
+                            const filteredSecondary = Array.isArray(feedbackPayload.secondaryUrls)
+                                ? feedbackPayload.secondaryUrls.filter(u => String(u || '').trim() && String(u) !== 'none')
+                                : [];
+                            const existingRelated = Array.isArray(normalizedMeta.relatedPages) ? normalizedMeta.relatedPages : [];
+                            const mergedRelated = [...new Set([...existingRelated, ...filteredSecondary])];
+                            const updatedMeta = {
+                                ...normalizedMeta,
+                                ...(knowledgeGraphFromUi ? { knowledgeGraph: knowledgeGraphFromUi } : {}),
+                                relatedPages: mergedRelated
+                            };
                             writeDocumentFiles(storagePath, primaryDoc.id, content, updatedMeta);
                             await documentService.finalizeBm25KeywordsForDocuments([primaryDoc.id]);
-                            console.log('[handleSubmitFeedback] Saved knowledge graph to primary doc:', primaryDoc.id);
+                            console.log('[handleSubmitFeedback] Updated primary doc KG and relatedPages:', primaryDoc.id);
                         }
                     }
                 } catch (saveError) {
-                    console.error('[handleSubmitFeedback] Error saving knowledge graph to primary doc:', saveError);
+                    console.error('[handleSubmitFeedback] Error updating primary doc metadata:', saveError);
                 }
             }
 
@@ -591,58 +597,14 @@ function createSidebarController(deps) {
         }
     }
 
-    async function buildKnowledgeGraphForForm({ sourceQuery, confluencePageId, jiraId, confluenceLink, secondaryUrls, existingKnowledgeGraph: passedKG }) {
-        const urls = Array.isArray(secondaryUrls) ? secondaryUrls.filter(u => u && u !== 'none') : [];
-        const allMetadata = readAllMetadata(storagePath);
-
-        // Collect secondary URL content
-        const contentMap = {};
-        for (const url of urls) {
-            let docContent = '';
-            try {
-                const urlObj = new URL(url);
-                const pageIdMatch = urlObj.search.match(/pageId=(\d+)/);
-                if (pageIdMatch && pageIdMatch[1]) {
-                    const doc = allMetadata.find(d => String(d.id) === String(pageIdMatch[1]));
-                    if (doc) docContent = readDocumentContent(storagePath, doc.id) || '';
-                }
-            } catch (_) {
-                const doc = allMetadata.find(d => String(d.id) === String(url));
-                if (doc) docContent = readDocumentContent(storagePath, doc.id) || '';
-            }
-            contentMap[url] = docContent;
-        }
-
-        // Resolve primary document
-        let primaryDoc = null;
-        if (confluencePageId) primaryDoc = allMetadata.find(d => String(d.id) === String(confluencePageId));
-        if (!primaryDoc && jiraId) primaryDoc = allMetadata.find(d => String(d.id) === String(jiraId));
-        if (!primaryDoc && confluenceLink) {
-            try {
-                const linkUrl = new URL(confluenceLink);
-                const m = linkUrl.search.match(/pageId=(\d+)/);
-                if (m && m[1]) primaryDoc = allMetadata.find(d => String(d.id) === String(m[1]));
-            } catch (_) {}
-        }
-
-        let primaryContent = '';
-        // Use the KG passed from the form (user may have edited it), or fall back to primary doc's stored KG
-        let existingKnowledgeGraph = String(passedKG || '').trim();
-        let referenceQueries = [];
-        if (primaryDoc) {
-            primaryContent = readDocumentContent(storagePath, primaryDoc.id) || '';
-            if (!existingKnowledgeGraph) {
-                existingKnowledgeGraph = String(primaryDoc.knowledgeGraph || '').trim();
-            }
-            referenceQueries = Array.isArray(primaryDoc.referencedQueries) ? primaryDoc.referencedQueries : [];
-        }
-        if (sourceQuery && !referenceQueries.includes(sourceQuery)) {
-            referenceQueries = [...referenceQueries, sourceQuery];
-        }
-
-        return await generateKnowledgeGraph(vscode, referenceQueries, urls, contentMap, {
-            primaryContent,
-            existingKnowledgeGraph
+    async function buildKnowledgeGraphForForm({ sourceQuery, confluencePageId, jiraId, confluenceLink, secondaryUrls, existingKnowledgeGraph: passedKG, conversationSummary }) {
+        return await documentService.buildKnowledgeGraph({
+            primaryDocId: confluencePageId || jiraId || null,
+            confluenceLink: confluenceLink || null,
+            secondaryUrls: Array.isArray(secondaryUrls) ? secondaryUrls : [],
+            referenceQueries: sourceQuery ? [sourceQuery] : [],
+            existingKnowledgeGraph: passedKG,
+            conversationSummary: String(conversationSummary || '').trim() || undefined
         });
     }
 

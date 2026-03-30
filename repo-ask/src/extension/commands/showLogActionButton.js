@@ -4,16 +4,43 @@
 
 module.exports = function createShowLogActionButtonCommand(deps) {
     const { vscode, context, sidebar, documentService, readAllMetadata, storagePath } = deps;
+    const { getJiraExtractionRegexes } = require('../tools/llm');
 
     function normalizeUrl(url) {
         return String(url || '').trim().replace(/[)>.,;]+$/, '').replace(/\/$/, '');
+    }
+
+    function findJiraMatches(text, firstOnly = false) {
+        const found = [];
+        const seen = new Set();
+        const textStr = String(text || '');
+        for (const regex of getJiraExtractionRegexes(vscode)) {
+            const gr = new RegExp(regex.source, regex.flags.includes('i') ? 'gi' : 'g');
+            for (const m of textStr.matchAll(gr)) {
+                const key = m[0].toUpperCase();
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    found.push(key);
+                    if (firstOnly) return found;
+                }
+            }
+        }
+        return found;
+    }
+
+    function isJiraId(str) {
+        const s = String(str || '').trim();
+        return getJiraExtractionRegexes(vscode).some(re => {
+            const anchored = new RegExp('^(?:' + re.source + ')$', re.flags.includes('i') ? 'i' : '');
+            return anchored.test(s);
+        });
     }
 
     function extractChatSignals(text) {
         const rawText = String(text || '');
         return {
             confluenceIds: [...new Set(Array.from(rawText.matchAll(/\b\d{5,}\b/g), match => match[0]))],
-            jiraIds: [...new Set(Array.from(rawText.matchAll(/\b[A-Z][A-Z0-9]+-\d+\b/g), match => match[0].toUpperCase()))],
+            jiraIds: findJiraMatches(rawText),
             urls: [...new Set(Array.from(rawText.matchAll(/https?:\/\/[^\s)\]>'"]+/gi), match => normalizeUrl(match[0])))]
         };
     }
@@ -26,8 +53,8 @@ module.exports = function createShowLogActionButtonCommand(deps) {
 
         const url = String(metadata.url || metadata.link || metadata.source || '').trim();
         const rawId = String(metadata.id || '').trim();
-        const jiraIdFromUrl = url.match(/\b([A-Z][A-Z0-9]+-\d+)\b/);
-        const jiraIdFromTitle = String(metadata.title || '').match(/^([A-Z][A-Z0-9]+-\d+)\b/);
+        const jiraIdFromUrl = findJiraMatches(url, true)[0] || null;
+        const jiraIdFromTitle = findJiraMatches(String(metadata.title || ''), true)[0] || null;
         const isJira = String(metadata.type || '').toLowerCase() === 'jira' || Boolean(jiraIdFromUrl || jiraIdFromTitle);
 
         return {
@@ -36,7 +63,7 @@ module.exports = function createShowLogActionButtonCommand(deps) {
             type: String(metadata.type || '').trim(),
             url,
             confluencePageId: !isJira && /^\d+$/.test(rawId) ? rawId : '',
-            jiraId: isJira ? String((jiraIdFromUrl && jiraIdFromUrl[1]) || (jiraIdFromTitle && jiraIdFromTitle[1]) || '').trim() : ''
+            jiraId: isJira ? String(jiraIdFromUrl || jiraIdFromTitle || '').trim() : ''
         };
     }
 
@@ -70,7 +97,7 @@ module.exports = function createShowLogActionButtonCommand(deps) {
                     type: '',
                     url: aiTopDocMatch[1],
                     confluencePageId: /^\d+$/.test(aiId) ? aiId : '',
-                    jiraId: /^[A-Z][A-Z0-9]+-\d+$/.test(aiId) ? aiId : ''
+                    jiraId: isJiraId(aiId) ? aiId : ''
                 };
             }
         }

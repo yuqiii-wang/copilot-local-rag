@@ -16,15 +16,35 @@ module.exports = function createMetadataCommands(deps) {
         });
         try {
             const updatedMetadata = await documentService.generateStoredMetadataById(docId);
-            upsertSidebarDocument(updatedMetadata);
+
+            // Also generate and save knowledge graph using the same logic as the feedback form
+            let finalMetadata = updatedMetadata;
+            try {
+                const mermaid = await documentService.buildKnowledgeGraph({
+                    primaryDocId: updatedMetadata.confluencePageId || updatedMetadata.jiraId || docId,
+                    confluenceLink: updatedMetadata.url || null,
+                    secondaryUrls: [],
+                    referenceQueries: [],
+                    existingKnowledgeGraph: updatedMetadata.knowledgeGraph || undefined,
+                    conversationSummary: String(updatedMetadata.feedback || updatedMetadata.summary || '').trim() || undefined
+                });
+                if (mermaid) {
+                    await documentService.saveKnowledgeGraph(docId, mermaid);
+                    finalMetadata = { ...updatedMetadata, knowledgeGraph: mermaid };
+                }
+            } catch (kgErr) {
+                console.error('[generateMetadata] KG generation error:', kgErr);
+            }
+
+            upsertSidebarDocument(finalMetadata);
             docsWebviewView.webview.postMessage({
                 command: 'metadataUpdated',
                 payload: {
-                    id: updatedMetadata.id,
-                    metadata: updatedMetadata
+                    id: finalMetadata.id,
+                    metadata: finalMetadata
                 }
             });
-            vscode.window.showInformationMessage(`Generated summary and keywords for: ${updatedMetadata.title || updatedMetadata.id}`);
+            vscode.window.showInformationMessage(`Generated summary and keywords for: ${finalMetadata.title || finalMetadata.id}`);
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to generate metadata: ${error.message}`);
         } finally {

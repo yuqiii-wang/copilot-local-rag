@@ -149,7 +149,8 @@ function normalizeStoredMetadataSchema(docId, metadata) {
         referencedQueries: normalizedReferencedQueries,
         summary: typeof base.summary === 'string' ? base.summary : '',
         feedback: typeof base.feedback === 'string' ? base.feedback : '',
-        knowledgeGraph: typeof base.knowledgeGraph === 'string' ? base.knowledgeGraph : ''
+        knowledgeGraph: typeof base.knowledgeGraph === 'string' ? base.knowledgeGraph : '',
+        relatedPages: Array.isArray(base.relatedPages) ? base.relatedPages : []
     };
     delete result.synonyms;  // legacy field — synonyms now live in keywords.synonyms
     return result;

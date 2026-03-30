@@ -25,16 +25,13 @@ function extractJsonObject(rawText) {
 function getJiraExtractionRegexes(vscode) {
     const configuration = vscode.workspace.getConfiguration('repoAsk');
     const jiraProfile = configuration.get('jira');
-    const configuredList = Array.isArray(jiraProfile?.regex) && jiraProfile.regex.length > 0
-        ? jiraProfile.regex
-        : ['PROJECT-\\d+'];
+    const patternList = Array.isArray(jiraProfile?.regex) ? jiraProfile.regex : [];
 
     const compiled = [];
-    for (const pattern of configuredList) {
+    for (const pattern of patternList) {
         if (typeof pattern !== 'string' || pattern.trim().length === 0) {
             continue;
         }
-
         try {
             compiled.push(new RegExp(pattern, 'i'));
         } catch {
@@ -181,6 +178,7 @@ async function generateKnowledgeGraph(vscode, referenceQueries, secondaryUrls, c
 
         const primaryContent = String(options.primaryContent || '').trim();
         const existingMermaid = String(options.existingKnowledgeGraph || '').trim();
+        const conversationSummary = String(options.conversationSummary || '').trim();
 
         // Prepare content from secondary URLs
         const secondaryContent = (Array.isArray(secondaryUrls) ? secondaryUrls : []).map(url => {
@@ -192,7 +190,7 @@ async function generateKnowledgeGraph(vscode, referenceQueries, secondaryUrls, c
             ? referenceQueries.join('\n')
             : '(none)';
 
-        const instruction = buildKnowledgeGraphPrompt({ queryList, primaryContent, secondaryContent, existingMermaid });
+        const instruction = buildKnowledgeGraphPrompt({ queryList, primaryContent, secondaryContent, existingMermaid, conversationSummary });
 
         const response = await withTimeout(model.sendRequest([
             vscode.LanguageModelChatMessage.User(instruction)
@@ -325,5 +323,6 @@ module.exports = {
     extractJsonObject,
     parseRefreshArg,
     generateKnowledgeGraph,
-    extractMermaidKeywords
+    extractMermaidKeywords,
+    getJiraExtractionRegexes
 };

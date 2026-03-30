@@ -63,11 +63,59 @@ def generate_dummy_data():
         }
     }
 
+    # Jira topic titles and opening sentences used to embed references inside Confluence pages.
+    # Must stay in sync with the jira_topics list defined below.
+    jira_topic_summaries = [
+        ('Fix memory leak in HFT module',            'Trading engine crashes under high load — profiling and memory allocation fixes required'),
+        ('Upgrade FIX protocol library',             'Update QuickFIX engine to version 1.15 to resolve latency spike bugs'),
+        ('Add OAuth2 to oms API',                    'Secure the Order Management System backend endpoints with OAuth2 authentication'),
+        ('Refactor PnL reconciliation job',          'Daily PnL job is timing out — SQL queries and indexing need optimisation'),
+        ('Implement Black-Scholes Greeks',           'Add Delta, Gamma, Theta, Vega, and Rho calculations to the options pricing engine'),
+        ('Create Dockerfile for FX Engine',          'Containerise the Foreign Exchange engine for Kubernetes deployment'),
+        ('Add Prometheus metrics to ledger',         'Expose /metrics endpoint in the Ledger service with transaction counts and error rates'),
+        ('Fix UI sorting in Bond Yield table',       'The frontend yield-to-maturity table currently sorts numbers alphabetically instead of numerically'),
+        ('Migrate market data to Kafka',             'Move from RabbitMQ to Kafka for Bloomberg feed ingestion to meet throughput requirements'),
+        ('Audit SWIFT messaging integration',        'Perform security audit and compliance checks on all SWIFT post-trade message flows'),
+        ('Implement order validation service',       'Create a new microservice for order validation integrating with the risk management system'),
+        ('Optimize market data processing',          'Improve market data processing pipeline performance by implementing parallel stream processing'),
+    ]
+
+    # Map confluence pages to related jira issues
+    # Maps topic index (0-based) to list of jira issue indices (1-based)
+    confluence_to_jira_mapping = {
+        0: [1, 2],           # Equities Trading Platform → HFT memory leak, FIX protocol upgrade
+        1: [5, 9],           # Fixed Income and Bonds → Black-Scholes Greeks, UI sorting fix
+        2: [7],              # FX Engine → Kafka migration
+        3: [5],              # Derivatives and Options → Black-Scholes Greeks
+        4: [4],              # Risk Management System → PnL reconciliation
+        5: [3, 11],          # Order Management System → OAuth2, order validation service
+        6: [4, 8],           # Ledger and Accounting → PnL reconciliation, Prometheus metrics
+        7: [10, 12],         # Market Data Feeds → SWIFT audit, market data optimization
+        8: [12],             # Algorithmic Trading Execution → market data optimization
+        9: [10],             # Settlement and Clearing → SWIFT audit
+        10: [11],            # Trade Execution Workflow → order validation service
+        11: [12]             # Market Data Processing Pipeline → market data optimization
+    }
+
     # Generate Confluence Pages
     for i, topic in enumerate(topics, 1):
         page_id = str(77778881 + i)
         title = topic['title']
         desc = topic['desc']
+        
+        # Get related jira issues for this page
+        related_jira_indices = confluence_to_jira_mapping.get(i - 1, [])
+        jira_references = ''
+        if related_jira_indices:
+            sentences = []
+            for jira_idx in related_jira_indices:
+                jira_key = f'PROJ-{jira_idx}'
+                jira_title, first_sentence = jira_topic_summaries[jira_idx - 1]
+                sentences.append(f'<strong>{jira_key}</strong>: {jira_title} — {first_sentence}.')
+            jira_references = ('<h3>Related Jira Issues</h3><p>'
+                               'The following Jira tickets track the implementation work for this component. '
+                               + ' '.join(sentences) + '</p>')
+        
         confluence_pages[page_id] = {
             'id': page_id,
             'type': 'page',
@@ -78,7 +126,7 @@ def generate_dummy_data():
             },
             'body': {
                 'storage': {
-                    'value': f'<div><h1>{title}</h1><p>{desc}</p><ul><li>Architecture Overview</li><li>API Endpoints</li></ul></div>',
+                    'value': f'<div><h1>{title}</h1><p>{desc}</p>{jira_references}<ul><li>Architecture Overview</li><li>API Endpoints</li></ul></div>',
                     'representation': 'storage'
                 }
             },

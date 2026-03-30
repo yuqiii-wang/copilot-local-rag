@@ -131,26 +131,44 @@ function buildConfluenceIdExtractorPrompt({ promptContext, rawInput }) {
  * @param {{ queryList: string, primaryContent: string, secondaryContent: string, existingMermaid?: string }} vars
  * @returns {string}
  */
-function buildKnowledgeGraphPrompt({ queryList, primaryContent, secondaryContent, existingMermaid }) {
+function buildKnowledgeGraphPrompt({ queryList, primaryContent, secondaryContent, existingMermaid, conversationSummary }) {
     const parts = [
         'You are a knowledge graph builder that outputs Mermaid diagram syntax.',
-        'Your task is to construct a knowledge graph as a Mermaid flowchart from the provided reference queries and document content.',
+        'Produce a BRIEF, FOCUSED graph — quality over quantity. Maximum 5–8 nodes total.',
         '',
-        '## Process',
-        '1. Read the REFERENCE QUERIES below. Extract key entities from them — these are your starting anchor entities.',
-        '2. Explore relationships between these anchor entities and other entities found in the PRIMARY CONTENT and SECONDARY CONTENT.',
-        '3. Focus on non-lexical, semantic relationships (e.g., "depends on", "triggers", "is part of", "manages", "produces", "consumes") rather than simple keyword co-occurrence.',
-        '4. Each node should represent a meaningful entity (system, process, concept, component, role).',
-        '5. Each edge should represent a named relationship.',
+        '## Entity Extraction Rules',
+        '1. The PRIMARY CONTENT is the source document — make it the central node.',
+        '2. From PRIMARY CONTENT, extract the 2 MOST IMPORTANT entities/concepts/systems mentioned. Only those that are explicitly discussed or critical to understanding the document.',
+        '3. From each SECONDARY CONTENT source (if any), extract the 1–2 most important entities referenced in that source only. Place them in a dedicated subgraph for that source.',
+        '4. Do NOT extract every term, framework, or technology mentioned. Extract ONLY the core entities central to the content.',
+        '5. If primary or secondary content lacks meaningful entities to connect, use a single node for the document itself instead.',
+        '',
+        '## Edge Label Rules',
+        '6. Edge labels must describe the ACTUAL SEMANTIC RELATIONSHIP found in the content between two entities.',
+        '   Infer the label from HOW the entities interact in the content, such as:',
+        '   - Specific APIs or endpoints they use (e.g. "via /api/auth")',
+        '   - Protocols or channels (e.g. "via REST API", "via gRPC", "via message queue")',
+        '   - Conditional triggers or events (e.g. "triggered by event X", "when condition Y is met")',
+        '   - Data flow or dependencies (e.g. "queries database", "calls", "publishes to")',
+        '   - Design patterns or architectural relationships (e.g. "orchestrates", "delegates", "provides")',
+        '   - Be concrete and specific. If the content describes HOW they connect, use that specific mechanism as the edge label.',
+        '   - If no clear mechanism is described, do not include the edge. Only connect entities if the content explicitly shows their relationship.',
+        '',
+        '## Subgraph Organization',
+        '8. All nodes derived from SECONDARY CONTENT (extended/secondary URLs) MUST be placed inside a Mermaid subgraph.',
+        '   Use one subgraph per secondary URL, labelled with a short document name.',
+        '   Example:',
+        '     subgraph Related["Related: DocName"]',
+        '       NodeA[Entity Name]',
+        '     end',
         ''
     ];
 
     if (existingMermaid) {
         parts.push(
             '## Existing Knowledge Graph',
-            'An existing Mermaid diagram is provided below. You MUST preserve all existing entities and relationships.',
-            'You are encouraged to ADD new entities and new relationships discovered from the current queries and content.',
-            'Only remove an existing entity if you are absolutely certain it is incorrect or contradicted by the new content.',
+            'Preserve existing cross-reference nodes and edges. Only add new entities from the current content.',
+            'Remove any node that is NOT a cross-reference derived from actual content.',
             '',
             '```mermaid',
             existingMermaid,
@@ -162,17 +180,20 @@ function buildKnowledgeGraphPrompt({ queryList, primaryContent, secondaryContent
     parts.push(
         '## Output Format',
         'Return ONLY a valid Mermaid flowchart diagram (no wrapping markdown code fences, no explanation).',
-        'Start with "graph TD" or "graph LR".',
-        'Use descriptive node IDs (e.g., FXEngine, TradeProcessor) and quoted labels where needed.',
-        'Use arrow labels for relationships: A -->|relationship| B',
+        'Start with "graph LR".',
+        'Use short node IDs and quoted labels where needed.',
+        'Use arrow labels for relationships: A -->|implements| B',
         '',
-        '## Reference Queries (anchor entities)',
+        '## Reference Queries',
         queryList,
         '',
-        '## Primary Content',
-        primaryContent ? primaryContent.slice(0, 3000) : '(none)',
+        '## Primary Content (source document)',
+        primaryContent || '(none)',
         '',
-        '## Secondary Content',
+        '## Conversation Summary (additional context about how this document was used)',
+        conversationSummary ? conversationSummary.slice(0, 1000) : '(none)',
+        '',
+        '## Secondary Content (content of related docs)',
         secondaryContent || '(none)'
     );
 

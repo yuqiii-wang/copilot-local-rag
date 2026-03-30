@@ -152,6 +152,8 @@ module.exports = function createRefreshCommand(deps) {
                 // Track feedback targets and source-query mapping for metadata updates.
                 const referenceQueries = new Set();
                 const sourceQueriesByTarget = new Map();
+                // Secondary URLs: only union referenced queries, never fully refresh (no KG/summary overwrite).
+                const secondarySourceQueriesByTarget = new Map();
                 
                 try {
                     // Get the feedback Confluence page URL from configuration
@@ -217,15 +219,14 @@ module.exports = function createRefreshCommand(deps) {
                                 }
                             }
 
-                            // Register secondary docs with the same source query
+                            // Register secondary docs: only union referenced queries, do not fully refresh.
                             for (const secondaryTarget of rowSecondaryUrls) {
                                 const target = secondaryTarget.trim();
                                 if (!target) continue;
-                                referenceQueries.add(target);
                                 if (sourceQuery) {
-                                    const currentQueries = sourceQueriesByTarget.get(target) || new Set();
+                                    const currentQueries = secondarySourceQueriesByTarget.get(target) || new Set();
                                     currentQueries.add(sourceQuery);
-                                    sourceQueriesByTarget.set(target, currentQueries);
+                                    secondarySourceQueriesByTarget.set(target, currentQueries);
                                 }
                             }
                         });
@@ -331,6 +332,14 @@ module.exports = function createRefreshCommand(deps) {
                     }
                 }
                 
+                // For secondary URLs: only merge referenced queries without overwriting KG/summary/etc.
+                if (secondarySourceQueriesByTarget.size > 0) {
+                    const latestMetadataForSecondary = readAllMetadata(storagePath);
+                    for (const [target, queries] of secondarySourceQueriesByTarget) {
+                        mergeReferencedQueriesIntoMetadata(target, queries, latestMetadataForSecondary);
+                    }
+                }
+
                 if (referencedQueryUpdates > 0) {
                     sidebar.setSidebarSyncStatus(`Reference queries loaded successfully (${referencedQueryUpdates} metadata updates)`);
                 } else {

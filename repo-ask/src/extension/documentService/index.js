@@ -12,6 +12,7 @@ const annotation = require('./annotation');
 const images = require('./images');
 const keywords = require('./keywords');
 const utils = require('./utils');
+const knowledgeGraph = require('./knowledgeGraph');
 
 function createDocumentService(deps) {
   const {
@@ -46,6 +47,7 @@ function createDocumentService(deps) {
   const _annotation = annotation(proxyContext); Object.assign(context, _annotation);
   const _sync = sync(proxyContext); Object.assign(context, _sync);
   const _ranking = ranking(proxyContext); Object.assign(context, _ranking);
+  const _knowledgeGraph = knowledgeGraph(proxyContext); Object.assign(context, _knowledgeGraph);
 
   return {
     syncDefaultDocs: _sync.syncDefaultDocs,
@@ -62,7 +64,9 @@ function createDocumentService(deps) {
     updateStoredMetadataById: _utils.updateStoredMetadataById,
     removeDocumentFromIndicesById: _utils.removeDocumentFromIndicesById,
     writeDocumentPromptFile: _utils.writeDocumentPromptFile,
-    writeDocumentSkillFile: _utils.writeDocumentSkillFile
+    writeDocumentSkillFile: _utils.writeDocumentSkillFile,
+    buildKnowledgeGraph: _knowledgeGraph.buildKnowledgeGraph,
+    saveKnowledgeGraph: _knowledgeGraph.saveKnowledgeGraph
   };
 }
 

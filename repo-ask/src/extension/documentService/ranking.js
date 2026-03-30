@@ -68,7 +68,16 @@ module.exports = function(context) {
     const KW  = SW.keywords                || {};
     const SYN = SW.synonyms                || {};
 
-    const allMetadata = readAllMetadata(storagePath);
+    const feedbackUrl = String(config.get('logActionConfluenceUrl') || '').trim().replace(/\/$/, '');
+    const allMetadata = readAllMetadata(storagePath).filter(m => {
+      if (!feedbackUrl) return true;
+      const docUrl = String(m.url || '').trim().replace(/\/$/, '');
+      return !docUrl || (
+        !feedbackUrl.includes(docUrl) &&
+        !docUrl.includes(feedbackUrl) &&
+        !feedbackUrl.endsWith(`/${String(m.id)}`)
+      );
+    });
     if (!allMetadata.length) return [];
     console.log(`[RepoAsk] loaded ${allMetadata.length} docs from store`);
 

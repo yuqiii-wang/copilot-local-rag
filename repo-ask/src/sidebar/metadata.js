@@ -7,6 +7,7 @@
         const keywordsInputEl = document.getElementById('keywords-input');
         const tagsInputEl = document.getElementById('tags-input');
         const referencedQueriesListEl = document.getElementById('referenced-queries-list');
+        const relatedPagesListEl = document.getElementById('related-pages-list');
         const typeInputEl = document.getElementById('type-input');
         const knowledgeGraphInputEl = document.getElementById('knowledge-graph-input');
         const metadataPaneEl = document.querySelector('.metadata-pane');
@@ -20,7 +21,7 @@
                 return [];
             }
             return Object.entries(metadata)
-                .filter(([key]) => key !== 'summary' && key !== 'keywords' && key !== 'tags' && key !== 'referencedQueries' && key !== 'type' && key !== 'knowledgeGraph')
+                .filter(([key]) => key !== 'summary' && key !== 'keywords' && key !== 'tags' && key !== 'referencedQueries' && key !== 'type' && key !== 'knowledgeGraph' && key !== 'relatedPages')
                 .map(([key, value]) => {
                     if (Array.isArray(value)) return { key, value: value.join(', ') };
                     if (value && typeof value === 'object') return { key, value: JSON.stringify(value) };
@@ -117,6 +118,20 @@
                 }
             }
 
+            // Render related pages as a read-only list
+            if (relatedPagesListEl) {
+                const related = selectedMetadata && Array.isArray(selectedMetadata.relatedPages)
+                    ? selectedMetadata.relatedPages.filter(p => p)
+                    : [];
+                if (related.length > 0) {
+                    relatedPagesListEl.innerHTML = related.map(page => `
+                        <li class="referenced-query-item">${escapeHtml(page)}</li>
+                    `).join('');
+                } else {
+                    relatedPagesListEl.innerHTML = '<li class="referenced-query-item">No related pages</li>';
+                }
+            }
+
             if (metadataListEl) {
                 if (items.length === 0) {
                     metadataListEl.innerHTML = '<li class="metadata-item">title: -</li>';
@@ -166,6 +181,16 @@
                 setMetadataEditMode(false);
             });
         }
+
+        document.querySelectorAll('.metadata-section-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const group = btn.closest('.metadata-field-group');
+                if (!group) return;
+                const isContracted = group.classList.toggle('contracted');
+                btn.textContent = isContracted ? '\u25B6' : '\u25BC';
+                btn.title = isContracted ? 'Expand' : 'Collapse';
+            });
+        });
 
         window.addEventListener('message', event => {
             const message = event.data;

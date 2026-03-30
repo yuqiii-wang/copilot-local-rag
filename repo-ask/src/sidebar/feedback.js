@@ -400,21 +400,12 @@ function initFeedbackForm() {
                 jiraId,
                 confluenceLink: document.getElementById('confluence-link')?.value || '',
                 secondaryUrls,
-                existingKnowledgeGraph
+                existingKnowledgeGraph,
+                conversationSummary: document.getElementById('conversation-summary')?.value?.trim() || ''
             });
         });
     }
 
-    // View Diagram button handler
-    const viewKgBtn = document.getElementById('view-kg-btn');
-    if (viewKgBtn) {
-        viewKgBtn.addEventListener('click', () => {
-            const mermaidText = document.getElementById('knowledge-graph-raw')?.value?.trim() || '';
-            if (mermaidText) {
-                vscode.postMessage({ command: 'viewKnowledgeGraph', mermaidText });
-            }
-        });
-    }
 }
 
 function escapeRegExp(value) {
@@ -524,10 +515,6 @@ function showFeedbackForm(firstUserQuery, selectedDocumentOrUrl, fullAiResponse,
         if (kgRawField) {
             kgRawField.value = selectedDocument.knowledgeGraph;
         }
-        const viewKgBtn = document.getElementById('view-kg-btn');
-        if (viewKgBtn) {
-            viewKgBtn.style.display = 'inline-block';
-        }
     }
     
     // Set the username field with the provided username, default to anonymous if not provided
@@ -570,10 +557,6 @@ function populateKnowledgeGraph(mermaid) {
     const rawField = document.getElementById('knowledge-graph-raw');
     if (rawField) {
         rawField.value = mermaid || '';
-    }
-    const viewKgBtn = document.getElementById('view-kg-btn');
-    if (viewKgBtn) {
-        viewKgBtn.style.display = mermaid ? 'inline-block' : 'none';
     }
     // Re-enable KG generate button
     const generateKgBtn = document.getElementById('generate-kg-btn');
@@ -637,8 +620,7 @@ window.addEventListener('message', (event) => {
             // Reset knowledge graph section
             const kgRawField = document.getElementById('knowledge-graph-raw');
             if (kgRawField) kgRawField.value = '';
-            const viewKgBtnEl = document.getElementById('view-kg-btn');
-            if (viewKgBtnEl) viewKgBtnEl.style.display = 'none';
+
 
             settleSubmitState(submitBtn, true, 'Submit');
 

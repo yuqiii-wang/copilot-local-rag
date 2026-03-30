@@ -4,7 +4,7 @@ module.exports = function(context) {
     readDocumentContent, localizeMarkdownImageLinks, getKeywordConfig, cleanKeywords, getStoredMetadataById,
     getPageHtml, isLikelyHtml, extractHtmlTagData, resolveSourceUrl, tokenization2bm25,
     buildCategorizedKeywords, normalizeCategorizedKeywords, flattenCategorizedKeywords } = context;
-  const { extractMermaidKeywords } = require('../tools/llm');
+  const { extractMermaidKeywords, getJiraExtractionRegexes } = require('../tools/llm');
   const { extractMdKeywords } = require('./md2keywords');
 
   // Builds structural keywords from document content + title.
@@ -13,6 +13,19 @@ module.exports = function(context) {
     const mdKeywords = extractMdKeywords(String(docText || ''));
     const titleKeywords = tokenize(String(title || ''));
     return [...titleKeywords, ...mdKeywords];
+  }
+
+  // Extracts all Jira issue keys explicitly referenced in text, using the configured jira.regex settings.
+  function extractJiraReferences(text) {
+    const found = new Set();
+    const textStr = String(text || '');
+    for (const regex of getJiraExtractionRegexes(vscode)) {
+      const gr = new RegExp(regex.source, regex.flags.includes('i') ? 'gi' : 'g');
+      for (const match of textStr.matchAll(gr)) {
+        found.add(match[0].toUpperCase());
+      }
+    }
+    return [...found];
   }
 
 async function refreshDocument(pageArg, options = {}) {
@@ -102,6 +115,8 @@ async function processDocument(page) {
     synonymNGrams: generateSynonyms(flattenCategorizedKeywords(baseKeywords))
   });
 
+  const referencedJiraIds = extractJiraReferences(markdownContent);
+
   const baseMetadata = {
     id: page.id,
     title,
@@ -115,7 +130,9 @@ async function processDocument(page) {
     tags: Array.isArray(existingMetadata.tags) ? existingMetadata.tags : [],
     feedback: String(existingMetadata.feedback || '').trim(),
     referencedQueries: Array.isArray(existingMetadata.referencedQueries) ? existingMetadata.referencedQueries : [],
-    knowledgeGraph: kgMermaid
+    referencedJiraIds,
+    knowledgeGraph: kgMermaid,
+    relatedPages: Array.isArray(existingMetadata.relatedPages) ? existingMetadata.relatedPages : []
   };
   const metadata = {
     ...existingMetadata,
@@ -162,6 +179,7 @@ async function processJiraIssue(issue) {
 
   const baseMetadata = {
     id: issue?.id,
+    issueKey,
     title,
     author: reporter,
     last_updated: String(fields?.updated || new Date().toISOString().slice(0, 10)).slice(0, 10),
@@ -173,7 +191,8 @@ async function processJiraIssue(issue) {
     tags: Array.isArray(existingMetadata.tags) ? existingMetadata.tags : [],
     feedback: String(existingMetadata.feedback || '').trim(),
     referencedQueries: Array.isArray(existingMetadata.referencedQueries) ? existingMetadata.referencedQueries : [],
-    knowledgeGraph: kgMermaid
+    knowledgeGraph: kgMermaid,
+    relatedPages: Array.isArray(existingMetadata.relatedPages) ? existingMetadata.relatedPages : []
   };
   const metadata = {
     ...existingMetadata,

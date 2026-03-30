@@ -7,26 +7,71 @@
                         <button id="metadata-edit-toggle-btn" class="action-btn" type="button" disabled>Edit</button>
                     </div>
                 </div>
-                <label class="metadata-label" for="type-input">Type</label>
-                <select id="type-input" class="metadata-select" disabled>
-                    <option value="confluence">Confluence</option>
-                    <option value="jira">Jira</option>
-                    <option value="skill">Skill</option>
-                    <option value="custom">Custom</option>
-                </select>
-                <label class="metadata-label" for="summary-input">Summary</label>
-                <textarea id="summary-input" class="metadata-textarea" rows="3" placeholder="Summary is empty. Generate or edit it."></textarea>
-                <label class="metadata-label" for="keywords-input">Keywords (comma separated)</label>
-                <textarea id="keywords-input" class="metadata-textarea metadata-textarea-keywords" rows="2" placeholder="keyword-a, keyword-b"></textarea>
-                <label class="metadata-label" for="tags-input">Tags (comma separated)</label>
-                <textarea id="tags-input" class="metadata-textarea metadata-textarea-keywords" rows="2" placeholder="tag-a, tag-b"></textarea>
-                <label class="metadata-label">Referenced Queries</label>
-                <ul id="referenced-queries-list" class="referenced-queries-list">
-                    <li class="referenced-query-item">No referenced queries</li>
-                </ul>
-                <label class="metadata-label" for="knowledge-graph-input">Knowledge Graph (Mermaid)</label>
-                <textarea id="knowledge-graph-input" class="metadata-textarea" rows="6" placeholder="No knowledge graph generated yet." disabled></textarea>
-                <ul id="metadata-list" class="metadata-list">
-                    <li class="metadata-item">title: -</li>
-                </ul>
+                <div class="metadata-field-group">
+                    <div class="metadata-field-header">
+                        <label class="metadata-label" for="type-input">Type</label>
+                        <button class="metadata-section-btn" type="button" title="Collapse">&#9660;</button>
+                    </div>
+                    <select id="type-input" class="metadata-select" disabled>
+                        <option value="confluence">Confluence</option>
+                        <option value="jira">Jira</option>
+                        <option value="skill">Skill</option>
+                        <option value="custom">Custom</option>
+                    </select>
+                </div>
+                <div class="metadata-field-group">
+                    <div class="metadata-field-header">
+                        <label class="metadata-label" for="summary-input">Summary</label>
+                        <button class="metadata-section-btn" type="button" title="Collapse">&#9660;</button>
+                    </div>
+                    <textarea id="summary-input" class="metadata-textarea" rows="3" placeholder="Summary is empty. Generate or edit it."></textarea>
+                </div>
+                <div class="metadata-field-group">
+                    <div class="metadata-field-header">
+                        <label class="metadata-label" for="keywords-input">Keywords (comma separated)</label>
+                        <button class="metadata-section-btn" type="button" title="Collapse">&#9660;</button>
+                    </div>
+                    <textarea id="keywords-input" class="metadata-textarea metadata-textarea-keywords" rows="2" placeholder="keyword-a, keyword-b"></textarea>
+                </div>
+                <div class="metadata-field-group">
+                    <div class="metadata-field-header">
+                        <label class="metadata-label" for="tags-input">Tags (comma separated)</label>
+                        <button class="metadata-section-btn" type="button" title="Collapse">&#9660;</button>
+                    </div>
+                    <textarea id="tags-input" class="metadata-textarea metadata-textarea-keywords" rows="2" placeholder="tag-a, tag-b"></textarea>
+                </div>
+                <div class="metadata-field-group">
+                    <div class="metadata-field-header">
+                        <label class="metadata-label">Referenced Queries</label>
+                        <button class="metadata-section-btn" type="button" title="Collapse">&#9660;</button>
+                    </div>
+                    <ul id="referenced-queries-list" class="referenced-queries-list">
+                        <li class="referenced-query-item">No referenced queries</li>
+                    </ul>
+                </div>
+                <div class="metadata-field-group">
+                    <div class="metadata-field-header">
+                        <label class="metadata-label">Related Pages</label>
+                        <button class="metadata-section-btn" type="button" title="Collapse">&#9660;</button>
+                    </div>
+                    <ul id="related-pages-list" class="referenced-queries-list">
+                        <li class="referenced-query-item">No related pages</li>
+                    </ul>
+                </div>
+                <div class="metadata-field-group">
+                    <div class="metadata-field-header">
+                        <label class="metadata-label" for="knowledge-graph-input">Knowledge Graph (Mermaid)</label>
+                        <button class="metadata-section-btn" type="button" title="Collapse">&#9660;</button>
+                    </div>
+                    <textarea id="knowledge-graph-input" class="metadata-textarea" rows="6" placeholder="No knowledge graph generated yet." disabled></textarea>
+                </div>
+                <div class="metadata-field-group">
+                    <div class="metadata-field-header">
+                        <label class="metadata-label">Details</label>
+                        <button class="metadata-section-btn" type="button" title="Collapse">&#9660;</button>
+                    </div>
+                    <ul id="metadata-list" class="metadata-list">
+                        <li class="metadata-item">title: -</li>
+                    </ul>
+                </div>
             </section>
