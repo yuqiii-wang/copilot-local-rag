@@ -1,0 +1,16 @@
+2026-04-01 09:15:22.001 INFO  [main] com.security.trading.TradingSystemApplication - Starting TradingSystemApplication v2.7.1-RELEASE
+2026-04-01 09:15:27.334 INFO  [main] com.security.trading.TradingSystemApplication - Successfully started TradingSystemApplication in 5.333 seconds (JVM running for 6.002)
+2026-04-01 09:30:01.112 INFO  [http-nio-8080-exec-1] com.security.trading.oms.OmsService - [OMS-2026-00251] New order received: symbol=MSFT, side=BUY, qty=3000, price=415.00, type=LIMIT, TIF=DAY, algo=TWAP
+2026-04-01 09:30:01.156 INFO  [http-nio-8080-exec-1] com.security.trading.oms.OmsService - [OMS-2026-00251] Routing decision: notional=1245000.00, route=ALGO_ENGINE:TWAP
+2026-04-01 09:30:01.201 INFO  [http-nio-8080-exec-1] com.security.trading.oms.OmsService - [OMS-2026-00251] Order EXECUTED: fillPrice=414.990 (slippage=-0.24bps), latencyMs=312
+2026-04-01 09:31:14.445 INFO  [http-nio-8080-exec-2] com.security.trading.algo.AlgoService - Strategy ACTIVATED: id=ALGO-00201, type=TWAP, window=09:30:00-15:30:00 EDT
+2026-04-01 09:32:50.678 INFO  [http-nio-8080-exec-3] com.security.trading.oms.OmsService - [OMS-2026-00252] New order received: symbol=NVDA, side=SELL, qty=1500, price=875.50, type=LIMIT, TIF=GTC
+2026-04-01 09:32:50.712 INFO  [http-nio-8080-exec-3] com.security.trading.oms.OmsService - [OMS-2026-00252] Order EXECUTED: fillPrice=875.480 (slippage=-0.02bps), latencyMs=267
+2026-04-01 09:35:33.890 INFO  [http-nio-8080-exec-4] com.security.trading.fixedincome.FixedIncomeService - Bond metrics calculation requested: ISIN=US38141GXZ26, faceValue=1000.00, couponRate=3.8750%, marketPrice=97.2500
+2026-04-01 09:35:33.945 DEBUG [http-nio-8080-exec-4] com.security.trading.fixedincome.FixedIncomeService - ISIN=US38141GXZ26: cleanPrice=97.2500, accruedInterest=0.6250, dirtyPrice=97.8750
+2026-04-01 09:35:34.012 INFO  [http-nio-8080-exec-4] com.security.trading.fixedincome.FixedIncomeService - ISIN=US38141GXZ26: YTM (Newton-Raphson, 7Y) = 4.2156%, MacaulayDuration=6.1234 years, ModifiedDuration=5.8701 years
+2026-04-01 09:38:12.234 INFO  [http-nio-8080-exec-5] com.security.trading.derivatives.DerivativesService - Black-Scholes pricing: type=PUT, underlying=QQQ, S=445.10, K=440.00, T=0.5Y, r=4.5000%, sigma=20.50%
+2026-04-01 09:38:12.289 INFO  [http-nio-8080-exec-5] com.security.trading.derivatives.DerivativesService - PUT price = 14.2345, Greeks: delta=-0.4123, gamma=0.00891, theta=-0.028/day, vega=21.3400/1%vol
+2026-04-01 09:41:05.567 INFO  [http-nio-8080-exec-6] com.security.trading.fx.FxService - FX order: buy=5000000 EUR, sell=USD, rate=1.0834, notional_usd=5417000.00, settlement=2026-04-03 T+2
+2026-04-01 09:44:30.890 INFO  [http-nio-8080-exec-7] com.security.trading.oms.OmsService - [OMS-2026-00267] New order received: symbol=AMZN, side=BUY, qty=800, price=196.75, type=MARKET
+2026-04-01 09:44:30.934 INFO  [http-nio-8080-exec-7] com.security.trading.oms.OmsService - [OMS-2026-00267] Order EXECUTED: fillPrice=196.810 (slippage=+0.30bps), latencyMs=198

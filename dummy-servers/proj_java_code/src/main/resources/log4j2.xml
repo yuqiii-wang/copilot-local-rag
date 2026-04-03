@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN">
+    <Appenders>
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n"/>
+        </Console>
+        
+        <!-- Main trading system log -->
+        <RollingFile name="TradingSystemLog"
+                     fileName="logs/trading-system.log"
+                     filePattern="logs/trading-system-%d{yyyy-MM-dd}-%i.log.gz">
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+                <SizeBasedTriggeringPolicy size="50MB"/>
+            </Policies>
+            <DefaultRolloverStrategy max="30"/>
+        </RollingFile>
+        
+        <!-- Error scenarios log -->
+        <RollingFile name="ErrorScenariosLog"
+                     fileName="logs/error-scenarios.log"
+                     filePattern="logs/error-scenarios-%d{yyyy-MM-dd}-%i.log.gz">
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+                <SizeBasedTriggeringPolicy size="50MB"/>
+            </Policies>
+            <DefaultRolloverStrategy max="30"/>
+        </RollingFile>
+        
+        <!-- Settlement processing log -->
+        <RollingFile name="SettlementLog"
+                     fileName="logs/settlement-processing.log"
+                     filePattern="logs/settlement-processing-%d{yyyy-MM-dd}-%i.log.gz">
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+                <SizeBasedTriggeringPolicy size="50MB"/>
+            </Policies>
+            <DefaultRolloverStrategy max="30"/>
+        </RollingFile>
+        
+        <!-- Risk management log -->
+        <RollingFile name="RiskManagementLog"
+                     fileName="logs/risk-management.log"
+                     filePattern="logs/risk-management-%d{yyyy-MM-dd}-%i.log.gz">
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+                <SizeBasedTriggeringPolicy size="50MB"/>
+            </Policies>
+            <DefaultRolloverStrategy max="30"/>
+        </RollingFile>
+        
+        <!-- Market data sync log -->
+        <RollingFile name="MarketDataLog"
+                     fileName="logs/market-data-sync.log"
+                     filePattern="logs/market-data-sync-%d{yyyy-MM-dd}-%i.log.gz">
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+                <SizeBasedTriggeringPolicy size="50MB"/>
+            </Policies>
+            <DefaultRolloverStrategy max="30"/>
+        </RollingFile>
+    </Appenders>
+    
+    <Loggers>
+        <!-- OMS Service Logger -->
+        <Logger name="com.security.trading.oms" level="DEBUG" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="TradingSystemLog"/>
+            <AppenderRef ref="ErrorScenariosLog"/>
+        </Logger>
+        
+        <!-- Settlement Service Logger -->
+        <Logger name="com.security.trading.settlement" level="DEBUG" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="SettlementLog"/>
+        </Logger>
+        
+        <!-- Risk Service Logger -->
+        <Logger name="com.security.trading.risk" level="DEBUG" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="RiskManagementLog"/>
+            <AppenderRef ref="ErrorScenariosLog"/>
+        </Logger>
+        
+        <!-- Market Data Service Logger -->
+        <Logger name="com.security.trading.marketdata" level="DEBUG" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="MarketDataLog"/>
+        </Logger>
+        
+        <!-- Fixed Income Service Logger -->
+        <Logger name="com.security.trading.fixedincome" level="DEBUG" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="TradingSystemLog"/>
+            <AppenderRef ref="ErrorScenariosLog"/>
+        </Logger>
+        
+        <!-- Derivatives Service Logger -->
+        <Logger name="com.security.trading.derivatives" level="DEBUG" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="TradingSystemLog"/>
+            <AppenderRef ref="ErrorScenariosLog"/>
+        </Logger>
+        
+        <!-- Algo Service Logger -->
+        <Logger name="com.security.trading.algo" level="DEBUG" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="TradingSystemLog"/>
+            <AppenderRef ref="ErrorScenariosLog"/>
+        </Logger>
+        
+        <!-- Ledger Service Logger -->
+        <Logger name="com.security.trading.ledger" level="DEBUG" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="SettlementLog"/>
+            <AppenderRef ref="ErrorScenariosLog"/>
+        </Logger>
+        
+        <!-- All Trading Services -->
+        <Logger name="com.security.trading" level="DEBUG" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="TradingSystemLog"/>
+        </Logger>
+        
+        <Root level="INFO">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="TradingSystemLog"/>
+        </Root>
+    </Loggers>
+</Configuration>

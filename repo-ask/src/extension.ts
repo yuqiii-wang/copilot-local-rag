@@ -181,12 +181,13 @@ function setupExtension(context: any) {
 
                 const loggedPrompts = context.globalState.get('repoAsk.loggedPrompts', []);
 
-                if (request.command === 'skill') {
+                if (request.command === 'production-support') {
                     await runSkillCommand(vscode, prompt, response, {
                         documentService,
                         readAllMetadata: () => readAllMetadata(storagePath),
                         readDocumentContent: (id: string) => readDocumentContent(storagePath, id),
-                        storagePath
+                        storagePath,
+                        extensionPath: context.extensionPath
                     }, { request });
                 } else if (isAdvanced) {
                     await runAdvancedDocSearch(vscode, prompt, response, {

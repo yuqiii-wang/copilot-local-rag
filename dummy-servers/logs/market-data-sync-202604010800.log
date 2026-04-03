@@ -1,0 +1,13 @@
+2026-04-01 08:00:01.001 INFO  [marketdata-sync-1] com.security.trading.marketdata.MarketDataService - Pre-market data sync started: syncTime=2026-04-01 08:00:01 EDT
+2026-04-01 08:00:01.045 INFO  [marketdata-sync-1] com.security.trading.marketdata.MarketDataService - Data source connections: Bloomberg=CONNECTED, Reuters=CONNECTED, ICE=CONNECTED, CME=CONNECTED, CBOE=CONNECTED
+2026-04-01 08:00:15.234 DEBUG [marketdata-sync-1] com.security.trading.marketdata.MarketDataService - Pre-market load: totalSymbols=12456, loaded=12450, missing=6 (exotic_EM), latency_ms=13800
+2026-04-01 08:05:00.456 INFO  [marketdata-sync-1] com.security.trading.marketdata.MarketDataService - Futures pre-market: ES1={price=5244.25, change=+5.50, change%=+0.105%}, NQ1={price=18412.00, change=+32.00, change%=+0.174%}
+2026-04-01 08:05:00.489 DEBUG [marketdata-sync-1] com.security.trading.marketdata.MarketDataService - Fair value calc: ES1 fair_value = SPX_close * (1 + rf*T - div_yield*T) = 5234.67 * (1 + 0.045*0.0027 - 0.013*0.0027) = 5234.99
+2026-04-01 08:10:22.678 INFO  [marketdata-sync-1] com.security.trading.marketdata.MarketDataService - Overnight bond moves: UST_10Y={yield=4.22%, change=-3bps vs prior close}, UST_2Y={yield=4.61%, change=-4bps}
+2026-04-01 08:10:22.712 DEBUG [marketdata-sync-1] com.security.trading.marketdata.MarketDataService - Yield curve shape: 2-10 spread = 4.22 - 4.61 = -0.39% (inverted), 10-30 spread = 4.22 - 4.55 = -0.33% (inverted)
+2026-04-01 08:15:45.890 INFO  [marketdata-sync-1] com.security.trading.marketdata.MarketDataService - Overnight FX: EURUSD={rate=1.0834, change=-0.0042 vs prior}, GBPUSD={rate=1.2613, change=+0.0021}, USDJPY={rate=151.34, change=-0.87}
+2026-04-01 08:20:30.234 INFO  [marketdata-sync-1] com.security.trading.marketdata.MarketDataService - VIX pre-market: VIX=16.82, change=-0.43 (-2.49%), term_structure=[VIX1M=16.8, VIX3M=17.4, VIX6M=18.1] (contango)
+2026-04-01 08:20:30.267 DEBUG [marketdata-sync-1] com.security.trading.marketdata.MarketDataService - Implied vol context: VIX=16.82 implies daily move ~1.06% (VIX/sqrt(252) = 16.82/15.87)
+2026-04-01 08:30:15.567 INFO  [marketdata-sync-1] com.security.trading.marketdata.MarketDataService - Pre-market equity activity: AAPL={pre_mkt=177.45, vs_close=+0.35, vol=320000}, NVDA={pre_mkt=874.20, vs_close=-1.30, vol=180000}
+2026-04-01 08:45:00.890 INFO  [marketdata-sync-1] com.security.trading.marketdata.MarketDataService - Data quality pre-open: dataLag_max=380ms, dataLag_avg=95ms, gaps=0, stale_symbols=6 (exotic_EM), qualityScore=99.95%
+2026-04-01 09:25:30.234 INFO  [marketdata-sync-1] com.security.trading.marketdata.MarketDataService - 5-min pre-open snapshot: spy_implied_open=522.80 (SPX=5234.67), sector_sentiment=[TECH+0.2%, FINANCIALS+0.4%, ENERGY-0.1%]

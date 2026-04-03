@@ -1,0 +1,44 @@
+{
+  "id": "production-support-main-skill",
+  "title": "Production Support Main Skill",
+  "summary": "Privacy-safe production log investigation. Takes the structured scan plan from production-support-plan as its guide: seeds keywords from COMMON_ERROR_WORDS and incident domain, LLM self-filters extracted identifiers via guess_pattern(), expands keywords from local code, runs N×M parallel async log scans, correlates hit timestamps, and produces a root-cause incident summary with traced URLs.",
+  "type": "skill",
+  "author": "Platform Engineering",
+  "tags": [
+    "production-support",
+    "incident-response",
+    "log-scanning",
+    "privacy",
+    "keyword-extraction",
+    "troubleshooting",
+    "runbook",
+    "devops"
+  ],
+  "scripts": {
+    "entrypoint": "scripts/main.py",
+    "libs": ["scripts/urls.py", "scripts/rules.py"],
+    "note": "Only main.py is executable. urls.py and rules.py are library modules imported by main.py."
+  },
+  "keywords": {
+    "title": { "1gram": {}, "2gram": {}, "3gram": {}, "4gram": {} },
+    "structural": { "1gram": {}, "2gram": {}, "3gram": {}, "4gram": {} },
+    "semantic": { "1gram": {}, "2gram": {}, "3gram": {}, "4gram": {} },
+    "bm25":     { "1gram": {}, "2gram": {}, "3gram": {}, "4gram": {} },
+    "kg":       { "1gram": {}, "2gram": {}, "3gram": {}, "4gram": {} },
+    "synonyms": { "1gram": {}, "2gram": {}, "3gram": {}, "4gram": {} }
+  },
+  "referencedQueries": [
+    "production issue troubleshooting",
+    "log scan for ISIN or order ID",
+    "incident response log investigation",
+    "keyword search in production logs",
+    "privacy safe log analysis",
+    "LLM token extraction from user query",
+    "api failures",
+    "performance degradation",
+    "root cause analysis",
+    "correlate log timestamps"
+  ],
+  "knowledgeGraph": "graph TD\n  A[Scan Plan] --> B[Step 1: Build Keywords]\n  B --> C[Step 2: Run Scanner]\n  C --> D{New entities?}\n  D -->|yes| B\n  D -->|no| E[Step 3: Interpret + Summarize]\n  E --> F[Root Cause + Timeline + Traced URLs]",
+  "last_updated": "2026-04-02"
+}

@@ -1,5 +1,56 @@
+import fs from 'fs';
 import path from 'path';
 import { selectDefaultChatModel, withTimeout, LLM_RESPONSE_TIMEOUT_MS, emitThinking } from './shared';
+
+const PROD_PLAN_ID = 'production-support-plan-skill';
+const PROD_MAIN_ID = 'production-support-main-skill';
+
+// Mirrors sanitizeFileSegment in utils.ts — used to predict the SKILL.md path.
+function sanitizeSkillTitle(title: string): string {
+    return String(title || 'item').toLowerCase().replace(/[^a-z0-9-_ ]+/g, '').trim().replace(/\s+/g, '-').slice(0, 64) || 'item';
+}
+
+/**
+ * Ensures production-support-plan and production-support-main skill files exist in
+ * <workspace>/.github/skills/. If either is absent from the docstore it is first
+ * synced from the bundled default_docs, then written to .github/skills/ exactly
+ * as if the user clicked "Add to Skills" in the sidebar.
+ */
+function ensureDefaultSkills(
+    vscodeApi: any,
+    deps: {
+        documentService: any;
+        readAllMetadata: () => any[];
+        readDocumentContent: (id: string) => string | null;
+        extensionPath: string;
+    }
+): void {
+    const { documentService, readAllMetadata, readDocumentContent, extensionPath } = deps;
+    const DEFAULT_IDS = [PROD_PLAN_ID, PROD_MAIN_ID];
+
+    let allMeta = readAllMetadata();
+    const missingFromStorage = DEFAULT_IDS.filter(id => !allMeta.find((m: any) => String(m.id) === id));
+    if (missingFromStorage.length > 0) {
+        documentService.syncDefaultDocs(extensionPath);
+        allMeta = readAllMetadata();
+    }
+
+    const workspaceRoot = vscodeApi.workspace.workspaceFolders?.[0]?.uri?.fsPath;
+    if (!workspaceRoot) return;
+
+    for (const id of DEFAULT_IDS) {
+        const meta = allMeta.find((m: any) => String(m.id) === id);
+        if (!meta) continue;
+        const safeTitle = sanitizeSkillTitle(meta.title || id);
+        const skillFilePath = path.join(workspaceRoot, '.github', 'skills', safeTitle, 'SKILL.md');
+        if (!fs.existsSync(skillFilePath)) {
+            const content = readDocumentContent(id);
+            if (content && content.trim().length > 0) {
+                documentService.writeDocumentSkillFile(meta, content);
+            }
+        }
+    }
+}
 
 /**
  * Skill command handler for @repoask /skill.
@@ -18,15 +69,21 @@ async function runSkillCommand(
         readAllMetadata: () => any[];
         readDocumentContent: (id: string) => string | null;
         storagePath: string;
+        extensionPath: string;
     },
     options: { request?: any } = {}
 ) {
-    const { documentService, readAllMetadata, readDocumentContent, storagePath } = deps;
+    const { documentService, readAllMetadata, readDocumentContent, storagePath, extensionPath } = deps;
 
     if (!vscodeApi.lm || !vscodeApi.LanguageModelChatMessage) {
         response.markdown('No language model is available in this VS Code session.');
         return;
     }
+
+    // Ensure production-support plan & main skills are present in .github/skills/
+    ensureDefaultSkills(vscodeApi, { documentService, readAllMetadata, readDocumentContent, extensionPath });
+
+    const PLAN_SKILL_ID = PROD_PLAN_ID;
 
     // ── 1. Collect all skill-type docs ───────────────────────────────────────
     const allMeta = readAllMetadata();
@@ -40,19 +97,20 @@ async function runSkillCommand(
         return;
     }
 
-    emitThinking(response, `Searching ${skillDocs.length} skill(s) for the best match...`);
+    // ── 2. Force production-support-plan as the starting skill ───────────────
+    let topSkillMeta: any = skillDocs.find((m: any) => String(m.id) === PLAN_SKILL_ID);
 
-    // ── 2. Rank all docs, then filter to skill IDs to find the best match ────
-    const skillIdSet = new Set(skillDocs.map((m: any) => String(m.id)));
-    const ranked = documentService.rankLocalDocuments(prompt, skillDocs.length * 3);
-    const rankedSkills = (ranked || []).filter((d: any) => skillIdSet.has(String(d.id)));
-
-    let topSkillMeta: any;
-    if (rankedSkills.length > 0) {
-        topSkillMeta = skillDocs.find((m: any) => String(m.id) === String(rankedSkills[0].id));
+    if (!topSkillMeta) {
+        // Fallback: rank remaining skills if plan doc is not present
+        emitThinking(response, `production-support-plan skill not found — searching ${skillDocs.length} skill(s) for the best match...`);
+        const skillIdSet = new Set(skillDocs.map((m: any) => String(m.id)));
+        const ranked = documentService.rankLocalDocuments(prompt, skillDocs.length * 3);
+        const rankedSkills = (ranked || []).filter((d: any) => skillIdSet.has(String(d.id)));
+        topSkillMeta = rankedSkills.length > 0
+            ? skillDocs.find((m: any) => String(m.id) === String(rankedSkills[0].id))
+            : skillDocs[0];
     } else {
-        // No ranking match — fall back to first available skill
-        topSkillMeta = skillDocs[0];
+        emitThinking(response, `Starting with production support plan skill...`);
     }
 
     // ── 3. Load skill content ────────────────────────────────────────────────

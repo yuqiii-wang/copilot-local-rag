@@ -1,0 +1,15 @@
+2026-04-01 13:00:04.112 INFO  [http-nio-8080-exec-1] com.security.trading.oms.OmsService - [OMS-2026-00391] New order received: symbol=GOOGL, side=BUY, qty=2000, price=172.25, type=LIMIT, TIF=GTC, algo=VWAP
+2026-04-01 13:00:04.156 INFO  [http-nio-8080-exec-1] com.security.trading.oms.OmsService - [OMS-2026-00391] Routing decision: notional=344500.00, route=ALGO_ENGINE:VWAP
+2026-04-01 13:00:04.201 INFO  [http-nio-8080-exec-1] com.security.trading.oms.OmsService - [OMS-2026-00391] Order EXECUTED: fillPrice=172.230 (slippage=-0.12bps), latencyMs=289
+2026-04-01 13:02:33.445 INFO  [http-nio-8080-exec-2] com.security.trading.fixedincome.FixedIncomeService - Bond trade: ISIN=US912828ZL72, side=BUY, qty=2000000 (face), price=99.125, yield=4.1230%, accrued=0.4375, dirtyPrice=99.5625
+2026-04-01 13:02:33.489 DEBUG [http-nio-8080-exec-2] com.security.trading.fixedincome.FixedIncomeService - ISIN=US912828ZL72: DV01=1.88 per bp, Convexity=67.23, SpreadOverBenchmark=+21.5bps
+2026-04-01 13:05:12.678 INFO  [http-nio-8080-exec-3] com.security.trading.oms.OmsService - [OMS-2026-00395] New order received: symbol=SPY, side=SELL, qty=10000, price=523.50, type=LIMIT, TIF=IOC
+2026-04-01 13:05:12.723 INFO  [http-nio-8080-exec-3] com.security.trading.oms.OmsService - [OMS-2026-00395] Partial fill: filledQty=7500, remainingQty=2500, fillPrice=523.485, latencyMs=156
+2026-04-01 13:05:12.756 INFO  [http-nio-8080-exec-3] com.security.trading.oms.OmsService - [OMS-2026-00395] IOC order: cancelled remaining 2500 shares (IOC expiry)
+2026-04-01 13:09:45.234 INFO  [http-nio-8080-exec-4] com.security.trading.fx.FxService - FX trade: GBPUSD, side=SELL GBP, qty=8000000, rate=1.2613, USD_proceeds=10090400.00, settlement=T+2
+2026-04-01 13:09:45.278 DEBUG [http-nio-8080-exec-4] com.security.trading.fx.FxService - FX spread captured: bid=1.2612, ask=1.2614, mid=1.2613, spread=0.0002 (1.59bps), fee=8008.00 USD
+2026-04-01 13:14:22.567 INFO  [http-nio-8080-exec-5] com.security.trading.derivatives.DerivativesService - Options strategy: IRON_CONDOR on SPY, legs=[BUY_515P, SELL_520P, SELL_525C, BUY_530C], net_premium=-2.34 (credit)
+2026-04-01 13:14:22.612 INFO  [http-nio-8080-exec-5] com.security.trading.derivatives.DerivativesService - Strategy risk profile: max_gain=234.00, max_loss=-266.00, breakevens=[517.66, 527.34], delta=-0.018
+2026-04-01 13:18:55.890 INFO  [http-nio-8080-exec-6] com.security.trading.algo.AlgoService - Backtest complete: id=BT-00201, strategyId=ALGO-00201, totalReturn=9.7812%, Sharpe=1.0234, maxDrawdown=6.4511%, winRate=71.00%
+2026-04-01 13:22:30.234 INFO  [http-nio-8080-exec-7] com.security.trading.oms.OmsService - [OMS-2026-00412] New order received: symbol=META, side=BUY, qty=4500, price=590.00, type=LIMIT, TIF=GTC
+2026-04-01 13:22:30.278 INFO  [http-nio-8080-exec-7] com.security.trading.oms.OmsService - [OMS-2026-00412] Order EXECUTED: fillPrice=589.950 (slippage=-0.08bps), latencyMs=245

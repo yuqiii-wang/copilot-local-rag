@@ -24,8 +24,8 @@
         "description": "RepoAsk chat for general questions from the document store",
         "commands": [
           {
-            "name": "skill",
-            "description": "Find the most relevant skill doc from your docstore and run it against your query"
+            "name": "production-support",
+            "description": "Run production support planning using the production-support-plan skill as the starting point"
           }
         ]
       }

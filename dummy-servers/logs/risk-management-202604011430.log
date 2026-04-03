@@ -1,0 +1,13 @@
+2026-04-01 14:30:00.001 INFO  [risk-monitor-1] com.security.trading.risk.RiskService - Afternoon risk snapshot: portfolioValue=428900000.00, VaR99=29.41M (6.86%), status=BREACH (threshold=6.75%)
+2026-04-01 14:30:00.034 ERROR [risk-monitor-1] com.security.trading.risk.RiskService - RISK ALERT: Intraday VaR BREACH: VaR99=29.41M (6.86%) exceeds threshold=28.98M (6.75%), breachAmount=0.43M, action=ESCALATE
+2026-04-01 14:30:00.067 WARN  [risk-monitor-1] com.security.trading.risk.RiskService - Risk escalation: severity=HIGH, notification=sent to Chief Risk Officer, audit_log=RISK-BREACH-2026-0401-001
+2026-04-01 14:31:22.234 INFO  [risk-monitor-1] com.security.trading.risk.RiskService - Sector drilldown: TECH intraday increase +2.1M (NVDA +1.2%, META +0.9%), current=187.3M (43.67%)
+2026-04-01 14:31:22.267 WARN  [risk-monitor-1] com.security.trading.risk.RiskService - SECTOR CONCENTRATION WARNING: TECH exposure=43.67% vs limit=40%, breach widened to 3.67%
+2026-04-01 14:35:45.567 INFO  [risk-monitor-1] com.security.trading.risk.RiskService - Emergency position reduction order issued: reduce TECH sector by 18.5M, target exposure=39.3%
+2026-04-01 14:40:30.890 INFO  [risk-monitor-1] com.security.trading.risk.RiskService - Position reduction complete: sold NVDA=8.2M, META=5.1M, MSFT=5.2M, new TECH exposure=168.8M (39.36%), within limit
+2026-04-01 14:40:30.923 INFO  [risk-monitor-1] com.security.trading.risk.RiskService - Post-reduction VaR: portfolioValue=410400000.00, VaR99=27.88M (6.79%), status=MARGINAL (just within 6.75% threshold at 6.79%)
+2026-04-01 14:45:00.234 WARN  [risk-monitor-1] com.security.trading.risk.RiskService - COUNTERPARTY WARNING: MS (Morgan Stanley) utilization=94.2% (47.1M / 50M limit), recommend no new hedges with MS today
+2026-04-01 15:00:00.567 INFO  [risk-monitor-1] com.security.trading.risk.RiskService - Stress test rerun post-reduction: loss=7950000.00 (1.94%), status=WITHIN_LIMIT
+2026-04-01 15:00:00.601 INFO  [risk-monitor-1] com.security.trading.risk.RiskService - Risk dashboard update: VaR99=27.88M, riskScore=6.9/10.0, status=YELLOW → GREEN pending close
+2026-04-01 15:30:00.890 INFO  [risk-monitor-1] com.security.trading.risk.RiskService - Derivative Greeks summary: delta_total=-0.189 (net SHORT), gamma=0.00512, vega=42.3, theta=-12.4/day, rho=51.2
+2026-04-01 15:30:00.923 INFO  [risk-monitor-1] com.security.trading.risk.RiskService - 1% rate shock = -2.9M PnL, 1% vol shock = +1.9M PnL, 1% FX shock = -0.7M PnL

@@ -1,0 +1,15 @@
+2026-04-01 08:45:12.334 ERROR [http-nio-8080-exec-1] com.security.trading.oms.OmsController - Invalid order request: symbol field is null or empty. Request: {side=SELL, qty=500, price=0.00}
+2026-04-01 08:46:03.567 WARN  [http-nio-8080-exec-2] com.security.trading.oms.OmsService - [OMS-2026-00201] Order price validation warning: price=0.01 is below minimum tick for NYSE, rounding to 0.01
+2026-04-01 08:47:55.890 ERROR [http-nio-8080-exec-3] com.security.trading.connectivity.ExchangeConnector - FIX session FAILED to connect: sessionId=FIX-NYSE-01, broker=NYSE, reason=ConnectionRefusedException after 3 retries
+2026-04-01 08:47:56.012 WARN  [http-nio-8080-exec-3] com.security.trading.connectivity.ExchangeConnector - Falling back to secondary FIX session: sessionId=FIX-NYSE-02, estimated_recovery=30s
+2026-04-01 08:48:31.234 INFO  [http-nio-8080-exec-3] com.security.trading.connectivity.ExchangeConnector - Secondary FIX session CONNECTED: sessionId=FIX-NYSE-02, latency=12ms
+2026-04-01 08:51:45.678 ERROR [http-nio-8080-exec-4] com.security.trading.risk.RiskService - Risk check FAILED: tradeId=CHECK-2026-00301, riskScore=118.90 exceeds threshold=50.00, action=TRADE_REJECTED
+2026-04-01 08:51:45.712 WARN  [http-nio-8080-exec-4] com.security.trading.risk.RiskService - Counterparty limit breach: counterpartyId=MS-007, currentExposure=3100000.00 > creditLimit=3000000.00, breachAmount=100000.00
+2026-04-01 08:53:22.890 ERROR [http-nio-8080-exec-5] com.security.trading.fixedincome.FixedIncomeService - Bond pricing exception: ISIN=BAD-ISIN-001, exception=ISINFormatException: Invalid ISIN format, expected 12 chars, got 11
+2026-04-01 08:54:11.223 ERROR [http-nio-8080-exec-6] com.security.trading.marketdata.MarketDataService - Market data sync FAILED on startup: source=REUTERS, exception=ConnectionTimeoutException: timeout after 30000ms, attempt=1/3
+2026-04-01 08:54:41.445 WARN  [http-nio-8080-exec-6] com.security.trading.marketdata.MarketDataService - Retrying Reuters connection with exponential backoff: nextRetry=2026-04-01 08:55:11
+2026-04-01 08:55:11.678 INFO  [http-nio-8080-exec-6] com.security.trading.marketdata.MarketDataService - Reuters connection RESTORED: recoveryRate=94.2%, failedSymbols=[EXOTIC-EM-3], dataLag=620ms
+2026-04-01 08:56:30.890 ERROR [http-nio-8080-exec-7] com.security.trading.algo.AlgoService - Strategy activation FAILED: strategyId=ALGO-00112, reason=InsufficientDataException: Only 38 bars available, minimum=252
+2026-04-01 08:56:30.912 ERROR [http-nio-8080-exec-7] com.security.trading.algo.AlgoService - Strategy CANNOT be activated due to failed backtest: id=ALGO-00112, status=INACTIVE
+2026-04-01 08:58:01.234 ERROR [http-nio-8080-exec-8] com.security.trading.fx.FxService - FX conversion failed: fromCurrency=ZZZ, toCurrency=USD, exception=UnknownCurrencyException
+2026-04-01 08:59:45.567 WARN  [http-nio-8080-exec-9] com.security.trading.fx.FxService - FX rate stale: currency_pair=USDJPY, lastUpdate=2026-03-30 18:00:00, age=51600 seconds (14.3 hours), attempting fallback rate

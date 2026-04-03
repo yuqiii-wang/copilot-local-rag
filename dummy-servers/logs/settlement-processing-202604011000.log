@@ -1,0 +1,13 @@
+2026-04-01 10:00:03.001 INFO  [settlement-mgr-1] com.security.trading.settlement.SettlementService - Settlement batch initiated: batchId=SETT-BATCH-2026-0401-001, totalTrades=1874, totalValue=65200000.00, T+0 trades=187, T+1 trades=1687
+2026-04-01 10:00:03.034 DEBUG [settlement-mgr-1] com.security.trading.settlement.SettlementService - Settlement parameters: DVP=true, cutoffTime=17:00:00 EDT, settlementDate=2026-04-01, RVP_enabled=false
+2026-04-01 10:00:18.234 INFO  [settlement-mgr-1] com.security.trading.settlement.SettlementService - Validating trade instructions: total=1874, passed=1868, failed=6, rejectionRate=0.32%
+2026-04-01 10:00:18.267 WARN  [settlement-mgr-1] com.security.trading.settlement.SettlementService - Failed instructions: tradeIds=[SE-2026-00341, SE-2026-00511, SE-2026-00634, SE-2026-00782, SE-2026-00890, SE-2026-01023], causes=[INVALID_ISIN, MISSING_SETTLEMENT_ACCT, INVALID_COUNTERPARTY, MISSING_SETTLEMENT_ACCT, INCOMPLETE_DATA, INVALID_ISIN]
+2026-04-01 10:00:55.567 INFO  [settlement-mgr-1] com.security.trading.settlement.SettlementService - Cash settlement: USD=65200000.00, EUR=4130000.00, GBP=1850000.00
+2026-04-01 10:01:30.890 INFO  [settlement-mgr-1] com.security.trading.settlement.SettlementService - Securities settlement: total=1868, withCustodian=1402, withDTC=466, withEuroclear=0
+2026-04-01 10:01:55.234 INFO  [settlement-mgr-1] com.security.trading.settlement.SettlementService - Custody reconciliation: custodianId=CUSTODIAN-BNY, settlementDate=2026-04-01, window=2 days
+2026-04-01 10:01:55.267 DEBUG [settlement-mgr-1] com.security.trading.settlement.SettlementService - Position reconciliation: ourRecords=1402, custodianRecords=1402, discrepancy=0, status=MATCHED
+2026-04-01 10:02:30.567 INFO  [settlement-mgr-1] com.security.trading.settlement.SettlementService - FX netting: EURUSD_net=8900000.00 EUR (net BUY), netSettlement=8900000.00*1.0834=9642260.00 USD
+2026-04-01 10:03:15.890 INFO  [settlement-mgr-1] com.security.trading.settlement.SettlementService - Status update: processed=934, pending=934, failed=6, success_rate=99.36%, estimated_completion=2026-04-01 16:30:00
+2026-04-01 10:04:05.234 INFO  [settlement-mgr-1] com.security.trading.settlement.SettlementService - Settlement completion: completedAt=2026-04-01 10:04:05, totalProcessed=1868, totalValue=74092260.00, settlementFee=7409.23
+2026-04-01 10:04:05.267 DEBUG [settlement-mgr-1] com.security.trading.settlement.SettlementService - Fee calculation: settlementFee = 74092260.00 * 0.0001 = 7409.23
+2026-04-01 10:04:30.567 INFO  [settlement-mgr-1] com.security.trading.settlement.SettlementService - Cash reconciliation: beginningCash=142000000.00, incomingCash=74092260.00, outgoingCash=65200000.00, endingCash=150892260.00

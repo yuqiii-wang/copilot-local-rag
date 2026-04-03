@@ -1,0 +1,44 @@
+{
+  "id": "production-support-plan-skill",
+  "title": "Production Support Plan Skill",
+  "summary": "Pre-investigation planning: calls list_log_descriptions() to discover available logs and their summaries, optionally searches internal docs via repoask_doc_check, selects relevant services, interprets the time window, and presents a human-reviewable scan plan. The user approves the plan to trigger production-support-main.",
+  "type": "skill",
+  "author": "Platform Engineering",
+  "tags": [
+    "production-support",
+    "incident-response",
+    "planning",
+    "log-discovery",
+    "triage",
+    "privacy",
+    "devops",
+    "doc-search"
+  ],
+  "scripts": {
+    "entrypoint": "scripts/urls.py",
+    "note": "Call list_log_descriptions(env) to discover available logs. No main.py needed for planning."
+  },
+  "keywords": {
+    "title": { "1gram": {}, "2gram": {}, "3gram": {}, "4gram": {} },
+    "structural": { "1gram": {}, "2gram": {}, "3gram": {}, "4gram": {} },
+    "semantic": { "1gram": {}, "2gram": {}, "3gram": {}, "4gram": {} },
+    "bm25":     { "1gram": {}, "2gram": {}, "3gram": {}, "4gram": {} },
+    "kg":       { "1gram": {}, "2gram": {}, "3gram": {}, "4gram": {} },
+    "synonyms": { "1gram": {}, "2gram": {}, "3gram": {}, "4gram": {} }
+  },
+  "referencedQueries": [
+    "production incident triage",
+    "which logs to scan for issue",
+    "identify relevant log files",
+    "what urls to trace for incident",
+    "plan log investigation",
+    "time window from user query",
+    "log discovery before scanning",
+    "extract identifiers from query",
+    "search internal docs for runbook",
+    "find related documentation for incident",
+    "review investigation plan before running"
+  ],
+  "knowledgeGraph": "graph TD\n  A[User Incident Query] --> B[Step 1: List Logs + Optional Doc Search]\n  B --> C[Select Services + Time Window]\n  C --> D{User Approves?}\n  D -->|edit| C\n  D -->|yes| E[production-support-main]",
+  "last_updated": "2026-04-02"
+}

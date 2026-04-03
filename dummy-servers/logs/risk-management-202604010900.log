@@ -1,0 +1,12 @@
+2026-04-01 09:00:00.001 INFO  [risk-monitor-1] com.security.trading.risk.RiskService - Daily risk monitoring started: monitoringDate=2026-04-01, marketOpen=2026-04-01 09:30:00, marketClose=2026-04-01 16:00:00
+2026-04-01 09:00:00.034 DEBUG [risk-monitor-1] com.security.trading.risk.RiskService - Risk limit parameters: VaR95=6.00%, VaR99=8.50%, CS_sector_max=40.00%, CS_counterparty_max=35.00%, notional_limit=500M USD
+2026-04-01 09:05:12.456 INFO  [risk-monitor-1] com.security.trading.risk.RiskService - Opening portfolio snapshot: portfolioValue=431500000.00, instrument_count=312, currency_exposure=[USD=72.1%, EUR=14.3%, GBP=8.2%, JPY=5.4%]
+2026-04-01 09:15:23.678 INFO  [risk-monitor-1] com.security.trading.risk.RiskService - Portfolio VaR snapshot: portfolioValue=431500000.00, VaR95=20.31M (4.71%), VaR99=27.22M (6.31%), status=WITHIN_LIMIT
+2026-04-01 09:15:23.712 DEBUG [risk-monitor-1] com.security.trading.risk.RiskService - VaR99 = 431500000.00 * 2.3263 * 0.1485 * sqrt(1) = 149.0M (annual) → 27.22M (1-day: annual/sqrt(252))
+2026-04-01 09:25:45.890 INFO  [risk-monitor-1] com.security.trading.risk.RiskService - Sector concentration: TECH=185.2M (42.92%), FINANCIALS=91.8M (21.28%), HEALTHCARE=69.4M (16.09%), ENERGY=48.6M (11.27%), OTHER=36.5M (8.44%)
+2026-04-01 09:25:45.923 WARN  [risk-monitor-1] com.security.trading.risk.RiskService - SECTOR CONCENTRATION WARNING: TECH sector exposure=42.92% exceeds limit=40%, breach=2.92%, action=MONITOR
+2026-04-01 09:35:10.234 INFO  [risk-monitor-1] com.security.trading.risk.RiskService - Counterparty exposure: GS=43.8M (10.15%), JPM=41.2M (9.55%), BLK=33.7M (7.81%), MS=29.4M (6.82%), BAC=27.1M (6.28%)
+2026-04-01 09:35:10.267 DEBUG [risk-monitor-1] com.security.trading.risk.RiskService - Top 5 counterparties: 175.2M (40.60%), limit=40%, status=MARGINAL_BREACH (+0.60%)
+2026-04-01 09:45:30.567 INFO  [risk-monitor-1] com.security.trading.risk.RiskService - Stress test PARALLEL_SHIFT_2%: current=431500000.00, stressed=423070000.00, loss=8430000.00 (1.95%), status=WITHIN_LIMIT
+2026-04-01 10:00:00.890 INFO  [risk-monitor-1] com.security.trading.risk.RiskService - Risk dashboard: timestamp=2026-04-01 10:00:00, VaR99=27.22M, riskScore=6.8/10.0, status=YELLOW (Elevated)
+2026-04-01 10:00:00.923 INFO  [risk-monitor-1] com.security.trading.risk.RiskService - Recommendation: REDUCE TECH exposure (42.92% vs limit 40%), WATCH GS credit (87.6% utilized), rebalance to ENERGY or UTILITIES
