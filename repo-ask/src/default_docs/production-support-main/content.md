@@ -13,23 +13,16 @@ The key change from the flat format is that **keywords and time windows live ins
 
 ```json
 {
-  "incident_summary": "<one-sentence description>",
-  "environment": "<environment>",
+  "incident_summary": "<one-sentence description of the incident>",
+  "environment": "<environment-name>",
   "original_query": "<verbatim user query>",
-  "extracted_identifiers": ["US0378331005"],
+  "extracted_identifiers": ["<raw-identifier-from-query>"],
   "scan_tasks": [
     {
-      "log_url": "http://<log-server>/logTail/trading-system?file=trading-system-<timestamp>.log",
-      "words": ["/orders/", "oms system", "routing", "fill"],
+      "log_url": "<base-url>/logTail/<prefix>?file=<prefix>-<timestamp>.log",
+      "words": ["<token-from-query>", "<log-message-literal-from-source-code>"],
       "time_ranges": [
-        {"start": "2026-04-01 09:00:00.000", "end": "2026-04-01 13:00:00.000"}
-      ]
-    },
-    {
-      "log_url": "<LOG_SCANNER_BASE_URL>/logTail/error-scenarios?file=error-scenarios-<timestamp>.log",
-      "words": ["unhandled", "fault", "rejection"],
-      "time_ranges": [
-        {"start": "2026-04-01 09:00:00.000", "end": "2026-04-01 13:00:00.000"}
+        {"start": "<YYYY-MM-DD HH:MM:SS.mmm>", "end": "<YYYY-MM-DD HH:MM:SS.mmm>"}
       ]
     }
   ]
@@ -72,7 +65,7 @@ Search the project source tree for the following patterns and extract their **li
 | `throw new …Exception("…")` | Exception message literal |
 | `@RequestMapping` / `@GetMapping` / `@PostMapping` value | Route path string |
 
-Strip format placeholders (`{}`, `%s`) from extracted strings. Keep only fragments whose topic is semantically relevant to the selected log's description (e.g. settlement-related error messages for the settlement log, OMS route paths for the trading-system log).
+Strip format placeholders (`{}`, `%s`) from extracted strings. Keep only fragments whose topic is semantically relevant to the selected log's description (e.g. `<domain>-related error messages for the <domain> log, <service> route paths for the <service-name> log`).
 
 Do **not** include `COMMON_ERROR_WORDS` in the plan — pass `--seed` to `main.py` instead so they are prepended automatically.
 
@@ -80,10 +73,10 @@ Do **not** include `COMMON_ERROR_WORDS` in the plan — pass `--seed` to `main.p
 
 | Raw value | `guess_pattern()` result |
 |---|---|
-| `US0378331005` | `[A-Z]{2}[A-Z0-9]{9}[0-9]` |
-| `ORD-00412` | `ORD(?:ER)?-\d+` |
-| `TRD-20260401001` | `TRD-\d+` |
-| `$102.50` | `\$?\d+\.\d{2}` |
+| `<ISIN-like alphanumeric>` | `[A-Z]{2}[A-Z0-9]{9}[0-9]` |
+| `<ORDER-prefix-ID>` | `<PREFIX>(?:ER)?-\d+` |
+| `<TRADE-prefix-ID>` | `<PREFIX>-\d+` |
+| `<decimal-currency-amount>` | `\$?\d+\.\d{2}` |
 
 ---
 
@@ -160,10 +153,10 @@ The scanner returns grouped dictionary `log_name → keyword → [timestamps]`. 
 
 ```json
 {
-  "trading-system-202604011300.log": {
-    "US0378331005": ["2026-04-01 09:44:03.666"],
-    "error":        ["2026-04-01 09:44:03.666", "2026-04-01 09:45:55.817"],
-    "/orders/":     ["2026-04-01 09:45:55.817"]
+  "<log-filename>.log": {
+    "<identifier-from-query>": ["<YYYY-MM-DD HH:MM:SS.mmm>"],
+    "<keyword-A>": ["<YYYY-MM-DD HH:MM:SS.mmm>", "<YYYY-MM-DD HH:MM:SS.mmm>"],
+    "<keyword-B>": ["<YYYY-MM-DD HH:MM:SS.mmm>"]
   }
 }
 ```
@@ -206,8 +199,8 @@ The log server (`/logTail/{component}?file={filename}`) accepts the following qu
 | `f` | `HH:MM` | Return lines from this time onwards (inclusive) |
 | `t` | `HH:MM` | Return lines up to this time (inclusive) |
 
-Parameters can be combined, e.g. `?file=app.log&f=09:00&t=13:00&i=ERROR&n=500`.
-`f`/`t` are applied before `n`; `i` returns JSON matches, `e` filters plain-text output.
+Parameters can be combined, e.g. `?file=<logfile>&f=<HH:MM>&t=<HH:MM>&i=<include-text>&n=<N>`.
+`f`/`t` are applied before `n`; `i` and `e` both return plain-text output.
 
 ### Scripts
 
@@ -225,14 +218,14 @@ python scripts/main.py --plan plan.json --seed
 python scripts/main.py --plan plan.json --seed --round 2 --max-rounds 5
 
 # Plan mode — inline JSON
-python scripts/main.py --plan '{"scan_tasks": [{"log_url": "http://127.0.0.1:8093/logTail/trading-system?file=trading-system-202604011300.log", "words": ["/orders/"], "time_ranges": [{"start": "2026-04-01 09:00:00.000", "end": "2026-04-01 13:00:00.000"}]}], "original_query": "", "extracted_identifiers": []}' --seed
+python scripts/main.py --plan '{"scan_tasks": [{"log_url": "<base-url>/logTail/<prefix>?file=<prefix>-<timestamp>.log", "words": ["<keyword>"], "time_ranges": [{"start": "<YYYY-MM-DD HH:MM:SS.mmm>", "end": "<YYYY-MM-DD HH:MM:SS.mmm>"}]}], "original_query": "<query>", "extracted_identifiers": []}' --seed
 
 # Flat mode — ad-hoc, all logs share one keyword list
 python scripts/main.py \
   --log-urls \
-      http://127.0.0.1:8093/logTail/trading-system?file=trading-system-202604011300.log \
-      http://127.0.0.1:8093/logTail/error-scenarios?file=error-scenarios-202604011515.log \
-  --time-ranges '[{"start": "2026-04-01 09:00:00.000", "end": "2026-04-01 12:00:00.000"}, {"start": "2026-04-01 14:00:00.000", "end": "2026-04-01 17:00:00.000"}]' \
+      <base-url>/logTail/<prefix-1>?file=<prefix-1>-<timestamp>.log \
+      <base-url>/logTail/<prefix-2>?file=<prefix-2>-<timestamp>.log \
+  --time-ranges '[{"start": "<YYYY-MM-DD HH:MM:SS.mmm>", "end": "<YYYY-MM-DD HH:MM:SS.mmm>"}, {"start": "<YYYY-MM-DD HH:MM:SS.mmm>", "end": "<YYYY-MM-DD HH:MM:SS.mmm>"}]' \
   --seed
 ```
 
@@ -240,7 +233,7 @@ python scripts/main.py \
 
 | Variable | Description |
 |---|---|
-| `LOG_SCANNER_BASE_URL` | Base URL of the log-scanning service (default: `http://localhost:8080`) |
+| `LOG_SCANNER_BASE_URL` | Base URL of the log-scanning service (default: `<logtail-base-url>`) |
 | `LOG_SCANNER_TOKEN` | Bearer token for the scanning service (optional) |
 
 ---
